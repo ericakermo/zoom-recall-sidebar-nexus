@@ -62,29 +62,63 @@ export const loadZoomSDK = async () => {
     }
     
     console.log('Loading Zoom SDK...');
+    
+    // Use polling to check for ZoomMtg availability
     return new Promise<boolean>((resolve, reject) => {
-      const zoomScript = document.createElement('script');
-      zoomScript.src = 'https://source.zoom.us/2.18.0/zoom-meeting-embedded-2.18.0.min.js';
-      zoomScript.async = false; // Important: Load in sequence, not async
-      zoomScript.onload = () => {
-        console.log('Zoom SDK loaded successfully');
+      // Track if we've already loaded the script to prevent duplicate loading
+      const isScriptLoaded = Array.from(document.getElementsByTagName('script')).some(
+        script => script.src.includes('zoom-meeting-embedded-2.18.0.min.js')
+      );
+      
+      if (!isScriptLoaded) {
+        const zoomScript = document.createElement('script');
+        zoomScript.src = 'https://source.zoom.us/2.18.0/zoom-meeting-embedded-2.18.0.min.js';
+        zoomScript.async = false; // Important: Load in sequence, not async
+        document.head.appendChild(zoomScript);
+      }
+      
+      // Set up polling mechanism to check for ZoomMtg availability
+      const maxAttempts = 20; // Maximum number of polling attempts
+      let attempts = 0;
+      const pollInterval = 300; // Poll every 300ms
+      
+      // Function to check if ZoomMtg is available
+      const checkZoomMtgAvailability = () => {
+        attempts++;
         
-        // Add a small delay to allow the SDK to initialize fully
-        setTimeout(() => {
-          if (window.ZoomMtg) {
-            console.log('ZoomMtg object is available');
-            resolve(true);
-          } else {
-            console.error('ZoomMtg object not available after script load');
-            reject(new Error('ZoomMtg object not available after script load'));
-          }
-        }, 1000); // 1 second delay
+        if (window.ZoomMtg) {
+          console.log(`ZoomMtg object detected after ${attempts} attempts`);
+          resolve(true);
+          return;
+        }
+        
+        if (attempts >= maxAttempts) {
+          console.error(`ZoomMtg not available after ${attempts} attempts`);
+          reject(new Error('Timed out waiting for ZoomMtg to initialize'));
+          return;
+        }
+        
+        // Continue polling
+        setTimeout(checkZoomMtgAvailability, pollInterval);
       };
-      zoomScript.onerror = (e) => {
-        console.error('Failed to load Zoom SDK', e);
-        reject(new Error('Failed to load Zoom SDK'));
-      };
-      document.head.appendChild(zoomScript);
+      
+      // Start checking
+      setTimeout(checkZoomMtgAvailability, pollInterval);
+      
+      // Add initial script load success/failure detection
+      if (!isScriptLoaded) {
+        const zoomScript = document.querySelector('script[src*="zoom-meeting-embedded-2.18.0.min.js"]');
+        if (zoomScript) {
+          zoomScript.addEventListener('load', () => {
+            console.log('Zoom SDK script loaded, now waiting for initialization...');
+          });
+          
+          zoomScript.addEventListener('error', (e) => {
+            console.error('Failed to load Zoom SDK script', e);
+            reject(new Error('Failed to load Zoom SDK script'));
+          });
+        }
+      }
     });
   } catch (error) {
     console.error('Error in loadZoomSDK:', error);
