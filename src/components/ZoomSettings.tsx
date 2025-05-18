@@ -19,7 +19,7 @@ export function ZoomSettings() {
       try {
         // Use a generic approach to query the zoom_connections table
         const { data, error } = await supabase
-          .from('zoom_connections')
+          .from('zoom_connections' as any)
           .select('*')
           .eq('user_id', user.id)
           .single();
@@ -82,7 +82,7 @@ export function ZoomSettings() {
       setIsLoading(true);
       // Use a generic approach to query the zoom_connections table
       const { error } = await supabase
-        .from('zoom_connections')
+        .from('zoom_connections' as any)
         .delete()
         .eq('user_id', user.id);
 

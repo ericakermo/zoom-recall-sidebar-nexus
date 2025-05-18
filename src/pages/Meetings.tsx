@@ -64,7 +64,7 @@ const Meetings = () => {
 
       // Check if user has connected their Zoom account using a generic approach
       const { data: zoomConnection, error: connectionError } = await supabase
-        .from('zoom_connections')
+        .from('zoom_connections' as any)
         .select('*')
         .eq('user_id', user.id)
         .single();

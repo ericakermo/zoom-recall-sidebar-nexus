@@ -86,7 +86,7 @@ export function ZoomMeeting({
         if (user?.id && role === 1) {
           // Use a generic approach to query the zoom_connections table
           const { data, error } = await supabase
-            .from('zoom_connections')
+            .from('zoom_connections' as any)
             .select('*')
             .eq('user_id', user.id)
             .single();
