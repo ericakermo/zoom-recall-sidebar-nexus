@@ -83,18 +83,21 @@ export function ZoomMeeting({
         await loadZoomSDK();
 
         // Get user's Zoom connection from Supabase
-        const { data: zoomConnection, error: dbError } = await supabase
-          .from('zoom_connections')
-          .select('*')
-          .eq('user_id', user?.id)
-          .single();
+        if (user?.id && role === 1) {
+          // Use a generic approach to query the zoom_connections table
+          const { data, error } = await supabase
+            .from('zoom_connections')
+            .select('*')
+            .eq('user_id', user.id)
+            .single();
 
-        if (dbError && dbError.code !== 'PGRST116') { // PGRST116 is "no rows returned" error
-          throw new Error('Error fetching Zoom connection');
-        }
+          if (error && error.code !== 'PGRST116') { // PGRST116 is "no rows returned" error
+            throw new Error('Error fetching Zoom connection');
+          }
 
-        if (!zoomConnection && role === 1) {
-          throw new Error('No Zoom connection found. Please connect your Zoom account first to host meetings.');
+          if (!data && role === 1) {
+            throw new Error('No Zoom connection found. Please connect your Zoom account first to host meetings.');
+          }
         }
 
         // Get meeting signature from your backend
