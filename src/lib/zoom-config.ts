@@ -70,7 +70,7 @@ export const initializeZoomMeeting = async (config: ZoomMeetingConfig) => {
   window.ZoomMtg.prepareWebSDK();
 
   await window.ZoomMtg.init({
-    leaveUrl: window.location.origin,
+    leaveUrl: window.location.origin + '/meetings',
     disableCORP: true,
     success: () => {
       console.log('Zoom Meeting SDK initialized');

@@ -8,7 +8,8 @@ import { Label } from '@/components/ui/label';
 import { ZoomMeeting } from '@/components/ZoomMeeting';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/context/AuthContext';
-import { Video } from 'lucide-react';
+import { Video, VideoOff, X } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
 
 interface MeetingFormData {
   meetingId: string;
@@ -16,7 +17,9 @@ interface MeetingFormData {
 
 const Meetings = () => {
   const [activeMeeting, setActiveMeeting] = useState<string | null>(null);
-  const { register, handleSubmit, formState: { errors } } = useForm<MeetingFormData>();
+  const [isHosting, setIsHosting] = useState(false);
+  const [isConnectingToZoom, setIsConnectingToZoom] = useState(false);
+  const { register, handleSubmit, formState: { errors }, reset } = useForm<MeetingFormData>();
   const { toast } = useToast();
   const { user } = useAuth();
 
@@ -42,10 +45,66 @@ const Meetings = () => {
     }
 
     setActiveMeeting(meetingId);
+    setIsHosting(false);
+    reset(); // Reset form
+  };
+
+  const hostMeeting = async () => {
+    if (!user) {
+      toast({
+        title: "Error",
+        description: "You must be logged in to host a meeting",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    try {
+      setIsConnectingToZoom(true);
+
+      // Check if user has connected their Zoom account
+      const { data: zoomConnection, error: connectionError } = await supabase
+        .from('zoom_connections')
+        .select('*')
+        .eq('user_id', user.id)
+        .single();
+
+      if (connectionError || !zoomConnection) {
+        toast({
+          title: "Zoom Account Not Connected",
+          description: "Please connect your Zoom account in Settings first",
+          variant: "destructive"
+        });
+        setIsConnectingToZoom(false);
+        return;
+      }
+      
+      // For now, we'll just use a hardcoded meeting ID for hosting
+      // In a real application, you would create a new meeting via Zoom API
+      const demoMeetingId = "1234567890"; // This would normally be created via API
+      
+      setActiveMeeting(demoMeetingId);
+      setIsHosting(true);
+      
+      toast({
+        title: "Meeting Created",
+        description: `You are now hosting meeting ${demoMeetingId}`,
+      });
+    } catch (error: any) {
+      console.error("Error hosting meeting:", error);
+      toast({
+        title: "Error",
+        description: error.message || "Failed to host meeting",
+        variant: "destructive"
+      });
+    } finally {
+      setIsConnectingToZoom(false);
+    }
   };
 
   const handleMeetingEnd = () => {
     setActiveMeeting(null);
+    setIsHosting(false);
     toast({
       title: "Meeting Ended",
       description: "You have left the Zoom meeting"
@@ -60,16 +119,27 @@ const Meetings = () => {
       </h1>
 
       {activeMeeting ? (
-        <div className="h-[80vh] relative">
-          <Button 
-            variant="outline" 
-            className="absolute top-2 right-2 z-10"
-            onClick={() => setActiveMeeting(null)}
-          >
-            Leave Meeting
-          </Button>
+        <div className="h-[80vh] relative border rounded-lg overflow-hidden">
+          <div className="absolute top-4 right-4 z-10">
+            <Button 
+              variant="outline" 
+              size="sm"
+              className="bg-white/80 hover:bg-white/90 text-black"
+              onClick={() => setActiveMeeting(null)}
+            >
+              <X className="h-4 w-4 mr-1" />
+              Exit
+            </Button>
+          </div>
+          
+          <div className="absolute top-4 left-4 z-10 bg-black/50 text-white px-3 py-1 rounded-full text-sm flex items-center">
+            <div className="w-2 h-2 rounded-full bg-green-500 mr-2"></div>
+            Meeting ID: {activeMeeting}
+          </div>
+          
           <ZoomMeeting 
             meetingNumber={activeMeeting}
+            role={isHosting ? 1 : 0} // 1 for host, 0 for attendee
             onMeetingEnd={handleMeetingEnd}
           />
         </div>
@@ -78,7 +148,7 @@ const Meetings = () => {
           <Card>
             <CardHeader>
               <CardTitle>Join a Meeting</CardTitle>
-              <CardDescription>Enter a Zoom meeting ID to join</CardDescription>
+              <CardDescription>Enter a Zoom meeting ID to join as a participant</CardDescription>
             </CardHeader>
             <CardContent>
               <form onSubmit={handleSubmit(joinMeeting)} className="space-y-4">
@@ -99,7 +169,10 @@ const Meetings = () => {
                     <p className="text-sm text-red-500">{errors.meetingId.message}</p>
                   )}
                 </div>
-                <Button type="submit">Join Meeting</Button>
+                <Button type="submit" className="w-full">
+                  <Video className="mr-2 h-4 w-4" />
+                  Join Meeting
+                </Button>
               </form>
             </CardContent>
           </Card>
@@ -107,15 +180,31 @@ const Meetings = () => {
           <Card>
             <CardHeader>
               <CardTitle>Host a Meeting</CardTitle>
-              <CardDescription>Start your own Zoom meeting</CardDescription>
+              <CardDescription>Start your own Zoom meeting as a host</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <p className="text-sm text-muted-foreground">
                 To host a meeting, you need to connect your Zoom account first in the Settings page.
               </p>
-              <Button onClick={() => window.location.href = '/settings'}>
-                Go to Settings
-              </Button>
+              <div className="space-x-3">
+                <Button 
+                  onClick={hostMeeting} 
+                  disabled={isConnectingToZoom}
+                  className="w-full"
+                >
+                  {isConnectingToZoom ? (
+                    <>
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                      Connecting...
+                    </>
+                  ) : (
+                    <>
+                      <Video className="mr-2 h-4 w-4" />
+                      Start Instant Meeting
+                    </>
+                  )}
+                </Button>
+              </div>
             </CardContent>
           </Card>
         </div>
