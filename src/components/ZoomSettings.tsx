@@ -54,8 +54,8 @@ export function ZoomSettings() {
       return;
     }
 
-    // Redirect to Zoom OAuth
-    const zoomClientId = import.meta.env.VITE_ZOOM_CLIENT_ID;
+    // Use the client ID from the environment variable
+    const zoomClientId = "eFAZ8Vf7RbG5saQVqL1zGA";
     if (!zoomClientId) {
       toast({
         title: "Error",
@@ -65,7 +65,9 @@ export function ZoomSettings() {
       return;
     }
 
-    const redirectUri = `${window.location.origin}/api/zoom-oauth-callback`;
+    // Use the Supabase URL for the redirect URI
+    const supabaseUrl = "https://qsxlvwwebbakmzpwjfbb.supabase.co";
+    const redirectUri = `${supabaseUrl}/functions/v1/zoom-oauth-callback`;
     const zoomAuthUrl = `https://zoom.us/oauth/authorize?response_type=code&client_id=${
       zoomClientId
     }&redirect_uri=${encodeURIComponent(redirectUri)}&state=${user.id}`;

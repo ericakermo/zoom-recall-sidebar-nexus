@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import { Button } from '@/components/ui/button';
@@ -13,10 +13,27 @@ const Auth = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isRedirecting, setIsRedirecting] = useState(false);
 
-  // Redirect if user is already authenticated
-  if (user && !loading) {
+  // Redirect if user is already authenticated, but only once
+  useEffect(() => {
+    if (user && !loading && !isRedirecting) {
+      setIsRedirecting(true);
+    }
+  }, [user, loading]);
+  
+  // If we're redirecting, show the redirect component
+  if (isRedirecting) {
     return <Navigate to="/" />;
+  }
+
+  // Don't redirect while still loading
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-gray-900 dark:border-gray-100"></div>
+      </div>
+    );
   }
   
   const handleSignIn = async (e: React.FormEvent) => {

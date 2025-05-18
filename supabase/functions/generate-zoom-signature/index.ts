@@ -9,6 +9,10 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
+// Set the Zoom SDK credentials
+const ZOOM_API_KEY = "eFAZ8Vf7RbG5saQVqL1zGA";
+const ZOOM_API_SECRET = "iopNR5wnxdK3mEIVE1llzQqAWbxXEB1l";
+
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
@@ -58,19 +62,9 @@ serve(async (req) => {
       )
     }
 
-    // Generate the signature
-    const apiKey = Deno.env.get('ZOOM_API_KEY')
-    const apiSecret = Deno.env.get('ZOOM_API_SECRET')
-
-    if (!apiKey || !apiSecret) {
-      return new Response(
-        JSON.stringify({ error: 'Missing Zoom API credentials' }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
-    }
-
+    // Generate the signature using the hardcoded values
     const timestamp = new Date().getTime() - 30000
-    const msg = Buffer.from(apiKey + meetingNumber + timestamp + role).toString()
+    const msg = Buffer.from(ZOOM_API_KEY + meetingNumber + timestamp + role).toString()
     const hash = createHash("sha256").update(msg).digest()
     const signature = encodeBase64(hash)
 

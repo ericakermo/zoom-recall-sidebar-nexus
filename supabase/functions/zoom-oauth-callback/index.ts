@@ -7,6 +7,10 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
+// Set the Zoom OAuth credentials
+const ZOOM_CLIENT_ID = "eFAZ8Vf7RbG5saQVqL1zGA";
+const ZOOM_CLIENT_SECRET = "iopNR5wnxdK3mEIVE1llzQqAWbxXEB1l";
+
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
@@ -47,7 +51,7 @@ serve(async (req) => {
       method: 'POST',
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded',
-        'Authorization': `Basic ${btoa(`${Deno.env.get('ZOOM_CLIENT_ID')}:${Deno.env.get('ZOOM_CLIENT_SECRET')}`)}`,
+        'Authorization': `Basic ${btoa(`${ZOOM_CLIENT_ID}:${ZOOM_CLIENT_SECRET}`)}`,
       },
       body: new URLSearchParams({
         grant_type: 'authorization_code',

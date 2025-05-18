@@ -1,8 +1,8 @@
 
 import { ZoomMeetingConfig } from '@/types/zoom';
 
-// Now use environment variables or Supabase edge functions
-const ZOOM_API_KEY = import.meta.env.VITE_ZOOM_API_KEY || '';
+// Use the client ID directly
+const ZOOM_API_KEY = "eFAZ8Vf7RbG5saQVqL1zGA";
 const SUPABASE_URL = 'https://qsxlvwwebbakmzpwjfbb.supabase.co';
 
 export const loadZoomSDK = async () => {
