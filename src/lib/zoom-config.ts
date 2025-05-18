@@ -68,7 +68,17 @@ export const loadZoomSDK = async () => {
       zoomScript.async = false; // Important: Load in sequence, not async
       zoomScript.onload = () => {
         console.log('Zoom SDK loaded successfully');
-        resolve(true);
+        
+        // Add a small delay to allow the SDK to initialize fully
+        setTimeout(() => {
+          if (window.ZoomMtg) {
+            console.log('ZoomMtg object is available');
+            resolve(true);
+          } else {
+            console.error('ZoomMtg object not available after script load');
+            reject(new Error('ZoomMtg object not available after script load'));
+          }
+        }, 1000); // 1 second delay
       };
       zoomScript.onerror = (e) => {
         console.error('Failed to load Zoom SDK', e);
@@ -129,7 +139,9 @@ export const getSignature = async (meetingNumber: string, role: number) => {
 };
 
 export const initializeZoomMeeting = async (config: ZoomMeetingConfig) => {
+  // Enhanced check for ZoomMtg object
   if (!window.ZoomMtg) {
+    console.error('ZoomMtg object not available. Current window keys:', Object.keys(window));
     throw new Error('Zoom Meeting SDK not loaded');
   }
 
@@ -138,22 +150,28 @@ export const initializeZoomMeeting = async (config: ZoomMeetingConfig) => {
     signature: '[REDACTED]' // Don't log the signature
   });
 
+  // Ensure we're setting up the SDK properly
   window.ZoomMtg.setZoomJSLib('https://source.zoom.us/2.18.0/lib', '/av');
   window.ZoomMtg.preLoadWasm();
   window.ZoomMtg.prepareWebSDK();
 
   return new Promise<any>((resolve, reject) => {
-    window.ZoomMtg.init({
-      leaveUrl: window.location.origin + '/meetings',
-      disableCORP: true, 
-      success: () => {
-        console.log('Zoom Meeting SDK initialized successfully');
-        resolve(window.ZoomMtg);
-      },
-      error: (error: any) => {
-        console.error('Error initializing Zoom Meeting SDK:', error);
-        reject(error);
-      }
-    });
+    try {
+      window.ZoomMtg.init({
+        leaveUrl: window.location.origin + '/meetings',
+        disableCORP: true,
+        success: () => {
+          console.log('Zoom Meeting SDK initialized successfully');
+          resolve(window.ZoomMtg);
+        },
+        error: (error: any) => {
+          console.error('Error initializing Zoom Meeting SDK:', error);
+          reject(error);
+        }
+      });
+    } catch (error) {
+      console.error('Exception during ZoomMtg.init():', error);
+      reject(error);
+    }
   });
 };
