@@ -1,8 +1,9 @@
+
 import { ZoomMeetingConfig } from '@/types/zoom';
 
-// These should be environment variables in production
-const ZOOM_API_KEY = 'YOUR_ZOOM_API_KEY';
-const ZOOM_API_SECRET = 'YOUR_ZOOM_API_SECRET';
+// Now use environment variables or Supabase edge functions
+const ZOOM_API_KEY = import.meta.env.VITE_ZOOM_API_KEY || '';
+const SUPABASE_URL = 'https://qsxlvwwebbakmzpwjfbb.supabase.co';
 
 export const loadZoomSDK = async () => {
   const script = document.createElement('script');
@@ -19,19 +20,23 @@ export const loadZoomSDK = async () => {
 };
 
 export const getSignature = async (meetingNumber: string, role: number) => {
-  // In production, this should be a server endpoint
-  // NEVER expose your API secret in the frontend
   try {
-    const response = await fetch('YOUR_BACKEND_ENDPOINT/zoom-signature', {
+    const response = await fetch(`${SUPABASE_URL}/functions/v1/generate-zoom-signature`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        'Authorization': `Bearer ${localStorage.getItem('supabase.auth.token')}`
       },
       body: JSON.stringify({
         meetingNumber,
         role,
       }),
     });
+    
+    if (!response.ok) {
+      throw new Error('Failed to generate signature');
+    }
+    
     const data = await response.json();
     return data.signature;
   } catch (error) {
@@ -61,4 +66,4 @@ export const initializeZoomMeeting = async (config: ZoomMeetingConfig) => {
   });
 
   return window.ZoomMtg;
-}; 
+};

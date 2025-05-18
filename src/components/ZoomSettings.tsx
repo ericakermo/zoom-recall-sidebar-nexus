@@ -1,13 +1,16 @@
+
 import { useEffect, useState } from 'react';
-import { useSupabaseClient, useUser } from '@supabase/auth-helpers-react';
+import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/context/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { useToast } from '@/hooks/use-toast';
 
 export function ZoomSettings() {
   const [isConnected, setIsConnected] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
-  const supabase = useSupabaseClient();
-  const user = useUser();
+  const { user } = useAuth();
+  const { toast } = useToast();
 
   useEffect(() => {
     const checkZoomConnection = async () => {
@@ -20,25 +23,51 @@ export function ZoomSettings() {
           .eq('user_id', user.id)
           .single();
 
-        if (error) throw error;
+        if (error && error.code !== 'PGRST116') { // PGRST116 is "no rows returned" error
+          throw error;
+        }
+        
         setIsConnected(!!data);
       } catch (error) {
         console.error('Error checking Zoom connection:', error);
+        toast({
+          title: "Error",
+          description: "Failed to check Zoom connection status",
+          variant: "destructive"
+        });
       } finally {
         setIsLoading(false);
       }
     };
 
     checkZoomConnection();
-  }, [user, supabase]);
+  }, [user, toast]);
 
   const handleConnectZoom = () => {
+    if (!user) {
+      toast({
+        title: "Error",
+        description: "You need to be logged in to connect Zoom",
+        variant: "destructive"
+      });
+      return;
+    }
+
     // Redirect to Zoom OAuth
+    const zoomClientId = import.meta.env.VITE_ZOOM_CLIENT_ID;
+    if (!zoomClientId) {
+      toast({
+        title: "Error",
+        description: "Zoom client ID not configured",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    const redirectUri = `${window.location.origin}/api/zoom-oauth-callback`;
     const zoomAuthUrl = `https://zoom.us/oauth/authorize?response_type=code&client_id=${
-      process.env.VITE_ZOOM_CLIENT_ID
-    }&redirect_uri=${encodeURIComponent(
-      `${window.location.origin}/api/zoom/callback`
-    )}`;
+      zoomClientId
+    }&redirect_uri=${encodeURIComponent(redirectUri)}&state=${user.id}`;
     
     window.location.href = zoomAuthUrl;
   };
@@ -54,9 +83,19 @@ export function ZoomSettings() {
         .eq('user_id', user.id);
 
       if (error) throw error;
+      
       setIsConnected(false);
+      toast({
+        title: "Success",
+        description: "Zoom account disconnected successfully"
+      });
     } catch (error) {
       console.error('Error disconnecting Zoom:', error);
+      toast({
+        title: "Error",
+        description: "Failed to disconnect Zoom account",
+        variant: "destructive"
+      });
     } finally {
       setIsLoading(false);
     }
@@ -95,4 +134,4 @@ export function ZoomSettings() {
       </CardContent>
     </Card>
   );
-} 
+}

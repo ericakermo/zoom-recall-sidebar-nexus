@@ -8,6 +8,7 @@ import Layout from "./components/Layout";
 import Dashboard from "./pages/Dashboard";
 import Profile from "./pages/Profile";
 import Settings from "./pages/Settings";
+import Meetings from "./pages/Meetings";
 import NotFound from "./pages/NotFound";
 import Auth from "./pages/Auth";
 import { AuthProvider } from "./context/AuthContext";
@@ -42,6 +43,13 @@ const App = () => (
               <ProtectedRoute>
                 <Layout>
                   <Settings />
+                </Layout>
+              </ProtectedRoute>
+            } />
+            <Route path="/meetings" element={
+              <ProtectedRoute>
+                <Layout>
+                  <Meetings />
                 </Layout>
               </ProtectedRoute>
             } />

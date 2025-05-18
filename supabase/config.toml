@@ -1,1 +1,8 @@
+
 project_id = "qsxlvwwebbakmzpwjfbb"
+
+[functions.generate-zoom-signature]
+verify_jwt = true
+
+[functions.zoom-oauth-callback]
+verify_jwt = false
