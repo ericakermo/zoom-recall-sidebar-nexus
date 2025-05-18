@@ -2,7 +2,7 @@
 import { useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
-import { loadZoomSDK, initializeZoomMeeting, getSignature } from '@/lib/zoom-config';
+import { loadZoomSDK, createAndInitializeZoomClient, getSignature, joinZoomMeeting, leaveZoomMeeting } from '@/lib/zoom-config';
 import { ZoomMeetingConfig } from '@/types/zoom';
 import { useAuth } from '@/context/AuthContext';
 import { Button } from '@/components/ui/button';
@@ -30,6 +30,8 @@ export function ZoomMeeting({
   const [participantCount, setParticipantCount] = useState(0);
   const [isConnected, setIsConnected] = useState(false);
   const controlsRef = useRef<HTMLDivElement>(null);
+  const zoomContainerRef = useRef<HTMLDivElement>(null);
+  const zoomClientRef = useRef<any>(null);
   const navigate = useNavigate();
   const { user } = useAuth();
   const { toast } = useToast();
@@ -61,18 +63,28 @@ export function ZoomMeeting({
   };
 
   const leaveMeeting = () => {
-    if (!window.ZoomMtg) return;
-    
-    window.ZoomMtg.leaveMeeting({
-      success: () => {
-        console.log('Left the meeting');
-        setIsConnected(false);
-        onMeetingEnd?.();
-      },
-      error: (error: any) => {
-        console.error('Error leaving meeting:', error);
-      }
-    });
+    if (zoomClientRef.current) {
+      leaveZoomMeeting(zoomClientRef.current)
+        .then(() => {
+          console.log('Left the meeting');
+          setIsConnected(false);
+          onMeetingEnd?.();
+        })
+        .catch((error: any) => {
+          console.error('Error leaving meeting:', error);
+        });
+    } else if (window.ZoomMtg) {
+      window.ZoomMtg.leaveMeeting({
+        success: () => {
+          console.log('Left the meeting');
+          setIsConnected(false);
+          onMeetingEnd?.();
+        },
+        error: (error: any) => {
+          console.error('Error leaving meeting:', error);
+        }
+      });
+    }
   };
 
   useEffect(() => {
@@ -118,48 +130,31 @@ export function ZoomMeeting({
           role,
         };
 
+        if (!zoomContainerRef.current) {
+          throw new Error('Zoom container element is not available.');
+        }
+
         // Initialize Zoom Meeting
-        const zoomClient = await initializeZoomMeeting(meetingConfig);
+        const zoomClient = await createAndInitializeZoomClient(zoomContainerRef.current);
+        zoomClientRef.current = zoomClient;
         zoomInitializedRef.current = true;
 
-        // Register event listeners
-        zoomClient.inMeetingServiceListener('onUserJoin', (data: any) => {
-          console.log('User joined:', data);
-          setParticipantCount(prev => prev + 1);
-        });
-
-        zoomClient.inMeetingServiceListener('onUserLeave', (data: any) => {
-          console.log('User left:', data);
-          setParticipantCount(prev => Math.max(0, prev - 1));
-        });
-
-        zoomClient.inMeetingServiceListener('onMeetingStatus', (data: any) => {
-          console.log('Meeting status changed:', data);
-          if (data.meetingStatus === 3) { // Meeting ended
-            onMeetingEnd?.();
-            setIsConnected(false);
-          }
-        });
-
         // Join the meeting
-        await zoomClient.join({
-          ...meetingConfig,
-          success: () => {
-            console.log('Successfully joined the meeting');
-            setIsLoading(false);
-            setIsConnected(true);
-            setParticipantCount(1); // Start with at least one participant (yourself)
-            
-            toast({
-              title: "Meeting Joined",
-              description: "You have successfully joined the Zoom meeting"
-            });
-          },
-          error: (error: any) => {
-            console.error('Failed to join meeting:', error);
-            setError('Failed to join the meeting. Please try again.');
-            setIsLoading(false);
-          }
+        await joinZoomMeeting(zoomClient, {
+          signature: meetingConfig.signature,
+          meetingNumber: meetingConfig.meetingNumber,
+          userName: meetingConfig.userName,
+          password: ''
+        });
+
+        console.log('Successfully joined the meeting');
+        setIsLoading(false);
+        setIsConnected(true);
+        setParticipantCount(1); // Start with at least one participant (yourself)
+        
+        toast({
+          title: "Meeting Joined",
+          description: "You have successfully joined the Zoom meeting"
         });
 
       } catch (err: any) {
@@ -172,7 +167,16 @@ export function ZoomMeeting({
     initializeZoom();
 
     return () => {
-      if (window.ZoomMtg && isConnected) {
+      if (zoomClientRef.current && isConnected) {
+        leaveZoomMeeting(zoomClientRef.current)
+          .then(() => {
+            console.log('Left the meeting during cleanup');
+            onMeetingEnd?.();
+          })
+          .catch((error) => {
+            console.error('Error leaving meeting during cleanup:', error);
+          });
+      } else if (window.ZoomMtg && isConnected) {
         window.ZoomMtg.leaveMeeting({
           success: () => {
             console.log('Left the meeting during cleanup');
@@ -226,7 +230,9 @@ export function ZoomMeeting({
 
   return (
     <>
-      <div id="zmmtg-root" className="w-full h-full relative" />
+      <div id="zmmtg-root" className="w-full h-full relative">
+        <div ref={zoomContainerRef} className="w-full h-full"></div>
+      </div>
       
       {isConnected && (
         <div 
