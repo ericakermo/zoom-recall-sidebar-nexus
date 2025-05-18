@@ -1,7 +1,7 @@
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
-import { createHmac } from "https://deno.land/std@0.168.0/crypto/mod.ts";
+import { hmac } from "https://deno.land/x/crypto@v0.10.0/hmac.ts";
 import { encode as encodeBase64 } from 'https://deno.land/std@0.168.0/encoding/base64.ts'
 
 // Configure CORS headers to allow requests from any origin
@@ -16,12 +16,15 @@ const ZOOM_API_KEY = "eFAZ8Vf7RbG5saQVqL1zGA";
 const ZOOM_API_SECRET = "iopNR5wnxdK3mEIVE1llzQqAWbxXEB1l";
 
 serve(async (req) => {
+  console.log("Function called with method:", req.method);
+  
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
+    console.log("Handling OPTIONS preflight request");
     return new Response(null, { 
       status: 200,
       headers: corsHeaders 
-    })
+    });
   }
 
   try {
@@ -33,58 +36,84 @@ serve(async (req) => {
           headers: { Authorization: req.headers.get('Authorization')! },
         },
       }
-    )
+    );
 
     // Get the JWT from the authorization header
-    const authHeader = req.headers.get('Authorization')
+    const authHeader = req.headers.get('Authorization');
     if (!authHeader) {
+      console.error("No authorization header provided");
       return new Response(
         JSON.stringify({ error: 'No authorization header' }),
         { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
+      );
     }
 
     // Get the JWT from the authorization header
-    const token = authHeader.replace('Bearer ', '')
+    const token = authHeader.replace('Bearer ', '');
     
     // Verify the JWT to get the user
-    const { data: { user }, error: userError } = await supabaseClient.auth.getUser(token)
+    const { data: { user }, error: userError } = await supabaseClient.auth.getUser(token);
     
     if (userError || !user) {
+      console.error("Invalid token or user not found:", userError);
       return new Response(
         JSON.stringify({ error: 'Invalid token' }),
         { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
+      );
     }
 
     // Parse the request body
-    const { meetingNumber, role } = await req.json()
+    let requestData;
+    try {
+      requestData = await req.json();
+    } catch (e) {
+      console.error("Error parsing request body:", e);
+      return new Response(
+        JSON.stringify({ error: 'Invalid JSON in request body' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const { meetingNumber, role } = requestData;
 
     if (!meetingNumber || role === undefined) {
+      console.error("Missing parameters:", { meetingNumber, role });
       return new Response(
         JSON.stringify({ error: 'Missing parameters' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
+      );
     }
 
     // Generate the signature
-    const timestamp = new Date().getTime() - 30000
-    const msg = Buffer.from(ZOOM_API_KEY + meetingNumber + timestamp + role).toString()
+    const timestamp = new Date().getTime() - 30000;
+    const msg = Buffer.from(ZOOM_API_KEY + meetingNumber + timestamp + role).toString();
     
-    // Using createHmac instead of HmacSha256
-    const hmac = createHmac("sha256", ZOOM_API_SECRET);
-    hmac.update(msg);
-    const signature = encodeBase64(hmac.digest());
+    // Using hmac instead of createHmac
+    const hmacSignature = hmac("sha256", ZOOM_API_SECRET, msg);
+    const signature = encodeBase64(hmacSignature);
 
+    console.log("Signature generated successfully");
     return new Response(
       JSON.stringify({ signature }),
-      { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    )
+      { 
+        status: 200, 
+        headers: { 
+          ...corsHeaders, 
+          'Content-Type': 'application/json' 
+        } 
+      }
+    );
   } catch (error) {
-    console.error('Error:', error)
+    console.error('Error:', error);
     return new Response(
       JSON.stringify({ error: error.message }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    )
+      { 
+        status: 500, 
+        headers: { 
+          ...corsHeaders, 
+          'Content-Type': 'application/json' 
+        } 
+      }
+    );
   }
-})
+});
