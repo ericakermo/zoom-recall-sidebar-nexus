@@ -1,9 +1,10 @@
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
-import { createHash, HmacSha256 } from "https://deno.land/std@0.168.0/crypto/mod.ts";
+import { createHmac } from "https://deno.land/std@0.168.0/crypto/mod.ts";
 import { encode as encodeBase64 } from 'https://deno.land/std@0.168.0/encoding/base64.ts'
 
+// Configure CORS headers to allow requests from any origin
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
@@ -70,10 +71,10 @@ serve(async (req) => {
     const timestamp = new Date().getTime() - 30000
     const msg = Buffer.from(ZOOM_API_KEY + meetingNumber + timestamp + role).toString()
     
-    // Using hmac instead of createHash
-    const key = ZOOM_API_SECRET;
-    const sigBytes = await new HmacSha256(key).update(msg).digest();
-    const signature = encodeBase64(sigBytes);
+    // Using createHmac instead of HmacSha256
+    const hmac = createHmac("sha256", ZOOM_API_SECRET);
+    hmac.update(msg);
+    const signature = encodeBase64(hmac.digest());
 
     return new Response(
       JSON.stringify({ signature }),

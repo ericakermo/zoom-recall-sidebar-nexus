@@ -6,39 +6,71 @@ const ZOOM_API_KEY = "eFAZ8Vf7RbG5saQVqL1zGA";
 const SUPABASE_URL = 'https://qsxlvwwebbakmzpwjfbb.supabase.co';
 
 export const loadZoomSDK = async () => {
-  // Create a promise to track when React and ReactDOM are loaded
-  const reactPromise = new Promise<boolean>((resolve) => {
-    // First load React
-    const reactScript = document.createElement('script');
-    reactScript.src = 'https://source.zoom.us/2.18.0/lib/vendor/react.min.js';
-    reactScript.onload = () => {
-      console.log('React loaded successfully');
-      
-      // Then load ReactDOM after React is loaded
-      const reactDomScript = document.createElement('script');
-      reactDomScript.src = 'https://source.zoom.us/2.18.0/lib/vendor/react-dom.min.js'; 
-      reactDomScript.onload = () => {
-        console.log('ReactDOM loaded successfully');
+  try {
+    console.log('Beginning Zoom SDK loading process');
+    
+    // First make sure React is loaded
+    if (!window.React) {
+      console.log('Loading React...');
+      await new Promise<void>((resolve, reject) => {
+        const reactScript = document.createElement('script');
+        reactScript.src = 'https://source.zoom.us/2.18.0/lib/vendor/react.min.js';
+        reactScript.async = true;
+        reactScript.onload = () => {
+          console.log('React loaded successfully');
+          resolve();
+        };
+        reactScript.onerror = (e) => {
+          console.error('Failed to load React', e);
+          reject(new Error('Failed to load React'));
+        };
+        document.head.appendChild(reactScript);
+      });
+    } else {
+      console.log('React already loaded');
+    }
+    
+    // Then make sure ReactDOM is loaded
+    if (!window.ReactDOM) {
+      console.log('Loading ReactDOM...');
+      await new Promise<void>((resolve, reject) => {
+        const reactDOMScript = document.createElement('script');
+        reactDOMScript.src = 'https://source.zoom.us/2.18.0/lib/vendor/react-dom.min.js';
+        reactDOMScript.async = true;
+        reactDOMScript.onload = () => {
+          console.log('ReactDOM loaded successfully');
+          resolve();
+        };
+        reactDOMScript.onerror = (e) => {
+          console.error('Failed to load ReactDOM', e);
+          reject(new Error('Failed to load ReactDOM'));
+        };
+        document.head.appendChild(reactDOMScript);
+      });
+    } else {
+      console.log('ReactDOM already loaded');
+    }
+    
+    // Finally load Zoom SDK
+    console.log('Loading Zoom SDK...');
+    return new Promise<boolean>((resolve, reject) => {
+      const zoomScript = document.createElement('script');
+      zoomScript.src = 'https://source.zoom.us/2.18.0/zoom-meeting-embedded-2.18.0.min.js';
+      zoomScript.async = true;
+      zoomScript.onload = () => {
+        console.log('Zoom SDK loaded successfully');
         resolve(true);
       };
-      document.head.appendChild(reactDomScript);
-    };
-    document.head.appendChild(reactScript);
-  });
-
-  // Wait for React and ReactDOM to load before loading Zoom
-  await reactPromise;
-  
-  // Now load the Zoom SDK
-  return new Promise<boolean>((resolve) => {
-    const zoomScript = document.createElement('script');
-    zoomScript.src = 'https://source.zoom.us/2.18.0/zoom-meeting-embedded-2.18.0.min.js';
-    zoomScript.onload = () => {
-      console.log('Zoom SDK loaded successfully');
-      resolve(true);
-    };
-    document.head.appendChild(zoomScript);
-  });
+      zoomScript.onerror = (e) => {
+        console.error('Failed to load Zoom SDK', e);
+        reject(new Error('Failed to load Zoom SDK'));
+      };
+      document.head.appendChild(zoomScript);
+    });
+  } catch (error) {
+    console.error('Error in loadZoomSDK:', error);
+    throw error;
+  }
 };
 
 export const getSignature = async (meetingNumber: string, role: number) => {
