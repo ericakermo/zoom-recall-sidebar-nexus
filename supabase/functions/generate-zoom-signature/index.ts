@@ -3,6 +3,7 @@ import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { hmac } from "https://deno.land/x/crypto@v0.10.0/hmac.ts";
 import { encode as encodeBase64 } from 'https://deno.land/std@0.168.0/encoding/base64.ts'
+import { encode as encodeHex } from "https://deno.land/std@0.168.0/encoding/hex.ts";
 
 // Configure CORS headers to allow requests from any origin
 const corsHeaders = {
@@ -84,11 +85,11 @@ serve(async (req) => {
       );
     }
 
-    // Generate the signature
+    // Generate the signature using Deno's TextEncoder instead of Buffer
     const timestamp = new Date().getTime() - 30000;
-    const msg = Buffer.from(ZOOM_API_KEY + meetingNumber + timestamp + role).toString();
+    const msg = new TextEncoder().encode(ZOOM_API_KEY + meetingNumber + timestamp + role);
     
-    // Using hmac instead of createHmac
+    // Using hmac with TextEncoder-created message
     const hmacSignature = hmac("sha256", ZOOM_API_SECRET, msg);
     const signature = encodeBase64(hmacSignature);
 
