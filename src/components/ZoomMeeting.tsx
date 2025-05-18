@@ -33,6 +33,7 @@ export function ZoomMeeting({
   const navigate = useNavigate();
   const { user } = useAuth();
   const { toast } = useToast();
+  const zoomInitializedRef = useRef(false);
 
   // Handle meeting controls
   const toggleMute = () => {
@@ -75,6 +76,12 @@ export function ZoomMeeting({
   };
 
   useEffect(() => {
+    // Prevent multiple initializations
+    if (zoomInitializedRef.current) {
+      console.log('Zoom already initialized, skipping');
+      return;
+    }
+    
     const initializeZoom = async () => {
       try {
         setIsLoading(true);
@@ -113,6 +120,7 @@ export function ZoomMeeting({
 
         // Initialize Zoom Meeting
         const zoomClient = await initializeZoomMeeting(meetingConfig);
+        zoomInitializedRef.current = true;
 
         // Register event listeners
         zoomClient.inMeetingServiceListener('onUserJoin', (data: any) => {
