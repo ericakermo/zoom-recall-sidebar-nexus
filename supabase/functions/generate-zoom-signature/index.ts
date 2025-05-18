@@ -1,104 +1,88 @@
 
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
-import * as crypto from 'https://deno.land/std@0.110.0/node/crypto.ts';
+import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { Sha256 } from 'https://deno.land/std@0.168.0/crypto/sha256.ts'
+import { encode as encodeBase64 } from 'https://deno.land/std@0.168.0/encoding/base64.ts'
 
-// CORS headers to allow our web client to call this function
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
+}
 
-// Handle CORS preflight requests
-export const corsResponse = () => {
-  return new Response(null, {
-    status: 204,
-    headers: corsHeaders,
-  });
-};
-
-const generateSignature = (apiKey: string, apiSecret: string, meetingNumber: string, role: number) => {
-  // Concatenate required data for the signature
-  const timestamp = new Date().getTime() - 30000;
-  const msg = Buffer.from(apiKey + meetingNumber + timestamp + role).toString();
-  
-  // Generate the signature using crypto
-  const hash = crypto.createHmac('sha256', apiSecret).update(msg).digest('base64');
-  const signature = Buffer.from(`${apiKey}.${meetingNumber}.${timestamp}.${role}.${hash}`).toString('base64');
-  
-  return signature;
-};
-
-Deno.serve(async (req) => {
+serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
-    return corsResponse();
+    return new Response(null, { headers: corsHeaders })
   }
-  
+
   try {
     const supabaseClient = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+      Deno.env.get('SUPABASE_URL') || '',
+      Deno.env.get('SUPABASE_ANON_KEY') || '',
       {
         global: {
           headers: { Authorization: req.headers.get('Authorization')! },
         },
       }
-    );
-    
-    // Get the JWT token from the request
-    const token = req.headers.get('Authorization')?.replace('Bearer ', '');
-    
-    if (!token) {
+    )
+
+    // Get the JWT from the authorization header
+    const authHeader = req.headers.get('Authorization')
+    if (!authHeader) {
       return new Response(
-        JSON.stringify({ error: 'Not authenticated' }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 401 }
-      );
+        JSON.stringify({ error: 'No authorization header' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
     }
+
+    // Get the JWT from the authorization header
+    const token = authHeader.replace('Bearer ', '')
     
-    // Verify the JWT token with Supabase
-    const { data: { user }, error: authError } = await supabaseClient.auth.getUser(token);
+    // Verify the JWT to get the user
+    const { data: { user }, error: userError } = await supabaseClient.auth.getUser(token)
     
-    if (authError || !user) {
+    if (userError || !user) {
       return new Response(
-        JSON.stringify({ error: 'Not authenticated' }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 401 }
-      );
+        JSON.stringify({ error: 'Invalid token' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
     }
-    
-    // Get the request body
-    const { meetingNumber, role } = await req.json();
-    
+
+    // Parse the request body
+    const { meetingNumber, role } = await req.json()
+
     if (!meetingNumber || role === undefined) {
       return new Response(
-        JSON.stringify({ error: 'Missing required parameters' }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
-      );
+        JSON.stringify({ error: 'Missing parameters' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
     }
-    
-    // Get Zoom API credentials from environment variables
-    const zoomApiKey = Deno.env.get('ZOOM_API_KEY');
-    const zoomApiSecret = Deno.env.get('ZOOM_API_SECRET');
-    
-    if (!zoomApiKey || !zoomApiSecret) {
-      return new Response(
-        JSON.stringify({ error: 'Zoom credentials not configured' }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
-      );
-    }
-    
+
     // Generate the signature
-    const signature = generateSignature(zoomApiKey, zoomApiSecret, meetingNumber, role);
-    
-    // Return the signature
+    const apiKey = Deno.env.get('ZOOM_API_KEY')
+    const apiSecret = Deno.env.get('ZOOM_API_SECRET')
+
+    if (!apiKey || !apiSecret) {
+      return new Response(
+        JSON.stringify({ error: 'Missing Zoom API credentials' }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+
+    const timestamp = new Date().getTime() - 30000
+    const msg = Buffer.from(apiKey + meetingNumber + timestamp + role).toString()
+    const hash = await new Sha256().update(msg).digest()
+    const signature = encodeBase64(hash)
+
     return new Response(
       JSON.stringify({ signature }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
-    );
-    
+      { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    )
   } catch (error) {
+    console.error('Error:', error)
     return new Response(
       JSON.stringify({ error: error.message }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
-    );
+      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    )
   }
-});
+})

@@ -1,8 +1,10 @@
+
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useSupabaseClient, useUser } from '@supabase/auth-helpers-react';
+import { supabase } from '@/integrations/supabase/client';
 import { loadZoomSDK, initializeZoomMeeting, getSignature } from '@/lib/zoom-config';
 import { ZoomMeetingConfig } from '@/types/zoom';
+import { useAuth } from '@/context/AuthContext';
 
 interface ZoomMeetingProps {
   meetingNumber: string;
@@ -20,8 +22,7 @@ export function ZoomMeeting({
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const navigate = useNavigate();
-  const supabase = useSupabaseClient();
-  const user = useUser();
+  const { user } = useAuth();
 
   useEffect(() => {
     const initializeZoom = async () => {
@@ -49,7 +50,7 @@ export function ZoomMeeting({
           signature,
           meetingNumber,
           userName: providedUserName || user?.email || 'Guest',
-          apiKey: process.env.VITE_ZOOM_API_KEY!,
+          apiKey: import.meta.env.VITE_ZOOM_API_KEY!,
           role,
         };
 
@@ -93,14 +94,14 @@ export function ZoomMeeting({
         });
       }
     };
-  }, [meetingNumber, providedUserName, role, user, supabase, onMeetingEnd]);
+  }, [meetingNumber, providedUserName, role, user, onMeetingEnd]);
 
   if (error) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[400px] p-4">
         <p className="text-red-500 mb-4">{error}</p>
         <button
-          onClick={() => navigate('/settings/zoom')}
+          onClick={() => navigate('/settings')}
           className="px-4 py-2 bg-primary text-primary-foreground rounded-md"
         >
           Connect Zoom Account
@@ -120,4 +121,4 @@ export function ZoomMeeting({
   return (
     <div id="zmmtg-root" className="w-full h-full" />
   );
-} 
+}

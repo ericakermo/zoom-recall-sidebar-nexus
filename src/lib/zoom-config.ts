@@ -21,11 +21,26 @@ export const loadZoomSDK = async () => {
 
 export const getSignature = async (meetingNumber: string, role: number) => {
   try {
+    // Get the token from localStorage
+    const token = localStorage.getItem('sb-qsxlvwwebbakmzpwjfbb-auth-token');
+    
+    if (!token) {
+      throw new Error('No authentication token found');
+    }
+    
+    // Parse the token to get the actual JWT
+    const parsedToken = JSON.parse(token);
+    const authToken = parsedToken?.access_token;
+    
+    if (!authToken) {
+      throw new Error('Invalid authentication token');
+    }
+    
     const response = await fetch(`${SUPABASE_URL}/functions/v1/generate-zoom-signature`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${localStorage.getItem('supabase.auth.token')}`
+        'Authorization': `Bearer ${authToken}`
       },
       body: JSON.stringify({
         meetingNumber,
