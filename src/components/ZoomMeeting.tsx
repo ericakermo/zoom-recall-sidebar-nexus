@@ -33,8 +33,9 @@ export function ZoomMeeting({
         await loadZoomSDK();
 
         // Get user's Zoom connection from Supabase
+        // Use type assertion to work around TypeScript issue with the zoom_connections table
         const { data: zoomConnection, error: dbError } = await supabase
-          .from('zoom_connections')
+          .from('zoom_connections' as any)
           .select('*')
           .eq('user_id', user?.id)
           .single();

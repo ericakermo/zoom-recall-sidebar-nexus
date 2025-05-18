@@ -17,10 +17,9 @@ export function ZoomSettings() {
       if (!user) return;
 
       try {
-        // We can't use type checking for this table yet since it's not in the types
-        // Using any type to bypass the TypeScript errors
+        // Use type assertion to work around TypeScript issue with the zoom_connections table
         const { data, error } = await supabase
-          .from('zoom_connections')
+          .from('zoom_connections' as any)
           .select('*')
           .eq('user_id', user.id)
           .single();
@@ -79,9 +78,9 @@ export function ZoomSettings() {
 
     try {
       setIsLoading(true);
-      // Using any type to bypass TypeScript errors
+      // Use type assertion to work around TypeScript issue with the zoom_connections table
       const { error } = await supabase
-        .from('zoom_connections')
+        .from('zoom_connections' as any)
         .delete()
         .eq('user_id', user.id);
 
