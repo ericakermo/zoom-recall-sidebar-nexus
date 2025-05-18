@@ -1,12 +1,13 @@
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
-import { createHash } from "https://deno.land/std@0.168.0/crypto/mod.ts";
+import { createHash, HmacSha256 } from "https://deno.land/std@0.168.0/crypto/mod.ts";
 import { encode as encodeBase64 } from 'https://deno.land/std@0.168.0/encoding/base64.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS'
 }
 
 // Set the Zoom SDK credentials
@@ -16,12 +17,15 @@ const ZOOM_API_SECRET = "iopNR5wnxdK3mEIVE1llzQqAWbxXEB1l";
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders })
+    return new Response(null, { 
+      status: 200,
+      headers: corsHeaders 
+    })
   }
 
   try {
     const supabaseClient = createClient(
-      Deno.env.get('SUPABASE_URL') || '',
+      Deno.env.get('SUPABASE_URL') || 'https://qsxlvwwebbakmzpwjfbb.supabase.co',
       Deno.env.get('SUPABASE_ANON_KEY') || '',
       {
         global: {
@@ -62,11 +66,14 @@ serve(async (req) => {
       )
     }
 
-    // Generate the signature using the hardcoded values
+    // Generate the signature
     const timestamp = new Date().getTime() - 30000
     const msg = Buffer.from(ZOOM_API_KEY + meetingNumber + timestamp + role).toString()
-    const hash = createHash("sha256").update(msg).digest()
-    const signature = encodeBase64(hash)
+    
+    // Using hmac instead of createHash
+    const key = ZOOM_API_SECRET;
+    const sigBytes = await new HmacSha256(key).update(msg).digest();
+    const signature = encodeBase64(sigBytes);
 
     return new Response(
       JSON.stringify({ signature }),
