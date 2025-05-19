@@ -1,115 +1,139 @@
 
 import { useState, useEffect, useRef } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { loadZoomSDK, getSignature, createAndInitializeZoomClient, joinZoomMeeting, leaveZoomMeeting } from '@/lib/zoom-config';
+import { Video, VideoOff, X } from 'lucide-react';
 
 export function JoinZoomMeeting() {
-  const [searchParams] = useSearchParams();
-  const meetingId = searchParams.get('meetingId') || '';
-  const password = searchParams.get('password') || '';
-  const [isJoining, setIsJoining] = useState(false);
-  const [isInMeeting, setIsInMeeting] = useState(false);
-  const [loadingState, setLoadingState] = useState<'idle' | 'loading-sdk' | 'ready' | 'error'>('idle');
-  const [errorMessage, setErrorMessage] = useState('');
   const { user } = useAuth();
   const { toast } = useToast();
-  const navigate = useNavigate();
-  const zoomContainerRef = useRef<HTMLDivElement>(null);
-  const zoomClientRef = useRef<any>(null);
+  const [searchParams] = useSearchParams();
+  
+  // Get meeting info from URL params if available
+  const meetingIdFromURL = searchParams.get('meetingId');
+  const passwordFromURL = searchParams.get('password') || '';
 
-  // Load the Zoom SDK when the component mounts
+  const [meetingId, setMeetingId] = useState(meetingIdFromURL || '');
+  const [password, setPassword] = useState(passwordFromURL || '');
+  const [isJoining, setIsJoining] = useState(false);
+  const [isInMeeting, setIsInMeeting] = useState(false);
+  const [isLoadingSDK, setIsLoadingSDK] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  
+  const zoomClientRef = useRef<any>(null);
+  const zoomRootRef = useRef<HTMLDivElement>(null);
+
+  // Load the Zoom SDK on component mount
   useEffect(() => {
+    let isMounted = true;
+    
     const initializeZoomSDK = async () => {
       try {
-        setLoadingState('loading-sdk');
-        await loadZoomSDK();
-        setLoadingState('ready');
-      } catch (error) {
-        console.error('Failed to load Zoom SDK:', error);
-        setErrorMessage('Failed to load Zoom Meeting SDK. Please try again later.');
-        setLoadingState('error');
-        toast({
-          title: 'Error',
-          description: 'Failed to load Zoom Meeting SDK',
-          variant: 'destructive',
-        });
+        setIsLoadingSDK(true);
+        setError(null);
+        
+        const isLoaded = await loadZoomSDK();
+        if (!isMounted) return;
+        
+        if (isLoaded) {
+          console.log('Zoom SDK loaded successfully');
+          setIsLoadingSDK(false);
+        }
+      } catch (err: any) {
+        console.error('Failed to load Zoom SDK:', err);
+        if (isMounted) {
+          setIsLoadingSDK(false);
+          setError('Failed to load Zoom SDK. Please try refreshing the page.');
+          toast({
+            title: "Error",
+            description: err.message || 'Failed to load Zoom SDK',
+            variant: "destructive"
+          });
+        }
       }
     };
 
     initializeZoomSDK();
-
-    // Cleanup function to leave meeting when component unmounts
+    
     return () => {
+      isMounted = false;
+      // Clean up meeting if component unmounts while in a meeting
       if (zoomClientRef.current && isInMeeting) {
         leaveZoomMeeting(zoomClientRef.current).catch(console.error);
       }
     };
   }, [toast]);
 
-  const handleJoinMeeting = async () => {
+  const handleJoinMeeting = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
     if (!user) {
       toast({
-        title: 'Authentication Required',
-        description: 'You need to be logged in to join meetings',
-        variant: 'destructive',
+        title: "Authentication Required",
+        description: "You must be logged in to join a meeting",
+        variant: "destructive"
       });
-      navigate('/auth');
       return;
     }
-
-    if (!meetingId) {
+    
+    // Validate meeting ID format
+    const formattedMeetingId = meetingId.replace(/\s+/g, '');
+    if (!/^\d{9,11}$/.test(formattedMeetingId)) {
       toast({
-        title: 'Meeting ID Required',
-        description: 'Please provide a valid meeting ID',
-        variant: 'destructive',
+        title: "Invalid Meeting ID",
+        description: "Please enter a valid Zoom meeting ID (9-11 digits)",
+        variant: "destructive"
       });
       return;
     }
-
-    if (!zoomContainerRef.current) {
+    
+    if (!zoomRootRef.current) {
       toast({
-        title: 'Error',
-        description: 'Zoom container not found',
-        variant: 'destructive',
+        title: "Error",
+        description: "Zoom container not found. Please try refreshing the page.",
+        variant: "destructive"
       });
       return;
     }
-
+    
     try {
       setIsJoining(true);
-
-      // Get the signature for joining the meeting
-      const signature = await getSignature(meetingId, 0); // 0 for attendee role
-
-      // Create and initialize the Zoom client
-      const client = await createAndInitializeZoomClient(zoomContainerRef.current);
+      setError(null);
+      
+      // Get signature from backend
+      const signature = await getSignature(formattedMeetingId, 0); // 0 = attendee role
+      
+      // Create and initialize Zoom client
+      const client = await createAndInitializeZoomClient(zoomRootRef.current);
       zoomClientRef.current = client;
-
-      // Join the Zoom meeting
+      
+      // Join the meeting
       await joinZoomMeeting(client, {
         signature,
-        meetingNumber: meetingId,
-        userName: user.email || 'User',
-        password,
+        meetingNumber: formattedMeetingId,
+        userName: user.email || 'Zoom User',
+        password: password,
         userEmail: user.email,
       });
-
+      
       setIsInMeeting(true);
       toast({
-        title: 'Success',
-        description: 'Joined the meeting successfully',
+        title: "Success",
+        description: "You have joined the meeting"
       });
-    } catch (error) {
-      console.error('Error joining meeting:', error);
-      setErrorMessage(`Failed to join meeting: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    } catch (err: any) {
+      console.error('Failed to join meeting:', err);
+      setError(err.message || 'Failed to join the meeting');
       toast({
-        title: 'Error Joining Meeting',
-        description: error instanceof Error ? error.message : 'Failed to join meeting',
-        variant: 'destructive',
+        title: "Error Joining Meeting",
+        description: err.message || 'An unexpected error occurred',
+        variant: "destructive"
       });
     } finally {
       setIsJoining(false);
@@ -120,77 +144,119 @@ export function JoinZoomMeeting() {
     if (zoomClientRef.current) {
       try {
         await leaveZoomMeeting(zoomClientRef.current);
+        zoomClientRef.current = null;
         setIsInMeeting(false);
         toast({
-          title: 'Left Meeting',
-          description: 'You have left the meeting',
+          title: "Meeting Left",
+          description: "You have left the Zoom meeting"
         });
-        navigate('/meetings');
-      } catch (error) {
-        console.error('Error leaving meeting:', error);
+      } catch (err: any) {
+        console.error('Error leaving meeting:', err);
         toast({
-          title: 'Error',
-          description: 'Failed to leave meeting properly',
-          variant: 'destructive',
+          title: "Error",
+          description: err.message || 'Failed to leave the meeting properly',
+          variant: "destructive"
         });
       }
     }
   };
 
   return (
-    <div className="w-full h-full flex flex-col">
-      <Card className="mb-4">
-        <CardHeader>
-          <CardTitle>Zoom Meeting: {meetingId}</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {loadingState === 'loading-sdk' && (
-            <div className="flex justify-center items-center p-8">
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
-              <span className="ml-4">Loading Zoom Meeting SDK...</span>
-            </div>
-          )}
-
-          {loadingState === 'error' && (
-            <div className="p-4 bg-destructive/10 text-destructive rounded-md">
-              <p>{errorMessage || 'An error occurred while loading the Zoom SDK'}</p>
-            </div>
-          )}
-
-          {loadingState === 'ready' && !isInMeeting && (
-            <div className="flex justify-center p-4">
-              <Button 
-                onClick={handleJoinMeeting} 
-                disabled={isJoining}
-                className="w-full md:w-auto"
-              >
-                {isJoining ? 'Joining...' : 'Join Meeting'}
-              </Button>
-            </div>
-          )}
-
-          <div 
-            ref={zoomContainerRef} 
-            className="zoom-component-view w-full"
-            style={{ 
-              height: isInMeeting ? '75vh' : '0',
-              overflow: 'hidden',
-              backgroundColor: '#fff',
-              transition: 'height 0.3s ease',
-              border: isInMeeting ? '1px solid #e2e8f0' : 'none',
-              borderRadius: '0.375rem'
-            }}
-          ></div>
-        </CardContent>
-        {isInMeeting && (
-          <CardFooter className="flex justify-end">
-            <Button variant="destructive" onClick={handleLeaveMeeting}>
+    <div className="w-full">
+      {isInMeeting ? (
+        <div className="relative h-[80vh] border rounded-lg overflow-hidden">
+          <div className="absolute top-4 right-4 z-10">
+            <Button 
+              variant="outline" 
+              size="sm"
+              className="bg-white/80 hover:bg-white/90 text-black"
+              onClick={handleLeaveMeeting}
+            >
+              <X className="h-4 w-4 mr-1" />
               Leave Meeting
             </Button>
-          </CardFooter>
-        )}
-      </Card>
+          </div>
+          
+          <div ref={zoomRootRef} className="w-full h-full"></div>
+        </div>
+      ) : (
+        <Card className="w-full max-w-md mx-auto">
+          <CardHeader>
+            <CardTitle>Join a Zoom Meeting</CardTitle>
+            <CardDescription>
+              Enter the meeting ID and password to join
+            </CardDescription>
+          </CardHeader>
+          
+          <form onSubmit={handleJoinMeeting}>
+            <CardContent className="space-y-4">
+              {isLoadingSDK ? (
+                <div className="flex flex-col items-center justify-center py-6">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mb-4"></div>
+                  <p>Loading Zoom SDK...</p>
+                </div>
+              ) : error ? (
+                <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-md">
+                  <p className="font-medium">Error</p>
+                  <p className="text-sm">{error}</p>
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    className="mt-2"
+                    onClick={() => window.location.reload()}
+                  >
+                    Reload Page
+                  </Button>
+                </div>
+              ) : (
+                <>
+                  <div className="space-y-2">
+                    <Label htmlFor="meetingId">Meeting ID</Label>
+                    <Input
+                      id="meetingId"
+                      placeholder="Enter 9-11 digit meeting ID"
+                      value={meetingId}
+                      onChange={(e) => setMeetingId(e.target.value)}
+                      required
+                    />
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label htmlFor="password">Password (if required)</Label>
+                    <Input
+                      id="password"
+                      type="password"
+                      placeholder="Meeting password"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                    />
+                  </div>
+                </>
+              )}
+            </CardContent>
+            
+            <CardFooter>
+              <Button 
+                type="submit" 
+                className="w-full"
+                disabled={isLoadingSDK || isJoining || !!error}
+              >
+                {isJoining ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                    Joining...
+                  </>
+                ) : (
+                  <>
+                    <Video className="mr-2 h-4 w-4" />
+                    Join Meeting
+                  </>
+                )}
+              </Button>
+            </CardFooter>
+          </form>
+        </Card>
+      )}
     </div>
   );
 }
-
