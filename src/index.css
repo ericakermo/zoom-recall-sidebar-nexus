@@ -99,3 +99,22 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* Zoom Meeting Styles */
+#zmmtg-root {
+  display: block;
+  position: fixed;
+  width: 100%;
+  height: 100%;
+  top: 0;
+  left: 0;
+  z-index: 1000;
+}
+
+.zoom-meeting {
+  position: relative;
+}
+
+.ReactModalPortal {
+  z-index: 1001;
+}

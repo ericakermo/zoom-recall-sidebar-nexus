@@ -6,6 +6,9 @@ export interface ZoomMeetingConfig {
   password?: string;
   apiKey: string;
   role: number; // 0 for attendee, 1 for host
+  leaveUrl?: string;
+  registrantToken?: string;
+  zakToken?: string;
 }
 
 export interface ZoomClient {
