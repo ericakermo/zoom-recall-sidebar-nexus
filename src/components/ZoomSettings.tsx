@@ -3,14 +3,36 @@ import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/context/AuthContext';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import * as z from 'zod';
+import { useNavigate } from 'react-router-dom';
+
+const joinMeetingSchema = z.object({
+  meetingId: z.string().min(9, 'Meeting ID must be at least 9 characters'),
+  meetingPassword: z.string().optional(),
+});
 
 export function ZoomSettings() {
   const [isConnected, setIsConnected] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const { user } = useAuth();
   const { toast } = useToast();
+  const navigate = useNavigate();
+
+  const joinForm = useForm<z.infer<typeof joinMeetingSchema>>({
+    resolver: zodResolver(joinMeetingSchema),
+    defaultValues: {
+      meetingId: '',
+      meetingPassword: '',
+    },
+  });
 
   useEffect(() => {
     const checkZoomConnection = async () => {
@@ -105,6 +127,10 @@ export function ZoomSettings() {
     }
   };
 
+  const onSubmitJoinMeeting = (values: z.infer<typeof joinMeetingSchema>) => {
+    navigate(`/meetings/join?meetingId=${values.meetingId}&password=${values.meetingPassword || ''}`);
+  };
+
   return (
     <Card>
       <CardHeader>
@@ -123,12 +149,61 @@ export function ZoomSettings() {
             <p className="text-sm text-green-600">
               Your Zoom account is connected
             </p>
-            <Button
-              variant="destructive"
-              onClick={handleDisconnectZoom}
-            >
-              Disconnect Zoom Account
-            </Button>
+            <div className="flex flex-col md:flex-row gap-4">
+              <Button 
+                onClick={() => navigate('/meetings')} 
+                className="w-full md:w-auto"
+              >
+                View My Meetings
+              </Button>
+              <Dialog>
+                <DialogTrigger asChild>
+                  <Button variant="outline" className="w-full md:w-auto">Join a Meeting</Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Join Zoom Meeting</DialogTitle>
+                    <DialogDescription>
+                      Enter the meeting ID and password (if required) to join.
+                    </DialogDescription>
+                  </DialogHeader>
+                  <Form {...joinForm}>
+                    <form onSubmit={joinForm.handleSubmit(onSubmitJoinMeeting)} className="space-y-4">
+                      <FormField
+                        control={joinForm.control}
+                        name="meetingId"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Meeting ID</FormLabel>
+                            <FormControl>
+                              <Input placeholder="123 456 7890" {...field} />
+                            </FormControl>
+                            <FormDescription>
+                              Enter the 9-11 digit meeting ID
+                            </FormDescription>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={joinForm.control}
+                        name="meetingPassword"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Password (Optional)</FormLabel>
+                            <FormControl>
+                              <Input placeholder="Meeting password" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <Button type="submit" className="w-full">Join Meeting</Button>
+                    </form>
+                  </Form>
+                </DialogContent>
+              </Dialog>
+            </div>
           </div>
         ) : (
           <Button onClick={handleConnectZoom}>
@@ -136,6 +211,18 @@ export function ZoomSettings() {
           </Button>
         )}
       </CardContent>
+      {isConnected && (
+        <CardFooter className="flex justify-end">
+          <Button
+            variant="destructive"
+            onClick={handleDisconnectZoom}
+            size="sm"
+          >
+            Disconnect Zoom Account
+          </Button>
+        </CardFooter>
+      )}
     </Card>
   );
 }
+
