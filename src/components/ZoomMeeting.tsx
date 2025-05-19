@@ -1,4 +1,3 @@
-
 import { useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
@@ -87,38 +86,19 @@ export function ZoomMeeting({
     }
   };
 
+  // Add this useEffect to handle container mounting
   useEffect(() => {
-    // Prevent multiple initializations
-    if (zoomInitializedRef.current) {
-      console.log('Zoom already initialized, skipping');
+    // Only proceed with initialization if container exists
+    if (!zoomContainerRef.current) {
+      console.log('Waiting for Zoom container to be mounted...');
       return;
     }
-    
+
     const initializeZoom = async () => {
       try {
         setIsLoading(true);
-        
-        // Load Zoom SDK
         await loadZoomSDK();
-
-        // Get user's Zoom connection from Supabase
-        if (user?.id && role === 1) {
-          // Use a generic approach to query the zoom_connections table
-          const { data, error } = await supabase
-            .from('zoom_connections' as any)
-            .select('*')
-            .eq('user_id', user.id)
-            .single();
-
-          if (error && error.code !== 'PGRST116') { // PGRST116 is "no rows returned" error
-            throw new Error('Error fetching Zoom connection');
-          }
-
-          if (!data && role === 1) {
-            throw new Error('No Zoom connection found. Please connect your Zoom account first to host meetings.');
-          }
-        }
-
+        
         // Get meeting signature from your backend
         const signature = await getSignature(meetingNumber, role);
 
@@ -126,13 +106,9 @@ export function ZoomMeeting({
           signature,
           meetingNumber,
           userName: providedUserName || user?.email || 'Guest',
-          apiKey: "eFAZ8Vf7RbG5saQVqL1zGA", // Use the API key directly
+          apiKey: "eFAZ8Vf7RbG5saQVqL1zGA",
           role,
         };
-
-        if (!zoomContainerRef.current) {
-          throw new Error('Zoom container element is not available.');
-        }
 
         // Initialize Zoom Meeting
         const zoomClient = await createAndInitializeZoomClient(zoomContainerRef.current);
@@ -147,16 +123,9 @@ export function ZoomMeeting({
           password: ''
         });
 
-        console.log('Successfully joined the meeting');
         setIsLoading(false);
         setIsConnected(true);
-        setParticipantCount(1); // Start with at least one participant (yourself)
         
-        toast({
-          title: "Meeting Joined",
-          description: "You have successfully joined the Zoom meeting"
-        });
-
       } catch (err: any) {
         console.error('Error initializing Zoom:', err);
         setError(err.message || 'Failed to initialize Zoom meeting');
@@ -165,27 +134,7 @@ export function ZoomMeeting({
     };
 
     initializeZoom();
-
-    return () => {
-      if (zoomClientRef.current && isConnected) {
-        leaveZoomMeeting(zoomClientRef.current)
-          .then(() => {
-            console.log('Left the meeting during cleanup');
-            onMeetingEnd?.();
-          })
-          .catch((error) => {
-            console.error('Error leaving meeting during cleanup:', error);
-          });
-      } else if (window.ZoomMtg && isConnected) {
-        window.ZoomMtg.leaveMeeting({
-          success: () => {
-            console.log('Left the meeting during cleanup');
-            onMeetingEnd?.();
-          }
-        });
-      }
-    };
-  }, [meetingNumber, providedUserName, role, user, onMeetingEnd]);
+  }, [meetingNumber, providedUserName, role, user]); // Add zoomContainerRef.current as dependency
 
   // Handle keyboard shortcuts
   useEffect(() => {
@@ -229,9 +178,14 @@ export function ZoomMeeting({
   }
 
   return (
-    <>
-      <div id="zmmtg-root" className="w-full h-full relative">
-        <div ref={zoomContainerRef} className="w-full h-full"></div>
+    <div className="relative w-full h-full">
+      <div 
+        ref={zoomContainerRef} 
+        className="w-full h-full min-h-[500px]"
+        style={{ position: 'relative' }}
+      >
+        {isLoading && <div>Loading Zoom meeting...</div>}
+        {error && <div>Error: {error}</div>}
       </div>
       
       {isConnected && (
@@ -312,6 +266,6 @@ export function ZoomMeeting({
           </Button>
         </div>
       )}
-    </>
+    </div>
   );
 }
