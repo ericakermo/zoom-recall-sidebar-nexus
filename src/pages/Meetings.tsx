@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { Button } from '@/components/ui/button';
@@ -62,9 +61,9 @@ const Meetings = () => {
     try {
       setIsConnectingToZoom(true);
 
-      // Check if user has connected their Zoom account using a generic approach
+      // Check if user has connected their Zoom account
       const { data: zoomConnection, error: connectionError } = await supabase
-        .from('zoom_connections' as any)
+        .from('zoom_connections')
         .select('*')
         .eq('user_id', user.id)
         .single();
@@ -78,17 +77,28 @@ const Meetings = () => {
         setIsConnectingToZoom(false);
         return;
       }
+
+      // Create a new meeting via the serverless function
+      const response = await fetch(`${SUPABASE_URL}/functions/v1/create-zoom-meeting`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to create meeting');
+      }
+
+      const meetingData = await response.json();
       
-      // For now, we'll just use a hardcoded meeting ID for hosting
-      // In a real application, you would create a new meeting via Zoom API
-      const demoMeetingId = "1234567890"; // This would normally be created via API
-      
-      setActiveMeeting(demoMeetingId);
+      setActiveMeeting(meetingData.id);
       setIsHosting(true);
       
       toast({
         title: "Meeting Created",
-        description: `You are now hosting meeting ${demoMeetingId}`,
+        description: `You are now hosting meeting ${meetingData.id}`,
       });
     } catch (error: any) {
       console.error("Error hosting meeting:", error);
