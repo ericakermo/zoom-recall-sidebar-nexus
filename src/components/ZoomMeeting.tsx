@@ -35,6 +35,7 @@ export function ZoomMeeting({
   const { user } = useAuth();
   const { toast } = useToast();
   const zoomInitializedRef = useRef(false);
+  const [containerReady, setContainerReady] = useState(false);
 
   // Handle meeting controls
   const toggleMute = () => {
@@ -86,46 +87,44 @@ export function ZoomMeeting({
     }
   };
 
-  // Add this useEffect to handle container mounting
+  // Separate useEffect for container mounting
   useEffect(() => {
-    // Only proceed with initialization if container exists
-    if (!zoomContainerRef.current) {
-      console.log('Waiting for Zoom container to be mounted...');
+    if (zoomContainerRef.current) {
+      setContainerReady(true);
+    }
+  }, []);
+
+  // Main initialization useEffect
+  useEffect(() => {
+    // Only proceed if container is ready
+    if (!containerReady || !zoomContainerRef.current) {
       return;
     }
 
     const initializeZoom = async () => {
       try {
         setIsLoading(true);
+        
+        // Load SDK first
         await loadZoomSDK();
         
-        // Get meeting signature from your backend
+        // Get signature
         const signature = await getSignature(meetingNumber, role);
 
-        const meetingConfig: ZoomMeetingConfig = {
+        // Initialize client with the ready container
+        const zoomClient = await createAndInitializeZoomClient(zoomContainerRef.current);
+        zoomClientRef.current = zoomClient;
+
+        // Join meeting
+        await joinZoomMeeting(zoomClient, {
           signature,
           meetingNumber,
           userName: providedUserName || user?.email || 'Guest',
-          apiKey: "eFAZ8Vf7RbG5saQVqL1zGA",
-          role,
-        };
-
-        // Initialize Zoom Meeting
-        const zoomClient = await createAndInitializeZoomClient(zoomContainerRef.current);
-        zoomClientRef.current = zoomClient;
-        zoomInitializedRef.current = true;
-
-        // Join the meeting
-        await joinZoomMeeting(zoomClient, {
-          signature: meetingConfig.signature,
-          meetingNumber: meetingConfig.meetingNumber,
-          userName: meetingConfig.userName,
           password: ''
         });
 
         setIsLoading(false);
         setIsConnected(true);
-        
       } catch (err: any) {
         console.error('Error initializing Zoom:', err);
         setError(err.message || 'Failed to initialize Zoom meeting');
@@ -134,7 +133,7 @@ export function ZoomMeeting({
     };
 
     initializeZoom();
-  }, [meetingNumber, providedUserName, role, user]); // Add zoomContainerRef.current as dependency
+  }, [containerReady, meetingNumber, providedUserName, role, user]);
 
   // Handle keyboard shortcuts
   useEffect(() => {
@@ -181,6 +180,7 @@ export function ZoomMeeting({
     <div className="relative w-full h-full">
       <div 
         ref={zoomContainerRef} 
+        id="zoom-meeting-container"
         className="w-full h-full min-h-[500px]"
         style={{ position: 'relative' }}
       >
