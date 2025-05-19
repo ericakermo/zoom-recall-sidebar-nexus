@@ -9,6 +9,7 @@ export interface ZoomMeetingConfig {
   leaveUrl?: string;
   registrantToken?: string;
   zakToken?: string;
+  userEmail?: string;
 }
 
 export interface ZoomClient {
