@@ -11,6 +11,7 @@ import { useToast } from '@/hooks/use-toast';
 
 interface ZoomMeetingProps {
   meetingNumber: string;
+  meetingPassword?: string;
   userName?: string;
   role?: number;
   onMeetingEnd?: () => void;
@@ -18,6 +19,7 @@ interface ZoomMeetingProps {
 
 export function ZoomMeeting({
   meetingNumber,
+  meetingPassword,
   userName: providedUserName,
   role = 0, // 0 for attendee, 1 for host
   onMeetingEnd
@@ -36,6 +38,7 @@ export function ZoomMeeting({
   const { toast } = useToast();
   const zoomInitializedRef = useRef(false);
   const [containerReady, setContainerReady] = useState(false);
+  const [meetingPassword, setMeetingPassword] = useState('');
 
   // Handle meeting controls
   const toggleMute = () => {
@@ -120,7 +123,7 @@ export function ZoomMeeting({
           signature,
           meetingNumber,
           userName: providedUserName || user?.email || 'Guest',
-          password: ''
+          password: meetingPassword || ''
         });
 
         setIsLoading(false);
@@ -133,7 +136,7 @@ export function ZoomMeeting({
     };
 
     initializeZoom();
-  }, [containerReady, meetingNumber, providedUserName, role, user]);
+  }, [containerReady, meetingNumber, providedUserName, role, user, meetingPassword]);
 
   // Handle keyboard shortcuts
   useEffect(() => {
