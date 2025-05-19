@@ -27,9 +27,9 @@ export const loadZoomSDK = (): Promise<boolean> => {
     try {
       console.log('Beginning Zoom Component SDK loading process');
 
-      const reactScriptUrl = 'https://source.zoom.us/2.18.0/lib/vendor/react.min.js';
-      const reactDOMScriptUrl = 'https://source.zoom.us/2.18.0/lib/vendor/react-dom.min.js';
-      const zoomEmbeddedSdkUrl = 'https://source.zoom.us/2.18.0/zoom-meeting-embedded-2.18.0.min.js';
+      const reactScriptUrl = 'https://source.zoom.us/3.13.2/lib/vendor/react.min.js';
+      const reactDOMScriptUrl = 'https://source.zoom.us/3.13.2/lib/vendor/react-dom.min.js';
+      const zoomEmbeddedSdkUrl = 'https://source.zoom.us/3.13.2/zoom-meeting-embedded-3.13.2.min.js';
 
       const loadScriptSequentially = async (url: string, name: string, globalToCheck?: string) => {
         if (globalToCheck && (window as any)[globalToCheck]) {
