@@ -1,4 +1,3 @@
-
 import { ZoomMeetingConfig } from '@/types/zoom';
 
 // Use the client ID directly for sdkKey
@@ -253,4 +252,57 @@ export const leaveZoomMeeting = async (client: any): Promise<void> => {
         }
         // Don't necessarily throw, as user might be trying to clean up an already ended session
     }
+};
+
+// Add this interface for meeting creation parameters
+interface CreateMeetingParams {
+  topic?: string;
+  type?: number; // 1 for instant meeting, 2 for scheduled meeting
+  settings?: {
+    host_video?: boolean;
+    participant_video?: boolean;
+    join_before_host?: boolean;
+    mute_upon_entry?: boolean;
+    waiting_room?: boolean;
+  };
+}
+
+// Add this function to create a meeting
+export const createZoomMeeting = async (params: CreateMeetingParams = {}): Promise<any> => {
+  try {
+    const tokenData = localStorage.getItem('sb-qsxlvwwebbakmzpwjfbb-auth-token');
+    if (!tokenData) {
+      throw new Error('Supabase auth token not found.');
+    }
+    
+    const parsedToken = JSON.parse(tokenData);
+    const authToken = parsedToken?.access_token;
+    if (!authToken) {
+      throw new Error('Invalid Supabase auth token structure.');
+    }
+
+    const response = await fetch(`${SUPABASE_URL}/functions/v1/create-zoom-meeting`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${authToken}`,
+      },
+      body: JSON.stringify(params),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Failed to create meeting: ${response.status}. ${errorText}`);
+    }
+
+    const meetingData = await response.json();
+    if (!meetingData.id) {
+      throw new Error('Meeting ID not found in response');
+    }
+
+    return meetingData;
+  } catch (error) {
+    console.error('Error creating Zoom meeting:', error);
+    throw error;
+  }
 };

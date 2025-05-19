@@ -9,6 +9,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/context/AuthContext';
 import { Video, VideoOff, X } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
+import { createZoomMeeting } from '@/lib/zoom-config';
 
 interface MeetingFormData {
   meetingId: string;
@@ -78,20 +79,18 @@ const Meetings = () => {
         return;
       }
 
-      // Create a new meeting via the serverless function
-      const response = await fetch(`${SUPABASE_URL}/functions/v1/create-zoom-meeting`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`,
-          'Content-Type': 'application/json'
+      // Create a new meeting using the zoom-config function
+      const meetingData = await createZoomMeeting({
+        topic: 'Instant Meeting',
+        type: 1,
+        settings: {
+          host_video: true,
+          participant_video: true,
+          join_before_host: false,
+          mute_upon_entry: true,
+          waiting_room: true
         }
       });
-
-      if (!response.ok) {
-        throw new Error('Failed to create meeting');
-      }
-
-      const meetingData = await response.json();
       
       setActiveMeeting(meetingData.id);
       setIsHosting(true);
