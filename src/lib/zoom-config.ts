@@ -119,19 +119,17 @@ export const loadZoomSDK = async (): Promise<boolean> => {
           console.log('ZoomMtgEmbedded version:', window.ZoomMtgEmbedded.version || 'unknown');
           
           try {
-            // Verify assets are accessible
-            console.log('Verifying asset accessibility...');
-            const assetPath = 'https://source.zoom.us/3.13.2/lib';
-            const testAsset = await fetch(`${assetPath}/av/av.js`);
-            if (!testAsset.ok) {
-              throw new Error('Failed to verify asset accessibility');
+            // Create a test client to verify SDK is working
+            const testClient = window.ZoomMtgEmbedded.createClient();
+            if (!testClient) {
+              throw new Error('Failed to create test client');
             }
             
-            console.log('All assets loaded and verified successfully');
+            console.log('SDK initialization verified successfully');
             zoomSDKLoaded = true;
             resolve(true);
           } catch (error) {
-            console.error('Error during asset verification:', error);
+            console.error('Error during SDK verification:', error);
             reject(error);
           }
         } else if (attempts >= maxAttempts) {
