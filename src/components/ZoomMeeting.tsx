@@ -1,3 +1,4 @@
+
 import { useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
@@ -38,7 +39,7 @@ export function ZoomMeeting({
   const { toast } = useToast();
   const zoomInitializedRef = useRef(false);
   const [containerReady, setContainerReady] = useState(false);
-  const [meetingPassword, setMeetingPassword] = useState('');
+  const [storedPassword, setStoredPassword] = useState('');
 
   // Handle meeting controls
   const toggleMute = () => {
