@@ -90,6 +90,22 @@ export function ZoomMeeting({
     }
   };
 
+  // Suppress the chrome message port error
+  useEffect(() => {
+    const originalConsoleError = console.error;
+    console.error = function(message, ...args) {
+      if (typeof message === 'string' && message.includes('message port closed')) {
+        // Ignore the message port closed error
+        return;
+      }
+      originalConsoleError.apply(console, [message, ...args]);
+    };
+    
+    return () => {
+      console.error = originalConsoleError;
+    };
+  }, []);
+
   // Separate useEffect for container mounting
   useEffect(() => {
     const checkContainer = () => {
@@ -148,17 +164,25 @@ export function ZoomMeeting({
         console.log('Client initialized, joining meeting...');
         zoomClientRef.current = zoomClient;
 
-        // Join meeting
-        await joinZoomMeeting(zoomClient, {
-          signature,
-          meetingNumber,
-          userName: providedUserName || user?.email || 'Guest',
-          password: meetingPassword || ''
-        });
+        // Join meeting with a small delay to ensure client is ready
+        setTimeout(async () => {
+          try {
+            await joinZoomMeeting(zoomClient, {
+              signature,
+              meetingNumber,
+              userName: providedUserName || user?.email || 'Guest',
+              password: meetingPassword || ''
+            });
 
-        console.log('Meeting joined successfully');
-        setIsLoading(false);
-        setIsConnected(true);
+            console.log('Meeting joined successfully');
+            setIsLoading(false);
+            setIsConnected(true);
+          } catch (joinError) {
+            console.error('Error joining meeting:', joinError);
+            setError('Failed to join meeting: ' + (joinError.message || 'Unknown error'));
+            setIsLoading(false);
+          }
+        }, 500);
       } catch (err: any) {
         console.error('Detailed Zoom initialization error:', err);
         setError(err.message || 'Failed to initialize Zoom meeting');
