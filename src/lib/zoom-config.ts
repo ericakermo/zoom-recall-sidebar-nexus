@@ -10,78 +10,85 @@ let zoomSDKLoadingPromise: Promise<boolean> | null = null;
 let zoomSDKLoaded = false; // Tracks if ZoomMtgEmbedded is confirmed available
 
 export const loadZoomSDK = (): Promise<boolean> => {
-  if (zoomSDKLoaded && window.ZoomMtgEmbedded) {
+  // If SDK is already loaded and ZoomMtgEmbedded is available, resolve immediately
+  if (window.ZoomMtgEmbedded) {
     console.log('Zoom Component SDK already loaded and ZoomMtgEmbedded is available.');
     return Promise.resolve(true);
   }
 
+  // If loading is already in progress, return the existing promise
   if (zoomSDKLoadingPromise) {
     console.log('Zoom Component SDK loading is already in progress.');
     return zoomSDKLoadingPromise;
   }
 
+  // Start the loading process
   zoomSDKLoadingPromise = new Promise<boolean>(async (resolve, reject) => {
     try {
       console.log('Beginning Zoom Component SDK loading process');
 
-      // Only load the Zoom SDK, skip React/ReactDOM
+      // Load the SDK script
       const zoomEmbeddedSdkUrl = 'https://source.zoom.us/3.13.2/zoom-meeting-embedded-3.13.2.min.js';
+      
+      const loadScript = (url: string): Promise<void> => {
+        return new Promise((res, rej) => {
+          if (document.querySelector(`script[src="${url}"]`)) {
+            console.log('Script already exists:', url);
+            res();
+            return;
+          }
 
-      const loadScriptSequentially = async (url: string, name: string) => {
-        if (document.querySelector(`script[src="${url}"]`)) {
-          console.log(`${name} script tag already exists.`);
-          return;
-        }
-        return new Promise<void>((res, rej) => {
-          console.log(`Loading ${name}...`);
+          console.log('Loading script:', url);
           const script = document.createElement('script');
           script.src = url;
           script.async = false;
           script.onload = () => {
-            console.log(`${name} loaded successfully.`);
+            console.log('Script loaded successfully:', url);
             res();
           };
           script.onerror = (e) => {
-            console.error(`Failed to load ${name}`, e);
-            rej(new Error(`Failed to load ${name}`));
+            console.error('Failed to load script:', url, e);
+            rej(new Error(`Failed to load ${url}`));
           };
           document.head.appendChild(script);
         });
       };
 
-      // Load only the Zoom SDK
-      if (!window.ZoomMtgEmbedded && !document.querySelector(`script[src="${zoomEmbeddedSdkUrl}"]`)) {
-        await loadScriptSequentially(zoomEmbeddedSdkUrl, 'Zoom Embedded SDK');
-      }
+      // Load the SDK
+      await loadScript(zoomEmbeddedSdkUrl);
 
-      // Poll for window.ZoomMtgEmbedded
-      const maxAttempts = 40;
+      // Poll for window.ZoomMtgEmbedded with increased timeout
+      const maxAttempts = 60; // Increased from 40
       let attempts = 0;
-      const pollInterval = 300;
+      const pollInterval = 500; // Increased from 300
 
       const checkZoomEmbeddedAvailability = () => {
         attempts++;
+        console.log(`Checking for ZoomMtgEmbedded (attempt ${attempts}/${maxAttempts})`);
+        
         if (window.ZoomMtgEmbedded) {
-          console.log(`ZoomMtgEmbedded object detected after ${attempts} attempts.`);
+          console.log('ZoomMtgEmbedded found!');
           zoomSDKLoaded = true;
           resolve(true);
         } else if (attempts >= maxAttempts) {
-          console.error(`ZoomMtgEmbedded not available after ${attempts} attempts.`);
-          console.log('Current window keys (searching for "zoom"):', Object.keys(window).filter(k => k.toLowerCase().includes('zoom')));
+          console.error('ZoomMtgEmbedded not available after maximum attempts');
+          console.log('Current window keys:', Object.keys(window));
           reject(new Error('Timed out waiting for ZoomMtgEmbedded to initialize'));
         } else {
           setTimeout(checkZoomEmbeddedAvailability, pollInterval);
         }
       };
+
       // Start polling
       checkZoomEmbeddedAvailability();
 
     } catch (error) {
       console.error('Error during SDK loading sequence:', error);
-      zoomSDKLoadingPromise = null; // Reset promise on critical error to allow retry
+      zoomSDKLoadingPromise = null;
       reject(error);
     }
   });
+
   return zoomSDKLoadingPromise;
 };
 

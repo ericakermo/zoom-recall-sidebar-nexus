@@ -1,4 +1,3 @@
-
 import { useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
@@ -137,68 +136,74 @@ export function ZoomMeeting({
 
   // Main initialization useEffect
   useEffect(() => {
-    // Only proceed if container is ready
-    if (!containerReady || !zoomContainerRef.current) {
-      return;
-    }
+    let isMounted = true;
 
     const initializeZoom = async () => {
       try {
         setIsLoading(true);
-        console.log('Starting Zoom initialization...');
-        
-        // Load SDK first
-        await loadZoomSDK();
-        console.log('SDK loaded successfully');
-        
-        // Get signature
-        const signature = await getSignature(meetingNumber, role);
-        console.log('Signature obtained');
+        setError(null);
 
-        // Initialize client with the ready container
+        // 1. Load SDK first with retry
+        let retryCount = 0;
+        const maxRetries = 3;
+        
+        while (retryCount < maxRetries) {
+          try {
+            await loadZoomSDK();
+            break;
+          } catch (err) {
+            retryCount++;
+            if (retryCount === maxRetries) throw err;
+            console.log(`Retrying SDK load (${retryCount}/${maxRetries})...`);
+            await new Promise(resolve => setTimeout(resolve, 1000));
+          }
+        }
+        
+        // 2. Get signature
+        const signature = await getSignature(meetingNumber, role);
+
+        // 3. Initialize client with the container
         if (!zoomContainerRef.current) {
           throw new Error('Zoom container not available');
         }
+
+        // Wait for container to be fully ready
+        await new Promise(resolve => setTimeout(resolve, 500));
+
+        const client = await createAndInitializeZoomClient(zoomContainerRef.current);
+        if (!isMounted) return;
         
-        console.log('Container ready, initializing client...');
-        const zoomClient = await createAndInitializeZoomClient(zoomContainerRef.current, {
-          zoomAppRoot: zoomContainerRef.current,
-          language: 'en-US',
-          patchJsMedia: true,
-          assetPath: 'https://source.zoom.us/3.13.2/lib',
+        zoomClientRef.current = client;
+
+        // 4. Join meeting
+        await joinZoomMeeting(client, {
+          signature,
+          meetingNumber,
+          userName: providedUserName || user?.email || 'Guest',
+          password: meetingPassword || ''
         });
-        
-        console.log('Client initialized, joining meeting...');
-        zoomClientRef.current = zoomClient;
 
-        // Join meeting with a small delay to ensure client is ready
-        setTimeout(async () => {
-          try {
-            await joinZoomMeeting(zoomClient, {
-              signature,
-              meetingNumber,
-              userName: providedUserName || user?.email || 'Guest',
-              password: meetingPassword || ''
-            });
-
-            console.log('Meeting joined successfully');
-            setIsLoading(false);
-            setIsConnected(true);
-          } catch (joinError) {
-            console.error('Error joining meeting:', joinError);
-            setError('Failed to join meeting: ' + (joinError.message || 'Unknown error'));
-            setIsLoading(false);
-          }
-        }, 500);
-      } catch (err: any) {
-        console.error('Detailed Zoom initialization error:', err);
-        setError(err.message || 'Failed to initialize Zoom meeting');
+        if (!isMounted) return;
         setIsLoading(false);
+        setIsConnected(true);
+      } catch (err: any) {
+        console.error('Error initializing Zoom:', err);
+        if (isMounted) {
+          setError(err.message || 'Failed to initialize Zoom meeting');
+          setIsLoading(false);
+        }
       }
     };
 
     initializeZoom();
-  }, [containerReady, meetingNumber, providedUserName, role, user, meetingPassword]);
+
+    return () => {
+      isMounted = false;
+      if (zoomClientRef.current) {
+        leaveZoomMeeting(zoomClientRef.current).catch(console.error);
+      }
+    };
+  }, [meetingNumber, meetingPassword, providedUserName, role, user]);
 
   // Handle keyboard shortcuts
   useEffect(() => {
