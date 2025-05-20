@@ -1,226 +1,326 @@
-import React, { useEffect, useRef, useState } from 'react';
-import { createAndInitializeZoomClient, getSignature, joinZoomMeeting, leaveZoomMeeting } from '@/lib/zoom-config';
+import { useEffect, useState, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { loadZoomSDK, createAndInitializeZoomClient, getSignature, joinZoomMeeting, leaveZoomMeeting } from '@/lib/zoom-config';
+import { useAuth } from '@/context/AuthContext';
+import { Button } from '@/components/ui/button';
+import { Mic, MicOff, Video, VideoOff, PhoneOff } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
 
 interface ZoomMeetingProps {
   meetingNumber: string;
-  userName: string;
-  userEmail?: string;
-  password?: string;
+  meetingPassword?: string;
+  userName?: string;
   role?: number;
-  onLeave?: () => void;
+  onMeetingEnd?: () => void;
 }
 
-export const ZoomMeeting: React.FC<ZoomMeetingProps> = ({
+export function ZoomMeeting({
   meetingNumber,
-  userName,
-  userEmail,
-  password,
+  meetingPassword,
+  userName: providedUserName,
   role = 0,
-  onLeave
-}) => {
+  onMeetingEnd
+}: ZoomMeetingProps) {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isMuted, setIsMuted] = useState(false);
   const [isVideoOff, setIsVideoOff] = useState(false);
   const [isConnected, setIsConnected] = useState(false);
-  const [isContainerReady, setIsContainerReady] = useState(false);
-  const [isSDKLoaded, setIsSDKLoaded] = useState(false);
-  
+  const [containerReady, setContainerReady] = useState(false);
+  const [sdkLoaded, setSdkLoaded] = useState(false);
   const zoomContainerRef = useRef<HTMLDivElement>(null);
   const zoomClientRef = useRef<any>(null);
+  const navigate = useNavigate();
+  const { user } = useAuth();
+  const { toast } = useToast();
 
-  // Check container setup and dimensions
-  useEffect(() => {
-    const checkContainer = () => {
-      if (zoomContainerRef.current) {
-        const container = zoomContainerRef.current;
-        const style = window.getComputedStyle(container);
-        
-        // Check if container is visible and has dimensions
-        if (
-          container.offsetWidth > 0 &&
-          container.offsetHeight > 0 &&
-          style.display !== 'none' &&
-          style.visibility !== 'hidden' &&
-          style.opacity !== '0'
-        ) {
-          console.log('Container is ready:', {
-            width: container.offsetWidth,
-            height: container.offsetHeight,
-            display: style.display,
-            visibility: style.visibility,
-            opacity: style.opacity
-          });
-          setIsContainerReady(true);
-          return true;
-        }
-      }
-      return false;
-    };
-
-    // Initial check
-    if (!checkContainer()) {
-      // If not ready, retry every 500ms for up to 10 seconds
-      let attempts = 0;
-      const maxAttempts = 20;
-      const interval = setInterval(() => {
-        attempts++;
-        if (checkContainer() || attempts >= maxAttempts) {
-          clearInterval(interval);
-        }
-      }, 500);
-
-      return () => clearInterval(interval);
+  // Handle meeting controls
+  const toggleMute = () => {
+    if (!window.ZoomMtgEmbedded) return;
+    
+    if (isMuted) {
+      window.ZoomMtgEmbedded.unmuteAudio();
+      setIsMuted(false);
+    } else {
+      window.ZoomMtgEmbedded.muteAudio();
+      setIsMuted(true);
     }
+  };
+
+  const toggleVideo = () => {
+    if (!window.ZoomMtgEmbedded) return;
+    
+    if (isVideoOff) {
+      window.ZoomMtgEmbedded.startVideo();
+      setIsVideoOff(false);
+    } else {
+      window.ZoomMtgEmbedded.stopVideo();
+      setIsVideoOff(true);
+    }
+  };
+
+  const leaveMeeting = () => {
+    if (zoomClientRef.current) {
+      leaveZoomMeeting(zoomClientRef.current)
+        .then(() => {
+          console.log('Left the meeting');
+          setIsConnected(false);
+          onMeetingEnd?.();
+        })
+        .catch((error: any) => {
+          console.error('Error leaving meeting:', error);
+        });
+    }
+  };
+
+  // Container setup check
+  useEffect(() => {
+    if (!zoomContainerRef.current) return;
+    
+    console.log('Starting container setup check');
+    
+    const container = zoomContainerRef.current;
+    const parentElement = container.parentElement;
+    
+    console.log('Container parent dimensions:', {
+      width: parentElement?.offsetWidth,
+      height: parentElement?.offsetHeight,
+      display: parentElement ? window.getComputedStyle(parentElement).display : 'none'
+    });
+    
+    // Ensure container has explicit dimensions
+    if (container && (!container.offsetWidth || !container.offsetHeight)) {
+      console.log('Container has no dimensions, forcing layout');
+      container.style.width = parentElement?.offsetWidth ? `${parentElement.offsetWidth}px` : '100%';
+      container.style.height = '500px';
+    }
+    
+    // Check after a short delay to ensure styles are applied
+    const checkContainer = () => {
+      if (!zoomContainerRef.current) return;
+      
+      const dimensions = {
+        width: container.offsetWidth,
+        height: container.offsetHeight,
+        id: container.id,
+        display: window.getComputedStyle(container).display,
+        position: window.getComputedStyle(container).position
+      };
+      
+      console.log('Container dimensions check:', dimensions);
+      
+      if (dimensions.width > 0 && dimensions.height > 0) {
+        console.log('Container dimensions verified:', dimensions);
+        setContainerReady(true);
+      } else {
+        console.log('Container dimensions not ready, retrying...');
+        setTimeout(checkContainer, 200);
+      }
+    };
+    
+    // Initial delay to ensure DOM is settled
+    setTimeout(checkContainer, 300);
+    
+    return () => {
+      setContainerReady(false);
+    };
+  }, []);
+  
+  // Load Zoom SDK
+  useEffect(() => {
+    console.log('Loading Zoom SDK separately');
+    
+    const loadSdk = async () => {
+      try {
+        await loadZoomSDK();
+        console.log('SDK loaded successfully');
+        setSdkLoaded(true);
+      } catch (err) {
+        console.error('Failed to load Zoom SDK:', err);
+        setError('Failed to load Zoom meetings SDK. Please try refreshing the page.');
+      }
+    };
+    
+    loadSdk();
   }, []);
 
-  // Initialize Zoom client and join meeting
+  // Main initialization useEffect
   useEffect(() => {
-    const initializeZoom = async () => {
-      if (!isContainerReady || !zoomContainerRef.current) {
-        console.log('Waiting for container to be ready...');
-        return;
-      }
+    if (!containerReady || !sdkLoaded) {
+      console.log('Waiting for container and SDK to be ready:', { containerReady, sdkLoaded });
+      return;
+    }
+    
+    console.log('Container and SDK ready, proceeding with initialization');
+    let isMounted = true;
 
+    const initializeZoom = async () => {
       try {
         setIsLoading(true);
         setError(null);
-
-        // Create and initialize Zoom client
-        const client = await createAndInitializeZoomClient(zoomContainerRef.current);
-        zoomClientRef.current = client;
-        setIsSDKLoaded(true);
-
-        // Get signature for the meeting
+        
+        // Get signature
+        console.log('Getting signature for meeting:', meetingNumber);
         const signature = await getSignature(meetingNumber, role);
+        console.log('Received signature successfully');
 
-        // Join the meeting
+        // Verify container
+        if (!zoomContainerRef.current) {
+          throw new Error('Meeting container disappeared. Please refresh the page.');
+        }
+        
+        // Initialize client
+        console.log('Creating and initializing Zoom client');
+        const client = await createAndInitializeZoomClient(zoomContainerRef.current);
+        
+        if (!isMounted) {
+          console.log('Component unmounted during initialization, aborting');
+          return;
+        }
+        
+        zoomClientRef.current = client;
+        
+        // Join meeting
+        console.log('Joining meeting:', meetingNumber);
         await joinZoomMeeting(client, {
           signature,
           meetingNumber,
-          userName,
-          password,
-          userEmail
+          userName: providedUserName || user?.email || 'Guest',
+          password: meetingPassword || ''
         });
-
+        
+        if (!isMounted) return;
+        
+        setIsLoading(false);
         setIsConnected(true);
-        setIsLoading(false);
+        
+        toast({
+          title: "Meeting Joined",
+          description: "You have successfully joined the Zoom meeting"
+        });
       } catch (err: any) {
-        console.error('Error initializing Zoom:', err);
-        setError(err.message || 'Failed to initialize Zoom meeting');
-        setIsLoading(false);
+        console.error('Error during Zoom initialization:', err);
+        
+        if (isMounted) {
+          const errorMessage = err.message || 'Failed to initialize Zoom meeting';
+          setError(errorMessage);
+          setIsLoading(false);
+          
+          toast({
+            title: "Meeting Error",
+            description: errorMessage,
+            variant: "destructive"
+          });
+        }
       }
     };
 
     initializeZoom();
 
-    // Cleanup function
     return () => {
+      isMounted = false;
       if (zoomClientRef.current) {
-        leaveZoomMeeting(zoomClientRef.current);
+        leaveZoomMeeting(zoomClientRef.current).catch(console.error);
       }
     };
-  }, [meetingNumber, userName, userEmail, password, role, isContainerReady]);
+  }, [containerReady, sdkLoaded, meetingNumber, meetingPassword, providedUserName, role, user, toast]);
 
-  // Handle meeting controls
-  const toggleMute = async () => {
-    if (zoomClientRef.current) {
-      try {
-        await zoomClientRef.current.mute();
-        setIsMuted(!isMuted);
-      } catch (error) {
-        console.error('Error toggling mute:', error);
+  // Handle keyboard shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (!isConnected) return;
+      
+      if (e.key === 'm') {
+        toggleMute();
+      } else if (e.key === 'v') {
+        toggleVideo();
+      } else if (e.key === 'l' && e.ctrlKey) {
+        leaveMeeting();
       }
-    }
-  };
+    };
 
-  const toggleVideo = async () => {
-    if (zoomClientRef.current) {
-      try {
-        await zoomClientRef.current.stopVideo();
-        setIsVideoOff(!isVideoOff);
-      } catch (error) {
-        console.error('Error toggling video:', error);
-      }
-    }
-  };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isConnected, isMuted, isVideoOff]);
 
-  const handleLeave = async () => {
-    if (zoomClientRef.current) {
-      try {
-        await leaveZoomMeeting(zoomClientRef.current);
-        if (onLeave) {
-          onLeave();
-        }
-      } catch (error) {
-        console.error('Error leaving meeting:', error);
-      }
-    }
-  };
+  if (error) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[400px] p-4">
+        <p className="text-red-500 mb-4">{error}</p>
+        <div className="text-sm text-gray-500 mb-6 max-w-md text-center">
+          <p>Troubleshooting tips:</p>
+          <ul className="list-disc list-inside mt-2 text-left">
+            <li>Check your internet connection</li>
+            <li>Verify that Zoom is not blocked by your network</li>
+            <li>Allow camera and microphone access in your browser</li>
+            <li>Try using a different browser (Chrome recommended)</li>
+          </ul>
+        </div>
+        <div className="flex gap-4">
+          <Button
+            onClick={() => {
+              setError(null);
+              setIsLoading(true);
+              setSdkLoaded(false);
+              loadZoomSDK().then(() => setSdkLoaded(true)).catch(e => setError(e.message));
+            }}
+            className="px-4 py-2 bg-primary text-primary-foreground rounded-md"
+          >
+            Retry Connection
+          </Button>
+          <Button
+            onClick={() => navigate('/meetings')}
+            variant="outline"
+            className="px-4 py-2 rounded-md"
+          >
+            Back to Meetings
+          </Button>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className="relative w-full h-full">
-      {/* Loading state */}
-      {isLoading && (
-        <div className="absolute inset-0 flex items-center justify-center bg-gray-900 bg-opacity-75 z-50">
-          <div className="text-white text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white mx-auto mb-4"></div>
-            <p>Initializing Zoom meeting...</p>
-          </div>
-        </div>
-      )}
-
-      {/* Error state */}
-      {error && (
-        <div className="absolute inset-0 flex items-center justify-center bg-gray-900 bg-opacity-75 z-50">
-          <div className="bg-red-500 text-white p-4 rounded-lg max-w-md">
-            <h3 className="text-lg font-semibold mb-2">Error</h3>
-            <p>{error}</p>
-            <button
-              onClick={() => window.location.reload()}
-              className="mt-4 px-4 py-2 bg-white text-red-500 rounded hover:bg-gray-100"
-            >
-              Retry
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* Meeting container */}
-      <div
-        ref={zoomContainerRef}
+    <div className="flex flex-col h-full">
+      <div 
+        ref={zoomContainerRef} 
         id="meetingSDKElement"
-        className="w-full h-full bg-gray-900"
-        style={{ minHeight: '480px' }}
-      />
-
-      {/* Meeting controls */}
+        className="w-full h-full min-h-[500px]"
+        style={{ position: 'relative', height: '100%', width: '100%' }}
+      >
+        {isLoading && <div>Loading Zoom meeting...</div>}
+      </div>
+      
       {isConnected && (
-        <div className="absolute bottom-0 left-0 right-0 bg-gray-800 bg-opacity-75 p-4 flex justify-center space-x-4">
-          <button
+        <div className="flex items-center justify-center gap-4 p-4 bg-background border-t">
+          <Button
+            variant="ghost"
+            size="icon"
             onClick={toggleMute}
-            className={`p-2 rounded-full ${
-              isMuted ? 'bg-red-500' : 'bg-gray-600'
-            } text-white hover:bg-opacity-80`}
+            className={isMuted ? 'bg-destructive/10 text-destructive' : ''}
           >
-            {isMuted ? 'Unmute' : 'Mute'}
-          </button>
-          <button
+            {isMuted ? <MicOff className="h-5 w-5" /> : <Mic className="h-5 w-5" />}
+          </Button>
+          
+          <Button
+            variant="ghost"
+            size="icon"
             onClick={toggleVideo}
-            className={`p-2 rounded-full ${
-              isVideoOff ? 'bg-red-500' : 'bg-gray-600'
-            } text-white hover:bg-opacity-80`}
+            className={isVideoOff ? 'bg-destructive/10 text-destructive' : ''}
           >
-            {isVideoOff ? 'Start Video' : 'Stop Video'}
-          </button>
-          <button
-            onClick={handleLeave}
-            className="p-2 rounded-full bg-red-500 text-white hover:bg-opacity-80"
+            {isVideoOff ? <VideoOff className="h-5 w-5" /> : <Video className="h-5 w-5" />}
+          </Button>
+          
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={leaveMeeting}
+            className="bg-destructive/10 text-destructive"
           >
-            Leave
-          </button>
+            <PhoneOff className="h-5 w-5" />
+          </Button>
         </div>
       )}
     </div>
   );
-};
+}

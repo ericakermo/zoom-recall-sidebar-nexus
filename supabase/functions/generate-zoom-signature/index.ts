@@ -1,15 +1,16 @@
+
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { hmac } from "https://deno.land/x/crypto@v0.10.0/hmac.ts";
 import { encode as encodeBase64 } from 'https://deno.land/std@0.168.0/encoding/base64.ts'
+import { encode as encodeHex } from "https://deno.land/std@0.168.0/encoding/hex.ts";
 
-// Configure CORS headers
+// Configure CORS headers to allow requests from any origin
 const corsHeaders = {
-  'Access-Control-Allow-Origin': 'https://zoom-recall-sidebar-nexus.lovable.app',
+  'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS',
-  'Access-Control-Max-Age': '86400',
-};
+  'Access-Control-Allow-Methods': 'POST, OPTIONS'
+}
 
 // Set the Zoom SDK credentials
 const ZOOM_API_KEY = "eFAZ8Vf7RbG5saQVqL1zGA";
@@ -20,9 +21,10 @@ serve(async (req) => {
   
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
-    return new Response(null, {
-      status: 204,
-      headers: corsHeaders
+    console.log("Handling OPTIONS preflight request");
+    return new Response(null, { 
+      status: 200,
+      headers: corsHeaders 
     });
   }
 
@@ -43,13 +45,7 @@ serve(async (req) => {
       console.error("No authorization header provided");
       return new Response(
         JSON.stringify({ error: 'No authorization header' }),
-        { 
-          status: 401, 
-          headers: { 
-            ...corsHeaders, 
-            'Content-Type': 'application/json' 
-          } 
-        }
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
@@ -63,13 +59,7 @@ serve(async (req) => {
       console.error("Invalid token or user not found:", userError);
       return new Response(
         JSON.stringify({ error: 'Invalid token' }),
-        { 
-          status: 401, 
-          headers: { 
-            ...corsHeaders, 
-            'Content-Type': 'application/json' 
-          } 
-        }
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
@@ -81,13 +71,7 @@ serve(async (req) => {
       console.error("Error parsing request body:", e);
       return new Response(
         JSON.stringify({ error: 'Invalid JSON in request body' }),
-        { 
-          status: 400, 
-          headers: { 
-            ...corsHeaders, 
-            'Content-Type': 'application/json' 
-          } 
-        }
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
@@ -97,34 +81,21 @@ serve(async (req) => {
       console.error("Missing parameters:", { meetingNumber, role });
       return new Response(
         JSON.stringify({ error: 'Missing parameters' }),
-        { 
-          status: 400, 
-          headers: { 
-            ...corsHeaders, 
-            'Content-Type': 'application/json' 
-          } 
-        }
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    // Generate the signature using HMAC-SHA256
+    // Generate the signature using Deno's TextEncoder instead of Buffer
     const timestamp = new Date().getTime() - 30000;
-    const msg = Buffer.from(ZOOM_API_KEY + meetingNumber + timestamp + role);
-    const signature = encodeBase64(
-      await hmac(
-        'SHA-256',
-        ZOOM_API_SECRET,
-        msg
-      )
-    );
+    const msg = new TextEncoder().encode(ZOOM_API_KEY + meetingNumber + timestamp + role);
+    
+    // Using hmac with TextEncoder-created message
+    const hmacSignature = hmac("sha256", ZOOM_API_SECRET, msg);
+    const signature = encodeBase64(hmacSignature);
 
     console.log("Signature generated successfully");
     return new Response(
-      JSON.stringify({ 
-        signature,
-        timestamp,
-        sdkKey: ZOOM_API_KEY
-      }),
+      JSON.stringify({ signature }),
       { 
         status: 200, 
         headers: { 
