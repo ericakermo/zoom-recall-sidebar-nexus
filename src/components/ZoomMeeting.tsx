@@ -94,6 +94,7 @@ export function ZoomMeeting({
   // Separate useEffect for container mounting
   useEffect(() => {
     if (zoomContainerRef.current) {
+      console.log('Zoom container ref is ready');
       setContainerReady(true);
     }
   }, []);
@@ -102,24 +103,29 @@ export function ZoomMeeting({
   useEffect(() => {
     // Only proceed if container is ready
     if (!containerReady || !zoomContainerRef.current) {
+      console.log('Container not ready yet, skipping initialization');
       return;
     }
 
     const initializeZoom = async () => {
       try {
         setIsLoading(true);
+        console.log('Starting Zoom initialization...');
         
         // Load SDK first
         await loadZoomSDK();
+        console.log('SDK loaded successfully');
         
         // Get signature
         const signature = await getSignature(meetingNumber, role);
+        console.log('Signature obtained successfully');
 
         // Initialize client with the ready container
         if (!zoomContainerRef.current) {
           throw new Error('Zoom container not available');
         }
         
+        console.log('Initializing Zoom client with container:', zoomContainerRef.current.id);
         const zoomClient = await createAndInitializeZoomClient(zoomContainerRef.current, {
           zoomAppRoot: zoomContainerRef.current,
           language: 'en-US',
@@ -127,9 +133,11 @@ export function ZoomMeeting({
           assetPath: 'https://source.zoom.us/3.13.2/lib',
         });
         
+        console.log('Zoom client initialized successfully');
         zoomClientRef.current = zoomClient;
 
         // Join meeting
+        console.log('Attempting to join meeting:', meetingNumber);
         await joinZoomMeeting(zoomClient, {
           signature,
           meetingNumber,
@@ -137,17 +145,29 @@ export function ZoomMeeting({
           password: meetingPassword || ''
         });
 
+        console.log('Meeting joined successfully');
         setIsLoading(false);
         setIsConnected(true);
+        toast({
+          title: "Connected",
+          description: "You've joined the Zoom meeting successfully",
+        });
       } catch (err: any) {
-        console.error('Error initializing Zoom:', err);
-        setError(err.message || 'Failed to initialize Zoom meeting');
+        console.error('Detailed Zoom initialization error:', err);
+        if (err?.stack) console.error('Error stack:', err.stack);
+        setError(err?.message || 'Failed to initialize Zoom meeting');
         setIsLoading(false);
+        
+        toast({
+          title: "Connection Error",
+          description: `Failed to join Zoom meeting: ${err?.message || 'Unknown error'}`,
+          variant: "destructive"
+        });
       }
     };
 
     initializeZoom();
-  }, [containerReady, meetingNumber, providedUserName, role, user, meetingPassword]);
+  }, [containerReady, meetingNumber, providedUserName, role, user, meetingPassword, toast]);
 
   // Handle keyboard shortcuts
   useEffect(() => {
