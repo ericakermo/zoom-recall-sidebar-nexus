@@ -69,6 +69,16 @@ export const loadZoomSDK = async (): Promise<boolean> => {
       // First, make sure CSS is loaded
       await loadZoomCss();
 
+      // Make React available globally
+      if (!window.React) {
+        console.log('Making React available globally');
+        window.React = (await import('react')).default;
+      }
+      if (!window.ReactDOM) {
+        console.log('Making ReactDOM available globally');
+        window.ReactDOM = (await import('react-dom')).default;
+      }
+
       // Load the SDK script
       const zoomEmbeddedSdkUrl = 'https://source.zoom.us/3.13.2/zoom-meeting-embedded-3.13.2.min.js';
       

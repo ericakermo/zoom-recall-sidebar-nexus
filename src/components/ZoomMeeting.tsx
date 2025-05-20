@@ -227,10 +227,6 @@ export function ZoomMeeting({
           id: container.id
         });
         
-        // Explicit wait before client initialization
-        console.log('Waiting before client initialization...');
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        
         // Initialize client with explicit options
         console.log('Creating and initializing Zoom client');
         const client = await createAndInitializeZoomClient(zoomContainerRef.current);
@@ -242,10 +238,6 @@ export function ZoomMeeting({
         
         console.log('Client initialization successful, storing reference');
         zoomClientRef.current = client;
-
-        // Another explicit wait before joining
-        console.log('Waiting before joining meeting...');
-        await new Promise(resolve => setTimeout(resolve, 1000));
         
         // Join meeting with comprehensive error handling
         console.log('Joining meeting:', meetingNumber);
