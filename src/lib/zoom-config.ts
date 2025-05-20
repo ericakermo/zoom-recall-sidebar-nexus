@@ -1,4 +1,3 @@
-
 import { ZoomMeetingConfig } from '@/types/zoom';
 
 // Use the client ID directly for sdkKey
@@ -70,7 +69,7 @@ export const loadZoomSDK = async (): Promise<boolean> => {
       // First, make sure CSS is loaded
       await loadZoomCss();
 
-      // Load the SDK script with improved retry logic
+      // Load the SDK script
       const zoomEmbeddedSdkUrl = 'https://source.zoom.us/3.13.2/zoom-meeting-embedded-3.13.2.min.js';
       
       const loadScript = (url: string): Promise<void> => {
@@ -98,28 +97,8 @@ export const loadZoomSDK = async (): Promise<boolean> => {
           document.head.appendChild(script);
         });
       };
-      
-      // Maximum retries for script loading
-      const maxScriptRetries = 3;
-      let scriptRetries = 0;
-      
-      while (scriptRetries < maxScriptRetries) {
-        try {
-          await loadScript(zoomEmbeddedSdkUrl);
-          console.log('Zoom SDK script loaded, attempt:', scriptRetries + 1);
-          break;
-        } catch (error) {
-          scriptRetries++;
-          console.error(`Script loading failed, attempt ${scriptRetries}/${maxScriptRetries}`, error);
-          
-          if (scriptRetries >= maxScriptRetries) {
-            throw new Error(`Failed to load Zoom SDK after ${maxScriptRetries} attempts`);
-          }
-          
-          // Wait before retry with increasing backoff
-          await new Promise(r => setTimeout(r, 1000 * scriptRetries));
-        }
-      }
+
+      await loadScript(zoomEmbeddedSdkUrl);
 
       // Poll for window.ZoomMtgEmbedded with enhanced logging
       const maxAttempts = 60; // 30 seconds with 500ms intervals

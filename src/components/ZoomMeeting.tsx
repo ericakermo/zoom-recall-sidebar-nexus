@@ -1,4 +1,3 @@
-
 import { useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
@@ -362,111 +361,47 @@ export function ZoomMeeting({
   }
 
   return (
-    <div className="relative w-full h-full">
+    <div className="flex flex-col h-full">
       <div 
         ref={zoomContainerRef} 
         id="meetingSDKElement"
-        style={{ 
-          position: 'relative',
-          width: '100%',
-          height: '100%',
-          minHeight: '500px',
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          justifyContent: 'center',
-          backgroundColor: '#f8f8f8', // Light background for visibility
-          border: isLoading ? '1px dashed #ccc' : 'none', // Visual indicator during loading
-        }}
+        className="w-full h-full min-h-[500px]"
+        style={{ position: 'relative', height: '100%', width: '100%' }}
       >
-        {isLoading && (
-          <div className="flex flex-col items-center justify-center z-10">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mb-4"></div>
-            <p className="text-lg font-medium">Connecting to Zoom meeting...</p>
-            <p className="text-sm text-gray-500 mt-2">
-              {containerReady ? 
-                (sdkLoaded ? 'Joining meeting room...' : 'Loading Zoom SDK...') : 
-                'Preparing meeting container...'}
-            </p>
-          </div>
-        )}
+        {isLoading && <div>Loading Zoom meeting...</div>}
+        {error && <div>Error: {error}</div>}
       </div>
       
       {isConnected && (
         <div 
           ref={controlsRef}
-          className="absolute bottom-6 left-1/2 transform -translate-x-1/2 z-50 bg-black/80 rounded-lg py-2 px-4 flex items-center space-x-4"
-          style={{ pointerEvents: 'auto' }}
+          className="flex items-center justify-center gap-4 p-4 bg-background border-t"
         >
-          <Button 
-            variant="ghost" 
-            size="icon" 
+          <Button
+            variant="ghost"
+            size="icon"
             onClick={toggleMute}
-            className="text-white hover:bg-gray-700 rounded-full"
-            title={isMuted ? "Unmute" : "Mute"}
+            className={isMuted ? 'bg-destructive/10 text-destructive' : ''}
           >
             {isMuted ? <MicOff className="h-5 w-5" /> : <Mic className="h-5 w-5" />}
           </Button>
           
-          <Button 
-            variant="ghost" 
-            size="icon" 
+          <Button
+            variant="ghost"
+            size="icon"
             onClick={toggleVideo}
-            className="text-white hover:bg-gray-700 rounded-full"
-            title={isVideoOff ? "Start Video" : "Stop Video"}
+            className={isVideoOff ? 'bg-destructive/10 text-destructive' : ''}
           >
             {isVideoOff ? <VideoOff className="h-5 w-5" /> : <Video className="h-5 w-5" />}
           </Button>
           
-          <Button 
-            variant="ghost" 
-            size="icon" 
-            className="text-white hover:bg-gray-700 rounded-full"
-            title="Participants"
-          >
-            <div className="relative">
-              <Users className="h-5 w-5" />
-              <span className="absolute -top-2 -right-2 bg-primary text-xs rounded-full w-4 h-4 flex items-center justify-center">
-                {participantCount}
-              </span>
-            </div>
-          </Button>
-          
-          <Button 
-            variant="ghost" 
-            size="icon" 
-            className="text-white hover:bg-gray-700 rounded-full"
-            title="Chat"
-          >
-            <MessageSquare className="h-5 w-5" />
-          </Button>
-          
-          <Button 
-            variant="ghost" 
-            size="icon" 
-            className="text-white hover:bg-gray-700 rounded-full"
-            title="Share Screen"
-          >
-            <Share2 className="h-5 w-5" />
-          </Button>
-          
-          <Button 
-            variant="ghost" 
-            size="icon" 
-            className="text-white hover:bg-gray-700 rounded-full"
-            title="Settings"
-          >
-            <Settings className="h-5 w-5" />
-          </Button>
-          
-          <Button 
-            variant="destructive" 
+          <Button
+            variant="ghost"
+            size="icon"
             onClick={leaveMeeting}
-            className="rounded-full"
-            title="Leave Meeting"
+            className="bg-destructive/10 text-destructive"
           >
-            <PhoneOff className="h-5 w-5 mr-1" />
-            Leave
+            <PhoneOff className="h-5 w-5" />
           </Button>
         </div>
       )}
