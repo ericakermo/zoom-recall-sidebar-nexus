@@ -194,7 +194,7 @@ export function ZoomMeeting({
     <div className="relative w-full h-full">
       <div 
         ref={zoomContainerRef} 
-        id="zoomContainer"
+        id="meetingSDKElement"
         className="w-full h-full min-h-[500px]"
         style={{ position: 'relative', height: '100%', width: '100%' }}
       >

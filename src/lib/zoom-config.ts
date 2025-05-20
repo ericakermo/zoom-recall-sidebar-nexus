@@ -1,4 +1,3 @@
-
 import { ZoomMeetingConfig } from '@/types/zoom';
 
 // Use the client ID directly for sdkKey
@@ -10,45 +9,35 @@ let zoomSDKLoadingPromise: Promise<boolean> | null = null;
 let zoomSDKLoaded = false; // Tracks if ZoomMtgEmbedded is confirmed available
 
 export const loadZoomSDK = (): Promise<boolean> => {
-  // If SDK is already loaded and ZoomMtgEmbedded is available, resolve immediately
   if (zoomSDKLoaded && window.ZoomMtgEmbedded) {
     console.log('Zoom Component SDK already loaded and ZoomMtgEmbedded is available.');
     return Promise.resolve(true);
   }
 
-  // If loading is already in progress, return the existing promise
   if (zoomSDKLoadingPromise) {
     console.log('Zoom Component SDK loading is already in progress.');
     return zoomSDKLoadingPromise;
   }
 
-  // Start the loading process
   zoomSDKLoadingPromise = new Promise<boolean>(async (resolve, reject) => {
     try {
       console.log('Beginning Zoom Component SDK loading process');
 
-      const reactScriptUrl = 'https://source.zoom.us/3.13.2/lib/vendor/react.min.js';
-      const reactDOMScriptUrl = 'https://source.zoom.us/3.13.2/lib/vendor/react-dom.min.js';
+      // Only load the Zoom SDK, skip React/ReactDOM
       const zoomEmbeddedSdkUrl = 'https://source.zoom.us/3.13.2/zoom-meeting-embedded-3.13.2.min.js';
 
-      const loadScriptSequentially = async (url: string, name: string, globalToCheck?: string) => {
-        if (globalToCheck && (window as any)[globalToCheck]) {
-          console.log(`${name} (${globalToCheck}) already available globally.`);
-          return;
-        }
+      const loadScriptSequentially = async (url: string, name: string) => {
         if (document.querySelector(`script[src="${url}"]`)) {
-          console.log(`${name} script tag already exists. Will proceed to poll if necessary.`);
-          // If script tag exists but global isn't set (for ZoomMtgEmbedded), polling will handle it.
-          // For React/ReactDOM, if tag exists, we assume they'll load or are part of app bundle.
+          console.log(`${name} script tag already exists.`);
           return;
         }
         return new Promise<void>((res, rej) => {
           console.log(`Loading ${name}...`);
           const script = document.createElement('script');
           script.src = url;
-          script.async = false; // Ensure sequential loading
+          script.async = false;
           script.onload = () => {
-            console.log(`${name} loaded successfully via script tag.`);
+            console.log(`${name} loaded successfully.`);
             res();
           };
           script.onerror = (e) => {
@@ -59,42 +48,24 @@ export const loadZoomSDK = (): Promise<boolean> => {
         });
       };
 
-      // It's generally better if your app (e.g., Vite/React) provides React/ReactDOM.
-      // Loading them from Zoom's CDN can lead to conflicts if versions mismatch or if your app already includes them.
-      // However, if you must load them this way:
-      if (!window.React) {
-        await loadScriptSequentially(reactScriptUrl, 'React from Zoom CDN');
-      } else {
-        console.log('React is already available globally (likely from app bundle).');
-      }
-      if (!window.ReactDOM) {
-        await loadScriptSequentially(reactDOMScriptUrl, 'ReactDOM from Zoom CDN');
-      } else {
-        console.log('ReactDOM is already available globally (likely from app bundle).');
-      }
-
-      // Load Zoom Embedded SDK script if not already present
+      // Load only the Zoom SDK
       if (!window.ZoomMtgEmbedded && !document.querySelector(`script[src="${zoomEmbeddedSdkUrl}"]`)) {
         await loadScriptSequentially(zoomEmbeddedSdkUrl, 'Zoom Embedded SDK');
-      } else if (window.ZoomMtgEmbedded) {
-        console.log('ZoomMtgEmbedded was already available globally.');
-      } else {
-        console.log('Zoom Embedded SDK script tag exists or was just added. Proceeding to poll for ZoomMtgEmbedded.');
       }
 
       // Poll for window.ZoomMtgEmbedded
-      const maxAttempts = 40; // Increased attempts for slower networks/initialization
+      const maxAttempts = 40;
       let attempts = 0;
-      const pollInterval = 300; // Poll every 300ms
+      const pollInterval = 300;
 
       const checkZoomEmbeddedAvailability = () => {
         attempts++;
         if (window.ZoomMtgEmbedded) {
           console.log(`ZoomMtgEmbedded object detected after ${attempts} attempts.`);
-          zoomSDKLoaded = true; // Set our flag
+          zoomSDKLoaded = true;
           resolve(true);
         } else if (attempts >= maxAttempts) {
-          console.error(`ZoomMtgEmbedded not available after ${attempts} attempts. Check console for script loading errors or conflicts.`);
+          console.error(`ZoomMtgEmbedded not available after ${attempts} attempts.`);
           console.log('Current window keys (searching for "zoom"):', Object.keys(window).filter(k => k.toLowerCase().includes('zoom')));
           reject(new Error('Timed out waiting for ZoomMtgEmbedded to initialize'));
         } else {
