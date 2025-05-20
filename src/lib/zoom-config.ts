@@ -107,7 +107,7 @@ export const loadZoomSDK = async (): Promise<boolean> => {
       let attempts = 0;
       const pollInterval = 500;
 
-      const checkZoomEmbeddedAvailability = () => {
+      const checkZoomEmbeddedAvailability = async () => {
         attempts++;
         
         if (attempts % 10 === 0) {
@@ -118,15 +118,32 @@ export const loadZoomSDK = async (): Promise<boolean> => {
           console.log('ZoomMtgEmbedded found after', attempts, 'attempts!');
           console.log('ZoomMtgEmbedded version:', window.ZoomMtgEmbedded.version || 'unknown');
           
-          // Pre-load required assets
-          window.ZoomMtgEmbedded.preLoadWasm();
-          window.ZoomMtgEmbedded.prepareWebSDK();
-          
-          // Load language files
-          window.ZoomMtgEmbedded.i18n.load('en-US');
-          
-          zoomSDKLoaded = true;
-          resolve(true);
+          try {
+            // Pre-load required assets in sequence
+            console.log('Pre-loading WebAssembly modules...');
+            await window.ZoomMtgEmbedded.preLoadWasm();
+            
+            console.log('Preparing Web SDK...');
+            await window.ZoomMtgEmbedded.prepareWebSDK();
+            
+            console.log('Loading language files...');
+            await window.ZoomMtgEmbedded.i18n.load('en-US');
+            
+            // Verify assets are accessible
+            console.log('Verifying asset accessibility...');
+            const assetPath = 'https://source.zoom.us/3.13.2/lib';
+            const testAsset = await fetch(`${assetPath}/av/av.js`);
+            if (!testAsset.ok) {
+              throw new Error('Failed to verify asset accessibility');
+            }
+            
+            console.log('All assets loaded and verified successfully');
+            zoomSDKLoaded = true;
+            resolve(true);
+          } catch (error) {
+            console.error('Error during asset preloading:', error);
+            reject(error);
+          }
         } else if (attempts >= maxAttempts) {
           console.error('ZoomMtgEmbedded not available after maximum attempts');
           reject(new Error('Timed out waiting for ZoomMtgEmbedded to initialize'));
