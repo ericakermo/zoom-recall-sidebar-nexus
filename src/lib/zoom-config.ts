@@ -117,6 +117,14 @@ export const loadZoomSDK = async (): Promise<boolean> => {
         if (window.ZoomMtgEmbedded) {
           console.log('ZoomMtgEmbedded found after', attempts, 'attempts!');
           console.log('ZoomMtgEmbedded version:', window.ZoomMtgEmbedded.version || 'unknown');
+          
+          // Pre-load required assets
+          window.ZoomMtgEmbedded.preLoadWasm();
+          window.ZoomMtgEmbedded.prepareWebSDK();
+          
+          // Load language files
+          window.ZoomMtgEmbedded.i18n.load('en-US');
+          
           zoomSDKLoaded = true;
           resolve(true);
         } else if (attempts >= maxAttempts) {
