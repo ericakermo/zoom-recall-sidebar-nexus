@@ -170,24 +170,26 @@ export const createAndInitializeZoomClient = async (
 
   const client = window.ZoomMtgEmbedded.createClient();
   
-  // Use provided init options or defaults
-  const options = initOptions || {
-    zoomAppRoot,
-    language: 'en-US',
-    patchJsMedia: true,
-    assetPath: 'https://source.zoom.us/3.13.1/lib', // Default assetPath for SDK v3+
-  };
-  
-  // Make sure zoomAppRoot is set
-  if (!options.zoomAppRoot && zoomAppRoot) {
-    options.zoomAppRoot = zoomAppRoot;
+  try {
+    // Note: Component View .init() is synchronous or returns a Promise that resolves quickly
+    // according to some docs, but it's safer to await if it returns a promise.
+    // The official GH repo example uses .then() for client.init()
+    await client.init({
+      zoomAppRoot: zoomAppRoot,
+      language: 'en-US',
+      patchJsMedia: true,
+      assetPath: 'https://source.zoom.us/3.13.2/lib',
+    });
+    console.log('Zoom Embedded SDK client initialized successfully.');
+    return client; // Return the initialized client instance
+  } catch (initError) {
+    console.error('Error initializing Zoom Embedded SDK client:', initError);
+    // Log more details if available
+    if (initError && typeof initError === 'object') {
+        console.error('Initialization error details:', JSON.stringify(initError));
+    }
+    throw initError;
   }
-
-  // Initialize the client
-  await client.init(options);
-  console.log('Zoom client initialized with options:', options);
-  
-  return client;
 };
 
 // Interface for join parameters, helps with type safety

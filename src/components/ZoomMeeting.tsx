@@ -1,4 +1,3 @@
-
 import { useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
@@ -116,30 +115,23 @@ export function ZoomMeeting({
         const signature = await getSignature(meetingNumber, role);
 
         // Initialize client with the ready container
-        const zoomClient = await createAndInitializeZoomClient(zoomContainerRef.current, {
-          zoomAppRoot: zoomContainerRef.current,
-          language: 'en-US',
-          patchJsMedia: true,
-          assetPath: 'https://source.zoom.us/3.13.1/lib', // Add assetPath for SDK v3+
-        });
-        zoomClientRef.current = zoomClient;
-
-        // Ensure we have valid join parameters
-        if (!signature || !meetingNumber) {
-          throw new Error('Missing required Zoom meeting parameters');
+        if (!zoomContainerRef.current) {
+          throw new Error('Zoom container not available');
         }
+        
+        const zoomClient = await createAndInitializeZoomClient(zoomContainerRef.current);
+        zoomClientRef.current = zoomClient;
 
         // Join meeting
         await joinZoomMeeting(zoomClient, {
           signature,
           meetingNumber,
           userName: providedUserName || user?.email || 'Guest',
-          password: meetingPassword || '' 
+          password: meetingPassword || ''
         });
 
         setIsLoading(false);
         setIsConnected(true);
-        console.log('Successfully connected to Zoom meeting');
       } catch (err: any) {
         console.error('Error initializing Zoom:', err);
         setError(err.message || 'Failed to initialize Zoom meeting');
