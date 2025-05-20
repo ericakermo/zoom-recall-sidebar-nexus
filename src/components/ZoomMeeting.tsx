@@ -1,3 +1,4 @@
+
 import { useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
@@ -39,6 +40,8 @@ export function ZoomMeeting({
   const zoomInitializedRef = useRef(false);
   const [containerReady, setContainerReady] = useState(false);
   const [storedPassword, setStoredPassword] = useState('');
+  const [sdkLoaded, setSdkLoaded] = useState(false);
+  const [joinAttempts, setJoinAttempts] = useState(0);
 
   // Handle meeting controls
   const toggleMute = () => {
@@ -108,89 +111,184 @@ export function ZoomMeeting({
 
   // Enhanced container mounting check
   useEffect(() => {
+    if (!zoomContainerRef.current) return;
+    
+    console.log('Starting container setup check');
+    
+    // Force layout calculation
+    const container = zoomContainerRef.current;
+    const parentElement = container.parentElement;
+    
+    console.log('Container parent dimensions:', {
+      width: parentElement?.offsetWidth,
+      height: parentElement?.offsetHeight,
+      display: parentElement ? window.getComputedStyle(parentElement).display : 'none'
+    });
+    
+    // Ensure container has explicit dimensions
+    if (container && (!container.offsetWidth || !container.offsetHeight)) {
+      console.log('Container has no dimensions, forcing layout');
+      
+      // Force explicit dimensions if needed
+      container.style.width = parentElement?.offsetWidth ? `${parentElement.offsetWidth}px` : '100%';
+      container.style.height = '500px';
+    }
+    
+    // Check after a short delay to ensure styles are applied
     const checkContainer = () => {
-      if (zoomContainerRef.current) {
-        const container = zoomContainerRef.current;
-        const dimensions = {
-          width: container.offsetWidth,
-          height: container.offsetHeight,
-          id: container.id,
-          display: window.getComputedStyle(container).display,
-          position: window.getComputedStyle(container).position
-        };
-        
-        console.log('Container check:', dimensions);
-        
-        if (dimensions.width > 0 && dimensions.height > 0) {
-          console.log('Container ready with dimensions:', dimensions);
-          setContainerReady(true);
-        } else {
-          console.log('Container not ready, retrying...');
-          setTimeout(checkContainer, 100);
-        }
+      if (!zoomContainerRef.current) return;
+      
+      const dimensions = {
+        width: container.offsetWidth,
+        height: container.offsetHeight,
+        id: container.id,
+        display: window.getComputedStyle(container).display,
+        position: window.getComputedStyle(container).position
+      };
+      
+      console.log('Container dimensions check:', dimensions);
+      
+      if (dimensions.width > 0 && dimensions.height > 0) {
+        console.log('Container dimensions verified:', dimensions);
+        setContainerReady(true);
+      } else {
+        console.log('Container dimensions not ready, retrying...');
+        setTimeout(checkContainer, 200);
       }
     };
     
-    checkContainer();
+    // Initial delay to ensure DOM is settled
+    setTimeout(checkContainer, 300);
+    
+    return () => {
+      // Cleanup if component unmounts during check
+      setContainerReady(false);
+    };
+  }, []);
+  
+  // Load Zoom SDK separately
+  useEffect(() => {
+    console.log('Loading Zoom SDK separately');
+    
+    const loadSdk = async () => {
+      try {
+        await loadZoomSDK();
+        console.log('SDK loaded successfully');
+        setSdkLoaded(true);
+      } catch (err) {
+        console.error('Failed to load Zoom SDK:', err);
+        setError('Failed to load Zoom meetings SDK. Please try refreshing the page.');
+      }
+    };
+    
+    loadSdk();
+    
+    return () => {
+      // No cleanup needed for SDK loading
+    };
   }, []);
 
-  // Main initialization useEffect
+  // Main initialization useEffect - now depends on containerReady and sdkLoaded
   useEffect(() => {
+    if (!containerReady || !sdkLoaded) {
+      console.log('Waiting for container and SDK to be ready:', { containerReady, sdkLoaded });
+      return;
+    }
+    
+    console.log('Container and SDK ready, proceeding with initialization');
     let isMounted = true;
 
     const initializeZoom = async () => {
       try {
         setIsLoading(true);
         setError(null);
-
-        // 1. Load SDK first with retry
-        let retryCount = 0;
-        const maxRetries = 3;
         
-        while (retryCount < maxRetries) {
-          try {
-            await loadZoomSDK();
-            break;
-          } catch (err) {
-            retryCount++;
-            if (retryCount === maxRetries) throw err;
-            console.log(`Retrying SDK load (${retryCount}/${maxRetries})...`);
-            await new Promise(resolve => setTimeout(resolve, 1000));
-          }
+        // Get signature with retry
+        console.log('Getting signature for meeting:', meetingNumber);
+        let signature;
+        try {
+          signature = await getSignature(meetingNumber, role);
+          console.log('Received signature successfully');
+        } catch (sigError) {
+          console.error('Failed to get meeting signature:', sigError);
+          throw new Error('Could not authenticate with Zoom. Please check your connection.');
         }
-        
-        // 2. Get signature
-        const signature = await getSignature(meetingNumber, role);
 
-        // 3. Initialize client with the container
+        // Verify container before proceeding
         if (!zoomContainerRef.current) {
-          throw new Error('Zoom container not available');
+          console.error('Container ref is null after earlier checks');
+          throw new Error('Meeting container disappeared. Please refresh the page.');
         }
-
-        // Wait for container to be fully ready
-        await new Promise(resolve => setTimeout(resolve, 500));
-
-        const client = await createAndInitializeZoomClient(zoomContainerRef.current);
-        if (!isMounted) return;
         
+        // Force check container dimensions one more time
+        const container = zoomContainerRef.current;
+        console.log('Final container check before client init:', {
+          width: container.offsetWidth,
+          height: container.offsetHeight,
+          id: container.id
+        });
+        
+        // Explicit wait before client initialization
+        console.log('Waiting before client initialization...');
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        
+        // Initialize client with explicit options
+        console.log('Creating and initializing Zoom client');
+        const client = await createAndInitializeZoomClient(zoomContainerRef.current);
+        
+        if (!isMounted) {
+          console.log('Component unmounted during initialization, aborting');
+          return;
+        }
+        
+        console.log('Client initialization successful, storing reference');
         zoomClientRef.current = client;
 
-        // 4. Join meeting
-        await joinZoomMeeting(client, {
-          signature,
-          meetingNumber,
-          userName: providedUserName || user?.email || 'Guest',
-          password: meetingPassword || ''
-        });
-
-        if (!isMounted) return;
-        setIsLoading(false);
-        setIsConnected(true);
-      } catch (err: any) {
-        console.error('Error initializing Zoom:', err);
-        if (isMounted) {
-          setError(err.message || 'Failed to initialize Zoom meeting');
+        // Another explicit wait before joining
+        console.log('Waiting before joining meeting...');
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        
+        // Join meeting with comprehensive error handling
+        console.log('Joining meeting:', meetingNumber);
+        try {
+          await joinZoomMeeting(client, {
+            signature,
+            meetingNumber,
+            userName: providedUserName || user?.email || 'Guest',
+            password: meetingPassword || ''
+          });
+          
+          console.log('Successfully joined meeting!');
+          
+          if (!isMounted) {
+            console.log('Component unmounted after joining, aborting');
+            return;
+          }
+          
           setIsLoading(false);
+          setIsConnected(true);
+          
+          toast({
+            title: "Meeting Joined",
+            description: "You have successfully joined the Zoom meeting"
+          });
+        } catch (joinError: any) {
+          console.error('Error joining meeting:', joinError);
+          throw new Error(`Failed to join meeting: ${joinError.message || 'Unknown error'}`);
+        }
+      } catch (err: any) {
+        console.error('Error during Zoom initialization sequence:', err);
+        
+        if (isMounted) {
+          const errorMessage = err.message || 'Failed to initialize Zoom meeting';
+          setError(errorMessage);
+          setIsLoading(false);
+          
+          toast({
+            title: "Meeting Error",
+            description: errorMessage,
+            variant: "destructive"
+          });
         }
       }
     };
@@ -200,10 +298,11 @@ export function ZoomMeeting({
     return () => {
       isMounted = false;
       if (zoomClientRef.current) {
+        console.log('Cleanup: Leaving meeting');
         leaveZoomMeeting(zoomClientRef.current).catch(console.error);
       }
     };
-  }, [meetingNumber, meetingPassword, providedUserName, role, user]);
+  }, [containerReady, sdkLoaded, meetingNumber, meetingPassword, providedUserName, role, user, toast]);
 
   // Handle keyboard shortcuts
   useEffect(() => {
@@ -223,16 +322,41 @@ export function ZoomMeeting({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isConnected, isMuted, isVideoOff]);
 
+  // Show more detailed error states
   if (error) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[400px] p-4">
         <p className="text-red-500 mb-4">{error}</p>
-        <Button
-          onClick={() => navigate('/settings')}
-          className="px-4 py-2 bg-primary text-primary-foreground rounded-md"
-        >
-          Connect Zoom Account
-        </Button>
+        <div className="text-sm text-gray-500 mb-6 max-w-md text-center">
+          <p>Troubleshooting tips:</p>
+          <ul className="list-disc list-inside mt-2 text-left">
+            <li>Check your internet connection</li>
+            <li>Verify that Zoom is not blocked by your network</li>
+            <li>Allow camera and microphone access in your browser</li>
+            <li>Try using a different browser (Chrome recommended)</li>
+          </ul>
+        </div>
+        <div className="flex gap-4">
+          <Button
+            onClick={() => {
+              setError(null);
+              setIsLoading(true);
+              setSdkLoaded(false);
+              // Restart the SDK loading process
+              loadZoomSDK().then(() => setSdkLoaded(true)).catch(e => setError(e.message));
+            }}
+            className="px-4 py-2 bg-primary text-primary-foreground rounded-md"
+          >
+            Retry Connection
+          </Button>
+          <Button
+            onClick={() => navigate('/meetings')}
+            variant="outline"
+            className="px-4 py-2 rounded-md"
+          >
+            Back to Meetings
+          </Button>
+        </div>
       </div>
     );
   }
@@ -250,16 +374,22 @@ export function ZoomMeeting({
           display: 'flex',
           flexDirection: 'column',
           alignItems: 'center',
-          justifyContent: 'center'
+          justifyContent: 'center',
+          backgroundColor: '#f8f8f8', // Light background for visibility
+          border: isLoading ? '1px dashed #ccc' : 'none', // Visual indicator during loading
         }}
       >
         {isLoading && (
-          <div className="flex flex-col items-center justify-center">
+          <div className="flex flex-col items-center justify-center z-10">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mb-4"></div>
-            <p>Connecting to Zoom meeting...</p>
+            <p className="text-lg font-medium">Connecting to Zoom meeting...</p>
+            <p className="text-sm text-gray-500 mt-2">
+              {containerReady ? 
+                (sdkLoaded ? 'Joining meeting room...' : 'Loading Zoom SDK...') : 
+                'Preparing meeting container...'}
+            </p>
           </div>
         )}
-        {error && <div>Error: {error}</div>}
       </div>
       
       {isConnected && (
