@@ -116,19 +116,30 @@ export function ZoomMeeting({
         const signature = await getSignature(meetingNumber, role);
 
         // Initialize client with the ready container
-        const zoomClient = await createAndInitializeZoomClient(zoomContainerRef.current);
+        const zoomClient = await createAndInitializeZoomClient(zoomContainerRef.current, {
+          zoomAppRoot: zoomContainerRef.current,
+          language: 'en-US',
+          patchJsMedia: true,
+          assetPath: 'https://source.zoom.us/3.13.1/lib', // Add assetPath for SDK v3+
+        });
         zoomClientRef.current = zoomClient;
+
+        // Ensure we have valid join parameters
+        if (!signature || !meetingNumber) {
+          throw new Error('Missing required Zoom meeting parameters');
+        }
 
         // Join meeting
         await joinZoomMeeting(zoomClient, {
           signature,
           meetingNumber,
           userName: providedUserName || user?.email || 'Guest',
-          password: meetingPassword || ''
+          password: meetingPassword || '' 
         });
 
         setIsLoading(false);
         setIsConnected(true);
+        console.log('Successfully connected to Zoom meeting');
       } catch (err: any) {
         console.error('Error initializing Zoom:', err);
         setError(err.message || 'Failed to initialize Zoom meeting');
@@ -184,9 +195,9 @@ export function ZoomMeeting({
     <div className="relative w-full h-full">
       <div 
         ref={zoomContainerRef} 
-        id="zoom-meeting-container"
+        id="zoomContainer"
         className="w-full h-full min-h-[500px]"
-        style={{ position: 'relative' }}
+        style={{ position: 'relative', height: '100%', width: '100%' }}
       >
         {isLoading && <div>Loading Zoom meeting...</div>}
         {error && <div>Error: {error}</div>}

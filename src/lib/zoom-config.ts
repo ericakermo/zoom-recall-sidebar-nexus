@@ -158,42 +158,36 @@ export const getSignature = async (meetingNumber: string, role: number): Promise
   }
 };
 
-export const createAndInitializeZoomClient = async (zoomAppRootElement: HTMLElement): Promise<any> => {
-  if (!zoomSDKLoaded || !window.ZoomMtgEmbedded) {
-    console.error('Zoom Component SDK is not loaded. Ensure loadZoomSDK() was called and succeeded.');
-    throw new Error('Zoom Component SDK not loaded. Cannot create client.');
+// Update this function to accept initialization options
+export const createAndInitializeZoomClient = async (
+  zoomAppRoot: HTMLElement,
+  initOptions?: any
+): Promise<any> => {
+  // Ensure the SDK is loaded
+  if (!window.ZoomMtgEmbedded) {
+    await loadZoomSDK();
   }
 
-  console.log('Creating Zoom Embedded SDK client...');
   const client = window.ZoomMtgEmbedded.createClient();
-  console.log('Zoom Embedded SDK client created.');
-
-  if (!zoomAppRootElement || !document.body.contains(zoomAppRootElement)) {
-    console.error('The zoomAppRootElement provided is invalid or not in the DOM.');
-    throw new Error('Invalid zoomAppRootElement for Zoom client initialization.');
-  }
-  console.log('Initializing Zoom Embedded SDK client with root element:', zoomAppRootElement);
   
-  try {
-    // Note: Component View .init() is synchronous or returns a Promise that resolves quickly
-    // according to some docs, but it's safer to await if it returns a promise.
-    // The official GH repo example uses .then() for client.init()
-    await client.init({
-      zoomAppRoot: zoomAppRootElement,
-      language: 'en-US',
-      patchJsMedia: true, // Recommended for better compatibility
-      // Customize other options as needed, e.g., webEndpoint, assetPath for ZFG
-    });
-    console.log('Zoom Embedded SDK client initialized successfully.');
-    return client; // Return the initialized client instance
-  } catch (initError) {
-    console.error('Error initializing Zoom Embedded SDK client:', initError);
-    // Log more details if available
-    if (initError && typeof initError === 'object') {
-        console.error('Initialization error details:', JSON.stringify(initError));
-    }
-    throw initError;
+  // Use provided init options or defaults
+  const options = initOptions || {
+    zoomAppRoot,
+    language: 'en-US',
+    patchJsMedia: true,
+    assetPath: 'https://source.zoom.us/3.13.1/lib', // Default assetPath for SDK v3+
+  };
+  
+  // Make sure zoomAppRoot is set
+  if (!options.zoomAppRoot && zoomAppRoot) {
+    options.zoomAppRoot = zoomAppRoot;
   }
+
+  // Initialize the client
+  await client.init(options);
+  console.log('Zoom client initialized with options:', options);
+  
+  return client;
 };
 
 // Interface for join parameters, helps with type safety
