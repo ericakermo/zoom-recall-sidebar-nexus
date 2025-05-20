@@ -1,15 +1,15 @@
-
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { hmac } from "https://deno.land/x/crypto@v0.10.0/hmac.ts";
 import { encode as encodeBase64 } from 'https://deno.land/std@0.168.0/encoding/base64.ts'
 
-// Configure CORS headers to allow requests from any origin
+// Configure CORS headers
 const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Origin': 'https://zoom-recall-sidebar-nexus.lovable.app',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS'
-}
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+  'Access-Control-Max-Age': '86400',
+};
 
 // Set the Zoom SDK credentials
 const ZOOM_API_KEY = "eFAZ8Vf7RbG5saQVqL1zGA";
@@ -20,10 +20,9 @@ serve(async (req) => {
   
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
-    console.log("Handling OPTIONS preflight request");
-    return new Response(null, { 
-      status: 200,
-      headers: corsHeaders 
+    return new Response(null, {
+      status: 204,
+      headers: corsHeaders
     });
   }
 
@@ -44,7 +43,13 @@ serve(async (req) => {
       console.error("No authorization header provided");
       return new Response(
         JSON.stringify({ error: 'No authorization header' }),
-        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        { 
+          status: 401, 
+          headers: { 
+            ...corsHeaders, 
+            'Content-Type': 'application/json' 
+          } 
+        }
       );
     }
 
@@ -58,7 +63,13 @@ serve(async (req) => {
       console.error("Invalid token or user not found:", userError);
       return new Response(
         JSON.stringify({ error: 'Invalid token' }),
-        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        { 
+          status: 401, 
+          headers: { 
+            ...corsHeaders, 
+            'Content-Type': 'application/json' 
+          } 
+        }
       );
     }
 
@@ -70,7 +81,13 @@ serve(async (req) => {
       console.error("Error parsing request body:", e);
       return new Response(
         JSON.stringify({ error: 'Invalid JSON in request body' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        { 
+          status: 400, 
+          headers: { 
+            ...corsHeaders, 
+            'Content-Type': 'application/json' 
+          } 
+        }
       );
     }
 
@@ -80,17 +97,26 @@ serve(async (req) => {
       console.error("Missing parameters:", { meetingNumber, role });
       return new Response(
         JSON.stringify({ error: 'Missing parameters' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        { 
+          status: 400, 
+          headers: { 
+            ...corsHeaders, 
+            'Content-Type': 'application/json' 
+          } 
+        }
       );
     }
 
     // Generate the signature using HMAC-SHA256
     const timestamp = new Date().getTime() - 30000;
-    const msg = new TextEncoder().encode(ZOOM_API_KEY + meetingNumber + timestamp + role);
-    
-    // Using hmac from Deno crypto correctly
-    const hmacSignature = hmac("sha256", ZOOM_API_SECRET, msg);
-    const signature = encodeBase64(hmacSignature);
+    const msg = Buffer.from(ZOOM_API_KEY + meetingNumber + timestamp + role);
+    const signature = encodeBase64(
+      await hmac(
+        'SHA-256',
+        ZOOM_API_SECRET,
+        msg
+      )
+    );
 
     console.log("Signature generated successfully");
     return new Response(
