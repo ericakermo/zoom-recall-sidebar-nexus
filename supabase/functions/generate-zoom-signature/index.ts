@@ -85,21 +85,17 @@ serve(async (req) => {
       );
     }
 
-    // Generate the signature using Zoom's official HMAC-SHA256 method
+    // Generate the signature using Deno's TextEncoder instead of Buffer
     const timestamp = new Date().getTime() - 30000;
-    const msg = `${ZOOM_API_KEY}${meetingNumber}${timestamp}${role}`;
+    const msg = new TextEncoder().encode(ZOOM_API_KEY + meetingNumber + timestamp + role);
     
-    // Use HMAC-SHA256 with the API Secret as the key
-    const hmacDigest = await hmac("sha256", ZOOM_API_SECRET, msg);
-    const signature = encodeBase64(hmacDigest);
+    // Using hmac with TextEncoder-created message
+    const hmacSignature = hmac("sha256", ZOOM_API_SECRET, msg);
+    const signature = encodeBase64(hmacSignature);
 
-    console.log("Signature generated successfully using HMAC-SHA256");
+    console.log("Signature generated successfully");
     return new Response(
-      JSON.stringify({ 
-        signature,
-        timestamp,
-        sdkKey: ZOOM_API_KEY
-      }),
+      JSON.stringify({ signature }),
       { 
         status: 200, 
         headers: { 

@@ -65,6 +65,7 @@ export function ZoomMeetingSample({
   const [error, setError] = useState<string | null>(null);
   const zoomContainer = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
+  const apiKey = 'eFAZ8Vf7RbG5saQVqL1zGA'; // Your SDK key
 
   useEffect(() => {
     const init = async () => {
@@ -114,7 +115,7 @@ export function ZoomMeetingSample({
       setError(null);
       
       // Get signature from your backend
-      const signatureData = await getSignature(meetingNumber, role);
+      const signature = await getSignature(meetingNumber, role);
       
       // Initialize the meeting container
       if (zoomContainer.current) {
@@ -123,17 +124,15 @@ export function ZoomMeetingSample({
           success: (success: any) => {
             console.log('Init success:', success);
             
-            // Join the meeting with the signature data from the server
+            // Join the meeting
             window.ZoomMtg.join({
-              signature: signatureData.signature,
+              signature: signature,
               meetingNumber: meetingNumber,
               userName: userName,
-              sdkKey: signatureData.sdkKey,
+              sdkKey: apiKey,
               userEmail: userEmail,
               passWord: passWord,
               tk: '',
-              // Use the timestamp from the server
-              timestamp: signatureData.timestamp,
               success: () => {
                 console.log('Joined meeting successfully');
                 setJoining(false);

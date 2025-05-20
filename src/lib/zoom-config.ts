@@ -151,7 +151,7 @@ export const loadZoomSDK = async (): Promise<boolean> => {
   return zoomSDKLoadingPromise;
 };
 
-export const getSignature = async (meetingNumber: string, role: number): Promise<{ signature: string, timestamp: number, sdkKey: string }> => {
+export const getSignature = async (meetingNumber: string, role: number): Promise<string> => {
   try {
     const tokenData = localStorage.getItem('sb-qsxlvwwebbakmzpwjfbb-auth-token');
     if (!tokenData) {
@@ -180,19 +180,11 @@ export const getSignature = async (meetingNumber: string, role: number): Promise
     }
     
     const data = await response.json();
-    if (!data.signature || !data.timestamp || !data.sdkKey) {
+    if (!data.signature) {
       throw new Error('Invalid response from authentication service');
     }
     
-    // Store the timestamp and sdkKey for use in join
-    localStorage.setItem('zoom_timestamp', data.timestamp.toString());
-    localStorage.setItem('zoom_sdk_key', data.sdkKey);
-    
-    return {
-      signature: data.signature,
-      timestamp: data.timestamp,
-      sdkKey: data.sdkKey
-    };
+    return data.signature;
   } catch (error) {
     console.error('Error getting signature:', error);
     throw error;
@@ -337,23 +329,13 @@ export const joinZoomMeeting = async (client: any, params: {
     throw new Error('Zoom client instance is required to join a meeting');
   }
   
-  // Get the stored timestamp and sdkKey
-  const timestamp = localStorage.getItem('zoom_timestamp');
-  const sdkKey = localStorage.getItem('zoom_sdk_key');
-  
-  if (!timestamp || !sdkKey) {
-    throw new Error('Missing required Zoom authentication parameters');
-  }
-  
   const joinPayload = {
-    sdkKey: sdkKey,
+    sdkKey: ZOOM_SDK_KEY,
     signature: params.signature,
     meetingNumber: params.meetingNumber,
     userName: params.userName,
     password: params.password || '',
     userEmail: params.userEmail || '',
-    // Include the timestamp from the server
-    timestamp: parseInt(timestamp),
     success: (event: any) => {
       console.log('Successfully joined meeting:', event);
     },
@@ -367,7 +349,6 @@ export const joinZoomMeeting = async (client: any, params: {
     signature: '[REDACTED]',
     meetingNumber: joinPayload.meetingNumber,
     userName: joinPayload.userName,
-    timestamp: joinPayload.timestamp
   });
   
   try {

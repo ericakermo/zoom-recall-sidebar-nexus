@@ -159,10 +159,10 @@ export function ZoomMeeting({
         setIsLoading(true);
         setError(null);
         
-        // Get signature with complete data
+        // Get signature
         console.log('Getting signature for meeting:', meetingNumber);
-        const signatureData = await getSignature(meetingNumber, role);
-        console.log('Received signature successfully with timestamp:', signatureData.timestamp);
+        const signature = await getSignature(meetingNumber, role);
+        console.log('Received signature successfully');
 
         // Verify container
         if (!zoomContainerRef.current) {
@@ -180,14 +180,13 @@ export function ZoomMeeting({
         
         zoomClientRef.current = client;
         
-        // Join meeting with all required params including timestamp
+        // Join meeting
         console.log('Joining meeting:', meetingNumber);
         await joinZoomMeeting(client, {
-          signature: signatureData.signature,
+          signature,
           meetingNumber,
           userName: providedUserName || user?.email || 'Guest',
           password: meetingPassword || ''
-          // timestamp is retrieved from localStorage in the joinZoomMeeting function
         });
         
         if (!isMounted) return;
