@@ -117,21 +117,8 @@ export const loadZoomSDK = async (): Promise<boolean> => {
         if (window.ZoomMtgEmbedded) {
           console.log('ZoomMtgEmbedded found after', attempts, 'attempts!');
           console.log('ZoomMtgEmbedded version:', window.ZoomMtgEmbedded.version || 'unknown');
-          
-          try {
-            // Create a test client to verify SDK is working
-            const testClient = window.ZoomMtgEmbedded.createClient();
-            if (!testClient) {
-              throw new Error('Failed to create test client');
-            }
-            
-            console.log('SDK initialization verified successfully');
-            zoomSDKLoaded = true;
-            resolve(true);
-          } catch (error) {
-            console.error('Error during SDK verification:', error);
-            reject(error);
-          }
+          zoomSDKLoaded = true;
+          resolve(true);
         } else if (attempts >= maxAttempts) {
           console.error('ZoomMtgEmbedded not available after maximum attempts');
           reject(new Error('Timed out waiting for ZoomMtgEmbedded to initialize'));
@@ -180,9 +167,13 @@ export const getSignature = async (meetingNumber: string, role: number): Promise
     }
     
     const data = await response.json();
-    if (!data.signature) {
+    if (!data.signature || !data.timestamp || !data.sdkKey) {
       throw new Error('Invalid response from authentication service');
     }
+    
+    // Store the timestamp and sdkKey for use in join
+    localStorage.setItem('zoom_timestamp', data.timestamp.toString());
+    localStorage.setItem('zoom_sdk_key', data.sdkKey);
     
     return data.signature;
   } catch (error) {
