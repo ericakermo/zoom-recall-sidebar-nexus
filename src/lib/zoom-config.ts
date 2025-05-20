@@ -1,3 +1,4 @@
+
 import { ZoomMeetingConfig } from '@/types/zoom';
 
 // Use the client ID directly for sdkKey
@@ -139,6 +140,14 @@ export const createAndInitializeZoomClient = async (
   if (!window.ZoomMtgEmbedded) {
     await loadZoomSDK();
   }
+
+  // Add logging to check container state
+  console.log('Container element:', zoomAppRoot);
+  console.log('Container ID:', zoomAppRoot.id);
+  console.log('Container dimensions:', {
+    width: zoomAppRoot.offsetWidth,
+    height: zoomAppRoot.offsetHeight
+  });
 
   const client = window.ZoomMtgEmbedded.createClient();
   
