@@ -1,3 +1,4 @@
+
 import { useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
@@ -119,7 +120,13 @@ export function ZoomMeeting({
           throw new Error('Zoom container not available');
         }
         
-        const zoomClient = await createAndInitializeZoomClient(zoomContainerRef.current);
+        const zoomClient = await createAndInitializeZoomClient(zoomContainerRef.current, {
+          zoomAppRoot: zoomContainerRef.current,
+          language: 'en-US',
+          patchJsMedia: true,
+          assetPath: 'https://source.zoom.us/3.13.2/lib',
+        });
+        
         zoomClientRef.current = zoomClient;
 
         // Join meeting

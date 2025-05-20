@@ -1,3 +1,4 @@
+
 import { ZoomMeetingConfig } from '@/types/zoom';
 
 // Use the client ID directly for sdkKey
@@ -179,6 +180,7 @@ export const createAndInitializeZoomClient = async (
       language: 'en-US',
       patchJsMedia: true,
       assetPath: 'https://source.zoom.us/3.13.2/lib',
+      ...initOptions
     });
     console.log('Zoom Embedded SDK client initialized successfully.');
     return client; // Return the initialized client instance
