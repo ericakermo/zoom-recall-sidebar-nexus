@@ -1,4 +1,3 @@
-
 import { useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
@@ -93,12 +92,24 @@ export function ZoomMeeting({
 
   // Separate useEffect for container mounting
   useEffect(() => {
-    if (zoomContainerRef.current) {
-      // Add a small delay to ensure container is fully mounted
-      setTimeout(() => {
-        setContainerReady(true);
-      }, 100);
-    }
+    const checkContainer = () => {
+      if (zoomContainerRef.current) {
+        const container = zoomContainerRef.current;
+        console.log('Container dimensions:', {
+          width: container.offsetWidth,
+          height: container.offsetHeight,
+          id: container.id
+        });
+        
+        if (container.offsetWidth > 0 && container.offsetHeight > 0) {
+          setContainerReady(true);
+        } else {
+          setTimeout(checkContainer, 100);
+        }
+      }
+    };
+    
+    checkContainer();
   }, []);
 
   // Main initialization useEffect
@@ -201,14 +212,33 @@ export function ZoomMeeting({
 
   return (
     <div className="relative w-full h-full">
+      {/* Add this wrapper div with explicit dimensions */}
       <div 
-        ref={zoomContainerRef} 
-        id="meetingSDKElement"
-        className="w-full h-full min-h-[500px]"
-        style={{ position: 'relative', height: '100%', width: '100%' }}
+        style={{ 
+          position: 'relative',
+          width: '100%',
+          height: '100%',
+          minHeight: '500px'
+        }}
       >
-        {isLoading && <div>Loading Zoom meeting...</div>}
-        {error && <div>Error: {error}</div>}
+        <div 
+          ref={zoomContainerRef} 
+          id="meetingSDKElement"
+          style={{ 
+            position: 'relative',
+            width: '100%',
+            height: '100%',
+            minHeight: '500px'
+          }}
+        >
+          {isLoading && (
+            <div className="flex flex-col items-center justify-center h-full">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mb-4"></div>
+              <p>Connecting to Zoom meeting...</p>
+            </div>
+          )}
+          {error && <div>Error: {error}</div>}
+        </div>
       </div>
       
       {isConnected && (

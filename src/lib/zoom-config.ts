@@ -1,4 +1,3 @@
-
 import { ZoomMeetingConfig } from '@/types/zoom';
 
 // Use the client ID directly for sdkKey
@@ -141,7 +140,11 @@ export const createAndInitializeZoomClient = async (
     await loadZoomSDK();
   }
 
-  // Add logging to check container state
+  // Ensure container is ready
+  if (!zoomAppRoot || !zoomAppRoot.id || zoomAppRoot.id !== 'meetingSDKElement') {
+    throw new Error('Invalid container element. Must have id="meetingSDKElement"');
+  }
+
   console.log('Container element:', zoomAppRoot);
   console.log('Container ID:', zoomAppRoot.id);
   console.log('Container dimensions:', {
@@ -152,17 +155,44 @@ export const createAndInitializeZoomClient = async (
   const client = window.ZoomMtgEmbedded.createClient();
   
   try {
-    // Note: Component View .init() is synchronous or returns a Promise that resolves quickly
-    // according to some docs, but it's safer to await if it returns a promise.
-    // The official GH repo example uses .then() for client.init()
+    // Initialize with all required options
     await client.init({
       zoomAppRoot: zoomAppRoot,
       language: 'en-US',
       patchJsMedia: true,
       assetPath: 'https://source.zoom.us/3.13.2/lib',
+      showMeetingHeader: true,
+      disableInvite: false,
+      disableCallOut: false,
+      disableRecord: false,
+      disableJoinAudio: false,
+      audioPanelAlwaysOpen: false,
+      showPureSharingContent: false,
+      isSupportAV: true,
+      isSupportChat: true,
+      isSupportQA: true,
+      isSupportCC: true,
+      isSupportPolling: true,
+      isSupportBreakout: true,
+      screenShare: true,
+      rwcBackup: '',
+      videoDrag: true,
+      sharingMode: 'both',
+      videoHeader: true,
+      isLockBottom: true,
+      isShowAvatar: true,
+      isShowUserStatistics: true,
+      meetingInfo: ['topic', 'host', 'mn', 'pwd', 'telPwd', 'invite', 'participant', 'dc', 'enctype'],
+      success: (event: any) => {
+        console.log('Zoom client initialized successfully', event);
+      },
+      error: (event: any) => {
+        console.error('Zoom client initialization error', event);
+      },
       ...initOptions
     });
-    console.log('Zoom Embedded SDK client initialized successfully.');
+    
+    console.log('Zoom Embedded SDK client initialized successfully');
     return client; // Return the initialized client instance
   } catch (initError) {
     console.error('Error initializing Zoom Embedded SDK client:', initError);
