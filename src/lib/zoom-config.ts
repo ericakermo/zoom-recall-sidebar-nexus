@@ -261,7 +261,6 @@ export const createAndInitializeZoomClient = async (
       zoomAppRoot,
       language: 'en-US',
       patchJsMedia: true,
-      assetPath: 'https://source.zoom.us/3.13.2/lib',
       showMeetingHeader: true,
       disableInvite: false,
       disableCallOut: false,
@@ -337,6 +336,12 @@ export const joinZoomMeeting = async (client: any, params: {
     userName: params.userName,
     password: params.password || '',
     userEmail: params.userEmail || '',
+    success: (event: any) => {
+      console.log('Successfully joined meeting:', event);
+    },
+    error: (event: any) => {
+      console.error('Error joining meeting:', event);
+    }
   };
   
   console.log('Attempting to join Zoom meeting with parameters:', { 
