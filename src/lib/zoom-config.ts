@@ -405,8 +405,10 @@ export const joinZoomMeeting = async (client: any, params: JoinMeetingParams): P
   }
   
   const joinPayload = {
-    ...params,
-    sdkKey: ZOOM_SDK_KEY, 
+    sdkKey: ZOOM_SDK_KEY,
+    signature: params.signature,
+    meetingNumber: params.meetingNumber,
+    userName: params.userName,
     password: params.password || '',
     userEmail: params.userEmail || '',
     tk: params.tk || '',
