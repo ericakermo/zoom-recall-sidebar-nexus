@@ -180,9 +180,13 @@ export const getSignature = async (meetingNumber: string, role: number): Promise
     }
     
     const data = await response.json();
-    if (!data.signature) {
+    if (!data.signature || !data.timestamp || !data.sdkKey) {
       throw new Error('Invalid response from authentication service');
     }
+    
+    // Store the timestamp and sdkKey for use in join
+    localStorage.setItem('zoom_timestamp', data.timestamp.toString());
+    localStorage.setItem('zoom_sdk_key', data.sdkKey);
     
     return data.signature;
   } catch (error) {
