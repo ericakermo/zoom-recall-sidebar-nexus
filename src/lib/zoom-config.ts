@@ -166,22 +166,15 @@ export const createAndInitializeZoomClient = async (
 ): Promise<any> => {
   // Ensure the SDK is loaded
   if (!window.ZoomMtgEmbedded) {
-    console.log('ZoomMtgEmbedded not found, loading SDK first');
     await loadZoomSDK();
-    
-    if (!window.ZoomMtgEmbedded) {
-      console.error('ZoomMtgEmbedded still not available after loading attempt');
-      throw new Error('Failed to load Zoom SDK: ZoomMtgEmbedded not available');
-    }
   }
 
-  console.log('Creating Zoom client with ZoomMtgEmbedded.createClient()');
   const client = window.ZoomMtgEmbedded.createClient();
   
   try {
-    console.log('Initializing Zoom client with options:', { ...initOptions, assetPath: initOptions?.assetPath });
     // Note: Component View .init() is synchronous or returns a Promise that resolves quickly
     // according to some docs, but it's safer to await if it returns a promise.
+    // The official GH repo example uses .then() for client.init()
     await client.init({
       zoomAppRoot: zoomAppRoot,
       language: 'en-US',
