@@ -1,3 +1,4 @@
+
 import { ZoomMeetingConfig } from '@/types/zoom';
 
 // Use the client ID directly for sdkKey
@@ -130,7 +131,7 @@ export const getSignature = async (meetingNumber: string, role: number): Promise
   }
 };
 
-// Update this function to accept initialization options
+// Enhanced initialization with better container validation and logging
 export const createAndInitializeZoomClient = async (
   zoomAppRoot: HTMLElement,
   initOptions?: any
@@ -140,27 +141,32 @@ export const createAndInitializeZoomClient = async (
     await loadZoomSDK();
   }
 
-  // Ensure container is ready
+  // Enhanced container validation
   if (!zoomAppRoot || !zoomAppRoot.id || zoomAppRoot.id !== 'meetingSDKElement') {
-    throw new Error('Invalid container element. Must have id="meetingSDKElement"');
+    throw new Error(`Invalid container element. Found: ${zoomAppRoot?.id}, Expected: meetingSDKElement`);
   }
 
-  console.log('Container element:', zoomAppRoot);
-  console.log('Container ID:', zoomAppRoot.id);
-  console.log('Container dimensions:', {
+  const containerDimensions = {
     width: zoomAppRoot.offsetWidth,
-    height: zoomAppRoot.offsetHeight
-  });
+    height: zoomAppRoot.offsetHeight,
+    style: {
+      display: window.getComputedStyle(zoomAppRoot).display,
+      position: window.getComputedStyle(zoomAppRoot).position
+    }
+  };
+  
+  console.log('Initializing Zoom client with container:', containerDimensions);
 
   const client = window.ZoomMtgEmbedded.createClient();
   
   try {
-    // Initialize with all required options
-    await client.init({
+    // Initialize with enhanced options and logging
+    const initConfig = {
       zoomAppRoot: zoomAppRoot,
       language: 'en-US',
       patchJsMedia: true,
       assetPath: 'https://source.zoom.us/3.13.2/lib',
+      // Required rendering options
       showMeetingHeader: true,
       disableInvite: false,
       disableCallOut: false,
@@ -184,18 +190,39 @@ export const createAndInitializeZoomClient = async (
       isShowUserStatistics: true,
       meetingInfo: ['topic', 'host', 'mn', 'pwd', 'telPwd', 'invite', 'participant', 'dc', 'enctype'],
       success: (event: any) => {
-        console.log('Zoom client initialized successfully', event);
+        console.log('Zoom client initialized successfully', {
+          event,
+          containerDimensions: {
+            width: zoomAppRoot.offsetWidth,
+            height: zoomAppRoot.offsetHeight
+          }
+        });
       },
       error: (event: any) => {
-        console.error('Zoom client initialization error', event);
+        console.error('Zoom client initialization error', {
+          event,
+          containerDimensions: {
+            width: zoomAppRoot.offsetWidth,
+            height: zoomAppRoot.offsetHeight
+          }
+        });
       },
       ...initOptions
-    });
+    };
+
+    console.log('Initializing Zoom client with config:', { ...initConfig, zoomAppRoot: 'DOM Element' });
+    await client.init(initConfig);
     
     console.log('Zoom Embedded SDK client initialized successfully');
-    return client; // Return the initialized client instance
+    return client;
   } catch (initError) {
-    console.error('Error initializing Zoom Embedded SDK client:', initError);
+    console.error('Error initializing Zoom Embedded SDK client:', {
+      error: initError,
+      containerDimensions: {
+        width: zoomAppRoot.offsetWidth,
+        height: zoomAppRoot.offsetHeight
+      }
+    });
     // Log more details if available
     if (initError && typeof initError === 'object') {
         console.error('Initialization error details:', JSON.stringify(initError));

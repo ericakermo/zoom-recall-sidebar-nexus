@@ -1,3 +1,4 @@
+
 import { useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
@@ -106,20 +107,26 @@ export function ZoomMeeting({
     };
   }, []);
 
-  // Separate useEffect for container mounting
+  // Enhanced container mounting check
   useEffect(() => {
     const checkContainer = () => {
       if (zoomContainerRef.current) {
         const container = zoomContainerRef.current;
-        console.log('Container dimensions:', {
+        const dimensions = {
           width: container.offsetWidth,
           height: container.offsetHeight,
-          id: container.id
-        });
+          id: container.id,
+          display: window.getComputedStyle(container).display,
+          position: window.getComputedStyle(container).position
+        };
         
-        if (container.offsetWidth > 0 && container.offsetHeight > 0) {
+        console.log('Container check:', dimensions);
+        
+        if (dimensions.width > 0 && dimensions.height > 0) {
+          console.log('Container ready with dimensions:', dimensions);
           setContainerReady(true);
         } else {
+          console.log('Container not ready, retrying...');
           setTimeout(checkContainer, 100);
         }
       }
@@ -225,44 +232,29 @@ export function ZoomMeeting({
     );
   }
 
-  if (isLoading) {
-    return (
-      <div className="flex flex-col items-center justify-center min-h-[400px]">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mb-4"></div>
-        <p>Connecting to Zoom meeting...</p>
-      </div>
-    );
-  }
-
   return (
     <div className="relative w-full h-full">
-      {/* Add this wrapper div with explicit dimensions */}
       <div 
+        ref={zoomContainerRef} 
+        id="meetingSDKElement"
         style={{ 
           position: 'relative',
           width: '100%',
           height: '100%',
-          minHeight: '500px'
+          minHeight: '500px',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center'
         }}
       >
-        <div 
-          ref={zoomContainerRef} 
-          id="meetingSDKElement"
-          style={{ 
-            position: 'relative',
-            width: '100%',
-            height: '100%',
-            minHeight: '500px'
-          }}
-        >
-          {isLoading && (
-            <div className="flex flex-col items-center justify-center h-full">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mb-4"></div>
-              <p>Connecting to Zoom meeting...</p>
-            </div>
-          )}
-          {error && <div>Error: {error}</div>}
-        </div>
+        {isLoading && (
+          <div className="flex flex-col items-center justify-center">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mb-4"></div>
+            <p>Connecting to Zoom meeting...</p>
+          </div>
+        )}
+        {error && <div>Error: {error}</div>}
       </div>
       
       {isConnected && (
