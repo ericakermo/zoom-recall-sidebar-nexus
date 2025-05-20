@@ -119,16 +119,6 @@ export const loadZoomSDK = async (): Promise<boolean> => {
           console.log('ZoomMtgEmbedded version:', window.ZoomMtgEmbedded.version || 'unknown');
           
           try {
-            // Pre-load required assets in sequence
-            console.log('Pre-loading WebAssembly modules...');
-            await window.ZoomMtgEmbedded.preLoadWasm();
-            
-            console.log('Preparing Web SDK...');
-            await window.ZoomMtgEmbedded.prepareWebSDK();
-            
-            console.log('Loading language files...');
-            await window.ZoomMtgEmbedded.i18n.load('en-US');
-            
             // Verify assets are accessible
             console.log('Verifying asset accessibility...');
             const assetPath = 'https://source.zoom.us/3.13.2/lib';
@@ -141,7 +131,7 @@ export const loadZoomSDK = async (): Promise<boolean> => {
             zoomSDKLoaded = true;
             resolve(true);
           } catch (error) {
-            console.error('Error during asset preloading:', error);
+            console.error('Error during asset verification:', error);
             reject(error);
           }
         } else if (attempts >= maxAttempts) {
