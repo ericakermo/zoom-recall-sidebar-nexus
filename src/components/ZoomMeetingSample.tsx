@@ -114,8 +114,8 @@ export function ZoomMeetingSample({
       setJoining(true);
       setError(null);
       
-      // Get signature with timestamp and sdkKey
-      const { signature, timestamp, sdkKey } = await getSignature(meetingNumber, role);
+      // Get signature from your backend
+      const signature = await getSignature(meetingNumber, role);
       
       // Initialize the meeting container
       if (zoomContainer.current) {
@@ -129,7 +129,7 @@ export function ZoomMeetingSample({
               signature: signature,
               meetingNumber: meetingNumber,
               userName: userName,
-              sdkKey: sdkKey,
+              sdkKey: apiKey,
               userEmail: userEmail,
               passWord: passWord,
               tk: '',

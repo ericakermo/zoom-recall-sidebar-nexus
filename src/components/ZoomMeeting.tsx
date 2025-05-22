@@ -1,4 +1,3 @@
-
 import { useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { loadZoomSDK, createAndInitializeZoomClient, getSignature, joinZoomMeeting, leaveZoomMeeting } from '@/lib/zoom-config';
@@ -160,10 +159,10 @@ export function ZoomMeeting({
         setIsLoading(true);
         setError(null);
         
-        // Get signature with timestamp and sdkKey
+        // Get signature
         console.log('Getting signature for meeting:', meetingNumber);
-        const { signature, timestamp, sdkKey } = await getSignature(meetingNumber, role);
-        console.log('Received signature successfully with timestamp:', timestamp);
+        const signature = await getSignature(meetingNumber, role);
+        console.log('Received signature successfully');
 
         // Verify container
         if (!zoomContainerRef.current) {
@@ -185,11 +184,9 @@ export function ZoomMeeting({
         console.log('Joining meeting:', meetingNumber);
         await joinZoomMeeting(client, {
           signature,
-          sdkKey,
           meetingNumber,
           userName: providedUserName || user?.email || 'Guest',
-          password: meetingPassword || '',
-          timestamp,
+          password: meetingPassword || ''
         });
         
         if (!isMounted) return;

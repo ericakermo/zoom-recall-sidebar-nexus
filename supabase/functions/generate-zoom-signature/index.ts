@@ -1,14 +1,16 @@
 
-import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
-import { create, getNumericDate } from 'https://deno.land/x/djwt@v2.8/mod.ts';
+import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { hmac } from "https://deno.land/x/crypto@v0.10.0/hmac.ts";
+import { encode as encodeBase64 } from 'https://deno.land/std@0.168.0/encoding/base64.ts'
+import { encode as encodeHex } from "https://deno.land/std@0.168.0/encoding/hex.ts";
 
 // Configure CORS headers to allow requests from any origin
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
   'Access-Control-Allow-Methods': 'POST, OPTIONS'
-};
+}
 
 // Set the Zoom SDK credentials
 const ZOOM_API_KEY = "eFAZ8Vf7RbG5saQVqL1zGA";
@@ -83,32 +85,17 @@ serve(async (req) => {
       );
     }
 
-    // Generate JWT signature for Zoom SDK v3+
-    const iat = Math.floor(Date.now() / 1000) - 30;
-    const exp = iat + 60 * 60 * 2; // 2 hours expiration
+    // Generate the signature using Deno's TextEncoder instead of Buffer
+    const timestamp = new Date().getTime() - 30000;
+    const msg = new TextEncoder().encode(ZOOM_API_KEY + meetingNumber + timestamp + role);
     
-    const header = { alg: "HS256", typ: "JWT" };
-    const payload = {
-      sdkKey: ZOOM_API_KEY,
-      mn: meetingNumber,
-      role: role,
-      iat: iat,
-      exp: exp,
-      appKey: ZOOM_API_KEY,
-      tokenExp: exp
-    };
+    // Using hmac with TextEncoder-created message
+    const hmacSignature = hmac("sha256", ZOOM_API_SECRET, msg);
+    const signature = encodeBase64(hmacSignature);
 
-    // Create JWT token
-    const signature = await create(header, payload, ZOOM_API_SECRET);
-    const timestamp = iat * 1000; // Convert to milliseconds for client
-    
-    console.log("JWT signature generated successfully");
+    console.log("Signature generated successfully");
     return new Response(
-      JSON.stringify({ 
-        signature,
-        timestamp,
-        sdkKey: ZOOM_API_KEY
-      }),
+      JSON.stringify({ signature }),
       { 
         status: 200, 
         headers: { 
