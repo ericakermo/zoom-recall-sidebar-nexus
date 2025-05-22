@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
@@ -7,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { loadZoomSDK, getSignature, createAndInitializeZoomClient, joinZoomMeeting, leaveZoomMeeting } from '@/lib/zoom-config';
+import { loadZoomSDK, getSignature, createAndInitializeZoomClient, joinMeeting, leaveZoomMeeting } from '@/lib/zoom-config';
 import { Video, VideoOff, X } from 'lucide-react';
 
 export function JoinZoomMeeting() {
@@ -113,8 +112,8 @@ export function JoinZoomMeeting() {
       const client = await createAndInitializeZoomClient(zoomRootRef.current);
       zoomClientRef.current = client;
       
-      // Join the meeting
-      await joinZoomMeeting(client, {
+      // Join the meeting - Changed from joinZoomMeeting to joinMeeting
+      await joinMeeting(client, {
         signature: signatureData.signature,
         meetingNumber: formattedMeetingId,
         userName: user.email || 'Zoom User',
