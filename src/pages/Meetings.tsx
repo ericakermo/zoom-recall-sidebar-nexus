@@ -24,6 +24,7 @@ const Meetings = () => {
   const { user } = useAuth();
   const [currentMeeting, setCurrentMeeting] = useState<any>(null);
   const [isStartingMeeting, setIsStartingMeeting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const joinMeeting = (data: MeetingFormData) => {
     if (!user) {
@@ -125,18 +126,19 @@ const Meetings = () => {
   const handleStartMeeting = async () => {
     setIsStartingMeeting(true);
     try {
-      // Get user info from your auth system
-      const user = {
-        name: 'Your Name', // Replace with actual user name
-        email: 'your.email@example.com' // Replace with actual user email
-      };
+      const tokenData = localStorage.getItem('sb-qsxlvwwebbakmzpwjfbb-auth-token');
+      if (!tokenData) {
+        throw new Error('Authentication required');
+      }
 
-      // Create a new meeting
+      const parsedToken = JSON.parse(tokenData);
+      const authToken = parsedToken?.access_token;
+
       const response = await fetch('https://qsxlvwwebbakmzpwjfbb.supabase.co/functions/v1/create-zoom-meeting', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('sb-qsxlvwwebbakmzpwjfbb-auth-token')}`,
+          'Authorization': `Bearer ${authToken}`,
         },
         body: JSON.stringify({
           topic: 'Instant Meeting',
@@ -152,13 +154,16 @@ const Meetings = () => {
       });
 
       if (!response.ok) {
-        throw new Error('Failed to create meeting');
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to create meeting');
       }
 
       const meeting = await response.json();
       setCurrentMeeting(meeting);
     } catch (error) {
       console.error('Failed to start meeting:', error);
+      // Show error to user
+      setError(error.message);
     } finally {
       setIsStartingMeeting(false);
     }
@@ -240,6 +245,11 @@ const Meetings = () => {
                 To host a meeting, you need to connect your Zoom account first in the Settings page.
               </p>
               <div className="space-x-3">
+                {error && (
+                  <div className="mt-4 p-4 bg-red-100 text-red-700 rounded">
+                    {error}
+                  </div>
+                )}
                 {!currentMeeting ? (
                   <Button 
                     onClick={handleStartMeeting}
