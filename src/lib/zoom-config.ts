@@ -1,4 +1,3 @@
-
 import { ZoomMeetingConfig } from '@/types/zoom';
 
 // Use the client ID directly for sdkKey
@@ -178,7 +177,10 @@ export const getSignature = async (meetingNumber: string, role: number): Promise
       },
       body: JSON.stringify({ 
         meetingNumber: meetingNumber,
-        role: role
+        role: role,
+        iss: ZOOM_SDK_KEY,
+        exp: expiration_time,
+        role: role // 1 for host
       }),
     });
 
@@ -331,61 +333,69 @@ export const createAndInitializeZoomClient = async (
   }
 };
 
-export const joinZoomMeeting = async (client: any, params: {
-  signature: string;
-  meetingNumber: string;
-  userName: string;
-  password?: string;
-  userEmail?: string;
-  timestamp?: number;
-  sdkKey?: string;
-}): Promise<void> => {
-  if (!client) {
-    throw new Error('Zoom client instance is required to join a meeting');
-  }
-  
-  if (!params.meetingNumber) {
-    throw new Error('Meeting number is required to join a meeting');
-  }
-  
-  const joinParams = {
-    signature: params.signature,
-    meetingNumber: params.meetingNumber,
-    userName: params.userName || 'Guest',
-    password: params.password || '',
-    sdkKey: params.sdkKey || ZOOM_SDK_KEY,
-    userEmail: params.userEmail || '',
-    success: (event: any) => {
-      console.log('Successfully joined meeting:', event);
-    },
-    error: (event: any) => {
-      console.error('Error joining meeting:', event);
-      console.error('Join error details:', JSON.stringify(event, null, 2));
-      
-      // Log the parameters used for better debugging
-      console.log('Join parameters used:', {
-        meetingNumber: params.meetingNumber,
-        sdkKey: params.sdkKey || ZOOM_SDK_KEY,
-        signature: params.signature,
-        userName: params.userName
-      });
-    }
-  };
-  
-  console.log('Attempting to join Zoom meeting with parameters:', joinParams);
-  
+export const joinMeeting = async (client, params) => {
   try {
-    await client.join(joinParams);
-    console.log('Successfully joined the Zoom meeting');
-  } catch (joinError: any) {
-    console.error('Error joining Zoom meeting:', joinError);
-    
-    if (joinError && typeof joinError === 'object') {
-      console.error('Join error details:', JSON.stringify(joinError, null, 2));
+    const tokenData = localStorage.getItem('sb-qsxlvwwebbakmzpwjfbb-auth-token');
+    if (!tokenData) {
+      throw new Error('Authentication required');
     }
-    
-    const errorMessage = joinError.message || 'Unknown join error';
-    throw new Error(`Failed to join meeting: ${errorMessage}`);
+    const parsedToken = JSON.parse(tokenData);
+    const authToken = parsedToken?.access_token;
+
+    // Get signature from your edge function
+    const response = await fetch(`${SUPABASE_URL}/functions/v1/generate-zoom-signature`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${authToken}`
+      },
+      body: JSON.stringify({
+        meetingNumber: params.meetingNumber,
+        role: 1 // 1 for host
+      })
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('Signature request failed:', {
+        status: response.status,
+        statusText: response.statusText,
+        errorText
+      });
+      throw new Error('Failed to get signature');
+    }
+
+    const { signature } = await response.json();
+    console.log('Signature received:', {
+      hasSignature: !!signature,
+      signatureLength: signature?.length
+    });
+
+    // Join with all required parameters
+    await client.join({
+      sdkKey: ZOOM_SDK_KEY,
+      signature: signature,
+      meetingNumber: params.meetingNumber,
+      userName: params.userName,
+      userEmail: params.userEmail,
+      passWord: params.password || '', // Required, even if empty
+      success: (success) => {
+        console.log('Join meeting success:', success);
+      },
+      error: (error) => {
+        console.error('Join meeting error:', error);
+        // Log detailed error information
+        console.error('Error details:', {
+          code: error.code,
+          message: error.message,
+          type: error.type,
+          reason: error.reason
+        });
+      }
+    });
+  } catch (error) {
+    console.error('Error joining meeting:', error);
+    throw error;
   }
 };
 
