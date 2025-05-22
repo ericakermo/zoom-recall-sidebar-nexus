@@ -22,6 +22,8 @@ const Meetings = () => {
   const { register, handleSubmit, formState: { errors }, reset } = useForm<MeetingFormData>();
   const { toast } = useToast();
   const { user } = useAuth();
+  const [currentMeeting, setCurrentMeeting] = useState<any>(null);
+  const [isStartingMeeting, setIsStartingMeeting] = useState(false);
 
   const joinMeeting = (data: MeetingFormData) => {
     if (!user) {
@@ -92,7 +94,7 @@ const Meetings = () => {
         }
       });
       
-      setActiveMeeting(meetingData.id);
+      setCurrentMeeting(meetingData);
       setIsHosting(true);
       
       toast({
@@ -118,6 +120,48 @@ const Meetings = () => {
       title: "Meeting Ended",
       description: "You have left the Zoom meeting"
     });
+  };
+
+  const handleStartMeeting = async () => {
+    setIsStartingMeeting(true);
+    try {
+      // Get user info from your auth system
+      const user = {
+        name: 'Your Name', // Replace with actual user name
+        email: 'your.email@example.com' // Replace with actual user email
+      };
+
+      // Create a new meeting
+      const response = await fetch('https://qsxlvwwebbakmzpwjfbb.supabase.co/functions/v1/create-zoom-meeting', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('sb-qsxlvwwebbakmzpwjfbb-auth-token')}`,
+        },
+        body: JSON.stringify({
+          topic: 'Instant Meeting',
+          type: 1,
+          settings: {
+            host_video: true,
+            participant_video: true,
+            join_before_host: false,
+            mute_upon_entry: true,
+            waiting_room: true
+          }
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to create meeting');
+      }
+
+      const meeting = await response.json();
+      setCurrentMeeting(meeting);
+    } catch (error) {
+      console.error('Failed to start meeting:', error);
+    } finally {
+      setIsStartingMeeting(false);
+    }
   };
 
   return (
@@ -196,23 +240,23 @@ const Meetings = () => {
                 To host a meeting, you need to connect your Zoom account first in the Settings page.
               </p>
               <div className="space-x-3">
-                <Button 
-                  onClick={hostMeeting} 
-                  disabled={isConnectingToZoom}
-                  className="w-full"
-                >
-                  {isConnectingToZoom ? (
-                    <>
-                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                      Connecting...
-                    </>
-                  ) : (
-                    <>
-                      <Video className="mr-2 h-4 w-4" />
-                      Start Instant Meeting
-                    </>
-                  )}
-                </Button>
+                {!currentMeeting ? (
+                  <Button 
+                    onClick={handleStartMeeting}
+                    disabled={isStartingMeeting}
+                    className="w-full"
+                  >
+                    {isStartingMeeting ? 'Starting Meeting...' : 'Start Instant Meeting'}
+                  </Button>
+                ) : (
+                  <div className="mt-4">
+                    <ZoomMeeting
+                      meetingNumber={currentMeeting.id}
+                      userName="Your Name" // Replace with actual user name
+                      userEmail="your.email@example.com" // Replace with actual user email
+                    />
+                  </div>
+                )}
               </div>
             </CardContent>
           </Card>
