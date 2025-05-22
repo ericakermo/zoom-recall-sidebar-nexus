@@ -177,10 +177,7 @@ export const getSignature = async (meetingNumber: string, role: number): Promise
       },
       body: JSON.stringify({ 
         meetingNumber: meetingNumber,
-        role: role,
-        iss: ZOOM_SDK_KEY,
-        exp: expiration_time,
-        role: role // 1 for host
+        role: role
       }),
     });
 
@@ -193,6 +190,12 @@ export const getSignature = async (meetingNumber: string, role: number): Promise
     if (!data.signature) {
       throw new Error('Invalid response from authentication service');
     }
+    
+    console.log("Received signature data:", {
+      signature: data.signature ? `${data.signature.substring(0, 10)}...` : 'undefined',
+      timestamp: data.timestamp,
+      sdkKey: data.sdkKey
+    });
     
     // Return the full response from the server
     return {

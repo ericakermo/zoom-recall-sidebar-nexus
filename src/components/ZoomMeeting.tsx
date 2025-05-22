@@ -1,11 +1,11 @@
+
 import { useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { loadZoomSDK, createAndInitializeZoomClient, getSignature, joinZoomMeeting, leaveZoomMeeting } from '@/lib/zoom-config';
+import { loadZoomSDK, getSignature } from '@/lib/zoom-config';
 import { useAuth } from '@/context/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Mic, MicOff, Video, VideoOff, PhoneOff } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import ZoomMtgEmbedded from '@zoom/meetingsdk/embedded';
 
 interface ZoomMeetingProps {
   meetingNumber: string;
@@ -16,7 +16,6 @@ interface ZoomMeetingProps {
 }
 
 const ZOOM_SDK_KEY = "eFAZ8Vf7RbG5saQVqL1zGA";
-const SUPABASE_URL = 'https://qsxlvwwebbakmzpwjfbb.supabase.co';
 
 export function ZoomMeeting({
   meetingNumber,
@@ -40,40 +39,53 @@ export function ZoomMeeting({
 
   // Handle meeting controls
   const toggleMute = () => {
-    if (!window.ZoomMtgEmbedded) return;
+    if (!window.ZoomMtgEmbedded || !zoomClientRef.current) return;
     
-    if (isMuted) {
-      window.ZoomMtgEmbedded.unmuteAudio();
-      setIsMuted(false);
-    } else {
-      window.ZoomMtgEmbedded.muteAudio();
-      setIsMuted(true);
+    try {
+      if (isMuted) {
+        zoomClientRef.current.unmuteAudio();
+        setIsMuted(false);
+      } else {
+        zoomClientRef.current.muteAudio();
+        setIsMuted(true);
+      }
+    } catch (err) {
+      console.error("Failed to toggle audio:", err);
     }
   };
 
   const toggleVideo = () => {
-    if (!window.ZoomMtgEmbedded) return;
+    if (!window.ZoomMtgEmbedded || !zoomClientRef.current) return;
     
-    if (isVideoOff) {
-      window.ZoomMtgEmbedded.startVideo();
-      setIsVideoOff(false);
-    } else {
-      window.ZoomMtgEmbedded.stopVideo();
-      setIsVideoOff(true);
+    try {
+      if (isVideoOff) {
+        zoomClientRef.current.startVideo();
+        setIsVideoOff(false);
+      } else {
+        zoomClientRef.current.stopVideo();
+        setIsVideoOff(true);
+      }
+    } catch (err) {
+      console.error("Failed to toggle video:", err);
     }
   };
 
   const leaveMeeting = () => {
-    if (zoomClientRef.current) {
-      leaveZoomMeeting(zoomClientRef.current)
-        .then(() => {
-          console.log('Left the meeting');
-          setIsConnected(false);
-          onMeetingEnd?.();
-        })
-        .catch((error: any) => {
-          console.error('Error leaving meeting:', error);
-        });
+    if (!zoomClientRef.current) {
+      console.log("No active Zoom client found for leaving meeting");
+      onMeetingEnd?.();
+      return;
+    }
+    
+    try {
+      zoomClientRef.current.leave();
+      console.log('Left the meeting');
+      setIsConnected(false);
+      onMeetingEnd?.();
+    } catch (error) {
+      console.error('Error leaving meeting:', error);
+      // Even if there's an error, still call the onMeetingEnd callback
+      onMeetingEnd?.();
     }
   };
 
@@ -95,8 +107,9 @@ export function ZoomMeeting({
     // Ensure container has explicit dimensions and ID
     if (container) {
       console.log('Setting container dimensions and ID');
-      container.style.width = parentElement?.offsetWidth ? `${parentElement.offsetWidth}px` : '100%';
-      container.style.height = '500px';
+      container.style.width = '100%';
+      container.style.height = '100%';
+      container.style.minHeight = '500px';
       container.id = 'meetingSDKElement';
     }
     
@@ -171,8 +184,13 @@ export function ZoomMeeting({
         setIsLoading(true);
         setError(null);
         
+        if (!zoomContainerRef.current || !window.ZoomMtgEmbedded) {
+          throw new Error("Zoom container or SDK not available");
+        }
+        
         // Create Zoom client
-        const client = ZoomMtgEmbedded.createClient();
+        const client = window.ZoomMtgEmbedded.createClient();
+        zoomClientRef.current = client;
 
         // Initialize with required parameters
         await client.init({
@@ -195,59 +213,53 @@ export function ZoomMeeting({
           }
         });
 
+        console.log("Zoom client initialized successfully");
+
         // Get signature
-        const tokenData = localStorage.getItem('sb-qsxlvwwebbakmzpwjfbb-auth-token');
-        if (!tokenData) {
-          throw new Error('Authentication required');
-        }
-
-        const parsedToken = JSON.parse(tokenData);
-        const authToken = parsedToken?.access_token;
-
-        const response = await fetch(`${SUPABASE_URL}/functions/v1/generate-zoom-signature`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${authToken}`
-          },
-          body: JSON.stringify({
-            meetingNumber,
-            role: 1 // 1 for host
-          })
+        const signatureData = await getSignature(meetingNumber, role || 0);
+        console.log("Signature data received:", {
+          hasSignature: !!signatureData.signature,
+          sdkKey: signatureData.sdkKey,
+          timestamp: signatureData.timestamp
         });
-
-        if (!response.ok) {
-          throw new Error('Failed to get signature');
-        }
-
-        const { signature } = await response.json();
 
         // Join meeting with all required parameters
         await client.join({
-          sdkKey: ZOOM_SDK_KEY,
-          signature: signature,
+          sdkKey: signatureData.sdkKey || ZOOM_SDK_KEY,
+          signature: signatureData.signature,
           meetingNumber: meetingNumber,
           userName: providedUserName || user?.email || 'Guest',
           userEmail: user?.email,
-          passWord: '', // Required, even if empty
-          success: (success) => {
+          passWord: meetingPassword || '', // Required, even if empty
+          success: (success: any) => {
             console.log('Join meeting success:', success);
-            setIsLoading(false);
-            setIsConnected(true);
-            toast({
-              title: "Meeting Joined",
-              description: "You have successfully joined the Zoom meeting"
-            });
+            if (isMounted) {
+              setIsLoading(false);
+              setIsConnected(true);
+              toast({
+                title: "Meeting Joined",
+                description: "You have successfully joined the Zoom meeting"
+              });
+            }
           },
-          error: (error) => {
+          error: (error: any) => {
             console.error('Join meeting error:', error);
-            setError(error);
-            setIsLoading(false);
-            toast({
-              title: "Meeting Error",
-              description: error,
-              variant: "destructive"
+            console.error('Error details:', {
+              code: error.code,
+              message: error.message,
+              type: error.type,
+              reason: error.reason
             });
+            
+            if (isMounted) {
+              setError(`Failed to join meeting: ${error.message || 'Unknown error'}`);
+              setIsLoading(false);
+              toast({
+                title: "Meeting Error",
+                description: error.message || 'Failed to join meeting',
+                variant: "destructive"
+              });
+            }
           }
         });
 
@@ -273,7 +285,11 @@ export function ZoomMeeting({
     return () => {
       isMounted = false;
       if (zoomClientRef.current) {
-        leaveZoomMeeting(zoomClientRef.current).catch(console.error);
+        try {
+          zoomClientRef.current.leave();
+        } catch (error) {
+          console.error('Error leaving meeting during cleanup:', error);
+        }
       }
     };
   }, [containerReady, sdkLoaded, meetingNumber, meetingPassword, providedUserName, role, user, toast]);

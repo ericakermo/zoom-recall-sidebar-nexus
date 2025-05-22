@@ -1,3 +1,4 @@
+
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { encode as encodeBase64 } from 'https://deno.land/std@0.168.0/encoding/base64.ts'
@@ -84,8 +85,8 @@ serve(async (req) => {
       );
     }
 
-    // Current timestamp in milliseconds, subtract 30 seconds
-    const timestamp = new Date().getTime() - 30000;
+    // Current timestamp in milliseconds
+    const timestamp = new Date().getTime();
     
     // Format meeting number as string
     const formattedMeetingNumber = String(meetingNumber);
@@ -94,7 +95,10 @@ serve(async (req) => {
     const numericRole = Number(role) || 0;
     
     // Create the message string exactly as required by Zoom
+    // Format: SDK_KEY + meetingNumber + timestamp + role
     const msg = `${ZOOM_API_KEY}${formattedMeetingNumber}${timestamp}${numericRole}`;
+    
+    console.log("Message string for signature:", msg);
     
     // Sign the message using HMAC SHA256
     const msgUint8 = new TextEncoder().encode(msg);
@@ -106,13 +110,14 @@ serve(async (req) => {
     
     console.log(`Generated signature for meeting ${meetingNumber} with role ${numericRole}`);
     console.log(`Message used for signing: ${msg}`);
+    console.log(`Timestamp: ${timestamp}`);
     
     return new Response(
       JSON.stringify({ 
         signature,
         sdkKey: ZOOM_API_KEY,
-        timestamp,
         meetingNumber: formattedMeetingNumber,
+        timestamp,
         role: numericRole
       }),
       { 

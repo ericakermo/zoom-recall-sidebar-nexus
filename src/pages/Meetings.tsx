@@ -10,7 +10,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/context/AuthContext';
 import { Video, VideoOff, X } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
-import { loadZoomSDK, getSignature, createAndInitializeZoomClient, joinZoomMeeting, leaveZoomMeeting, createZoomMeeting } from '@/lib/zoom-config';
+import { loadZoomSDK, getSignature } from '@/lib/zoom-config';
 
 interface MeetingFormData {
   meetingId: string;
@@ -32,7 +32,10 @@ const Meetings = () => {
   // Load the Zoom SDK on component mount
   useState(() => {
     loadZoomSDK()
-      .then(() => setSdkLoaded(true))
+      .then(() => {
+        console.log("Zoom SDK loaded successfully in Meetings.tsx");
+        setSdkLoaded(true);
+      })
       .catch(err => {
         console.error("Failed to load Zoom SDK:", err);
         setError("Failed to load Zoom SDK. Please try refreshing the page.");
@@ -42,7 +45,7 @@ const Meetings = () => {
   const joinMeeting = (data: MeetingFormData) => {
     if (!user) {
       toast({
-        title: "Error",
+        title: "Authentication Required",
         description: "You must be logged in to join a meeting",
         variant: "destructive"
       });
@@ -65,88 +68,36 @@ const Meetings = () => {
     reset(); // Reset form
   };
 
-  const hostMeeting = async () => {
+  const handleStartMeeting = async () => {
     if (!user) {
       toast({
-        title: "Error",
+        title: "Authentication Required",
         description: "You must be logged in to host a meeting",
         variant: "destructive"
       });
       return;
     }
 
-    try {
-      setIsConnectingToZoom(true);
-
-      // Check if user has connected their Zoom account
-      const { data: zoomConnection, error: connectionError } = await supabase
-        .from('zoom_connections')
-        .select('*')
-        .eq('user_id', user.id)
-        .single();
-
-      if (connectionError || !zoomConnection) {
-        toast({
-          title: "Zoom Account Not Connected",
-          description: "Please connect your Zoom account in Settings first",
-          variant: "destructive"
-        });
-        setIsConnectingToZoom(false);
-        return;
-      }
-
-      // Create a new meeting using the zoom-config function
-      const meetingData = await createZoomMeeting({
-        topic: 'Instant Meeting',
-        type: 1,
-        settings: {
-          host_video: true,
-          participant_video: true,
-          join_before_host: false,
-          mute_upon_entry: true,
-          waiting_room: true
-        }
-      });
-      
-      setCurrentMeeting(meetingData);
-      setIsHosting(true);
-      
-      toast({
-        title: "Meeting Created",
-        description: `You are now hosting meeting ${meetingData.id}`,
-      });
-    } catch (error: any) {
-      console.error("Error hosting meeting:", error);
-      toast({
-        title: "Error",
-        description: error.message || "Failed to host meeting",
-        variant: "destructive"
-      });
-    } finally {
-      setIsConnectingToZoom(false);
-    }
-  };
-
-  const handleMeetingEnd = () => {
-    setActiveMeeting(null);
-    setIsHosting(false);
-    setCurrentMeeting(null);
-    setZoomCredentials(null);
-    toast({
-      title: "Meeting Ended",
-      description: "You have left the Zoom meeting"
-    });
-  };
-
-  const handleStartMeeting = async () => {
     setIsStartingMeeting(true);
     setError(null);
+    
     try {
-      // Generate a random meeting ID for testing
+      console.log("Starting meeting...");
+      
+      // Generate a test meeting ID for testing
       const testMeetingId = "79014147874"; // Using a fixed test meeting ID
+      
+      console.log("Getting signature for meeting:", testMeetingId);
       
       // Get the signature for this meeting
       const signatureData = await getSignature(testMeetingId, 1); // 1 = host
+      
+      console.log("Signature received:", {
+        hasSignature: !!signatureData.signature,
+        signatureLength: signatureData.signature?.length,
+        timestamp: signatureData.timestamp,
+        sdkKey: signatureData.sdkKey
+      });
       
       setZoomCredentials({
         meetingNumber: testMeetingId,
@@ -176,6 +127,17 @@ const Meetings = () => {
     } finally {
       setIsStartingMeeting(false);
     }
+  };
+
+  const handleMeetingEnd = () => {
+    setActiveMeeting(null);
+    setIsHosting(false);
+    setCurrentMeeting(null);
+    setZoomCredentials(null);
+    toast({
+      title: "Meeting Ended",
+      description: "You have left the Zoom meeting"
+    });
   };
 
   return (
@@ -252,7 +214,7 @@ const Meetings = () => {
             </CardHeader>
             <CardContent className="space-y-4">
               <p className="text-sm text-muted-foreground">
-                To host a meeting, you need to connect your Zoom account first in the Settings page.
+                Start an instant meeting with a test meeting ID to check the Zoom integration.
               </p>
               {error && (
                 <div className="mt-4 p-4 bg-red-100 text-red-700 rounded">
@@ -270,7 +232,7 @@ const Meetings = () => {
                     Starting Meeting...
                   </>
                 ) : (
-                  <>Start Instant Meeting</>
+                  <>Start Test Meeting</>
                 )}
               </Button>
             </CardContent>
