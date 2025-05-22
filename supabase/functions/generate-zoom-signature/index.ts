@@ -1,9 +1,8 @@
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
-import { hmac } from "https://deno.land/x/crypto@v0.10.0/hmac.ts";
 import { encode as encodeBase64 } from 'https://deno.land/std@0.168.0/encoding/base64.ts'
-import { encode as encodeHex } from "https://deno.land/std@0.168.0/encoding/hex.ts";
+import { hmac } from "https://deno.land/x/crypto@v0.10.0/hmac.ts";
 
 // Configure CORS headers to allow requests from any origin
 const corsHeaders = {
@@ -76,38 +75,46 @@ serve(async (req) => {
       );
     }
 
-    const { meetingNumber, role } = requestData;
-
+    const { meetingNumber, role = 0 } = requestData;
+    
     if (!meetingNumber) {
-      console.error("Missing meeting number:", { meetingNumber, role });
+      console.error("Missing meeting number:", requestData);
       return new Response(
         JSON.stringify({ error: 'Missing meeting number' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    if (role === undefined) {
-      console.error("Missing role parameter:", { meetingNumber, role });
-      return new Response(
-        JSON.stringify({ error: 'Missing role parameter' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    // Generate the signature using Deno's TextEncoder instead of Buffer
+    // Current timestamp in milliseconds, subtract 30 seconds
     const timestamp = new Date().getTime() - 30000;
-    const msg = new TextEncoder().encode(ZOOM_API_KEY + meetingNumber + timestamp + role);
     
-    // Using hmac with TextEncoder-created message
-    const hmacSignature = hmac("sha256", ZOOM_API_SECRET, msg);
+    // Format meeting number as string
+    const formattedMeetingNumber = String(meetingNumber);
+    
+    // Format role as number
+    const numericRole = Number(role) || 0;
+    
+    // Create the message string exactly as required by Zoom
+    const msg = `${ZOOM_API_KEY}${formattedMeetingNumber}${timestamp}${numericRole}`;
+    
+    // Sign the message using HMAC SHA256
+    const msgUint8 = new TextEncoder().encode(msg);
+    const keyUint8 = new TextEncoder().encode(ZOOM_API_SECRET);
+    const hmacSignature = hmac("sha256", keyUint8, msgUint8);
+    
+    // Base64 encode the signature
     const signature = encodeBase64(hmacSignature);
-
-    console.log("Signature generated successfully for meeting:", meetingNumber);
+    
+    console.log(`Generated signature for meeting ${meetingNumber} with role ${numericRole}`);
+    console.log(`Message used for signing: ${msg}`);
+    
     return new Response(
       JSON.stringify({ 
         signature,
+        sdkKey: ZOOM_API_KEY,
         timestamp,
-        sdkKey: ZOOM_API_KEY
+        meetingNumber: formattedMeetingNumber,
+        role: numericRole
       }),
       { 
         status: 200, 

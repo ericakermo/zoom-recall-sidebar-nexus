@@ -1,3 +1,4 @@
+
 import { ZoomMeetingConfig } from '@/types/zoom';
 
 // Use the client ID directly for sdkKey
@@ -175,7 +176,10 @@ export const getSignature = async (meetingNumber: string, role: number): Promise
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${authToken}`,
       },
-      body: JSON.stringify({ meetingNumber, role }),
+      body: JSON.stringify({ 
+        meetingNumber: meetingNumber,
+        role: role
+      }),
     });
 
     if (!response.ok) {
@@ -188,6 +192,7 @@ export const getSignature = async (meetingNumber: string, role: number): Promise
       throw new Error('Invalid response from authentication service');
     }
     
+    // Return the full response from the server
     return {
       signature: data.signature,
       timestamp: data.timestamp || 0,
@@ -343,29 +348,34 @@ export const joinZoomMeeting = async (client: any, params: {
     throw new Error('Meeting number is required to join a meeting');
   }
   
-  const joinPayload = {
-    sdkKey: params.sdkKey || ZOOM_SDK_KEY,
+  const joinParams = {
     signature: params.signature,
     meetingNumber: params.meetingNumber,
-    userName: params.userName,
+    userName: params.userName || 'Guest',
     password: params.password || '',
+    sdkKey: params.sdkKey || ZOOM_SDK_KEY,
     userEmail: params.userEmail || '',
     success: (event: any) => {
       console.log('Successfully joined meeting:', event);
     },
     error: (event: any) => {
       console.error('Error joining meeting:', event);
+      console.error('Join error details:', JSON.stringify(event, null, 2));
+      
+      // Log the parameters used for better debugging
+      console.log('Join parameters used:', {
+        meetingNumber: params.meetingNumber,
+        sdkKey: params.sdkKey || ZOOM_SDK_KEY,
+        signature: params.signature,
+        userName: params.userName
+      });
     }
   };
   
-  console.log('Attempting to join Zoom meeting with parameters:', { 
-    meetingNumber: joinPayload.meetingNumber,
-    userName: joinPayload.userName,
-    sdkKey: joinPayload.sdkKey
-  });
+  console.log('Attempting to join Zoom meeting with parameters:', joinParams);
   
   try {
-    await client.join(joinPayload);
+    await client.join(joinParams);
     console.log('Successfully joined the Zoom meeting');
   } catch (joinError: any) {
     console.error('Error joining Zoom meeting:', joinError);

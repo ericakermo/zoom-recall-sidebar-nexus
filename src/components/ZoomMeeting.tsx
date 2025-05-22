@@ -89,11 +89,12 @@ export function ZoomMeeting({
       display: parentElement ? window.getComputedStyle(parentElement).display : 'none'
     });
     
-    // Ensure container has explicit dimensions
-    if (container && (!container.offsetWidth || !container.offsetHeight)) {
-      console.log('Container has no dimensions, forcing layout');
+    // Ensure container has explicit dimensions and ID
+    if (container) {
+      console.log('Setting container dimensions and ID');
       container.style.width = parentElement?.offsetWidth ? `${parentElement.offsetWidth}px` : '100%';
       container.style.height = '500px';
+      container.id = 'meetingSDKElement';
     }
     
     // Check after a short delay to ensure styles are applied
@@ -170,7 +171,7 @@ export function ZoomMeeting({
         // Get signature
         console.log('Getting signature for meeting:', meetingNumber);
         const signatureData = await getSignature(meetingNumber, role);
-        console.log('Received signature successfully:', signatureData);
+        console.log('Received signature data:', signatureData);
 
         // Verify container
         if (!zoomContainerRef.current) {
@@ -192,7 +193,7 @@ export function ZoomMeeting({
         console.log('Joining meeting:', meetingNumber);
         await joinZoomMeeting(client, {
           signature: signatureData.signature,
-          meetingNumber,
+          meetingNumber: meetingNumber,
           userName: providedUserName || user?.email || 'Guest',
           password: meetingPassword || '',
           userEmail: user?.email,
@@ -295,11 +296,15 @@ export function ZoomMeeting({
     <div className="flex flex-col h-full">
       <div 
         ref={zoomContainerRef} 
-        id="meetingSDKElement"
         className="w-full h-full min-h-[500px]"
         style={{ position: 'relative', height: '100%', width: '100%' }}
       >
-        {isLoading && <div>Loading Zoom meeting...</div>}
+        {isLoading && (
+          <div className="flex flex-col items-center justify-center h-full w-full">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mb-4"></div>
+            <p>Loading Zoom meeting...</p>
+          </div>
+        )}
       </div>
       
       {isConnected && (
