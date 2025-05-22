@@ -125,6 +125,7 @@ const Meetings = () => {
 
   const handleStartMeeting = async () => {
     setIsStartingMeeting(true);
+    setError(null);
     try {
       const tokenData = localStorage.getItem('sb-qsxlvwwebbakmzpwjfbb-auth-token');
       if (!tokenData) {
@@ -159,10 +160,10 @@ const Meetings = () => {
       }
 
       const meeting = await response.json();
+      console.log("Created meeting:", meeting);
       setCurrentMeeting(meeting);
     } catch (error) {
       console.error('Failed to start meeting:', error);
-      // Show error to user
       setError(error.message);
     } finally {
       setIsStartingMeeting(false);
@@ -196,7 +197,7 @@ const Meetings = () => {
           </div>
           
           <ZoomMeeting 
-            meetingNumber={activeMeeting}
+            meetingNumber={String(activeMeeting)}
             role={isHosting ? 1 : 0} // 1 for host, 0 for attendee
             onMeetingEnd={handleMeetingEnd}
           />
@@ -261,7 +262,7 @@ const Meetings = () => {
                 ) : (
                   <div className="mt-4">
                     <ZoomMeeting
-                      meetingNumber={currentMeeting.id}
+                      meetingNumber={String(currentMeeting.id)}
                       userName={user?.email || 'Guest'} 
                     />
                   </div>

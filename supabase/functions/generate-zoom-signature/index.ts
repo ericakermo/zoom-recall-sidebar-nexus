@@ -67,6 +67,7 @@ serve(async (req) => {
     let requestData;
     try {
       requestData = await req.json();
+      console.log("Request data:", requestData);
     } catch (e) {
       console.error("Error parsing request body:", e);
       return new Response(
@@ -77,10 +78,18 @@ serve(async (req) => {
 
     const { meetingNumber, role } = requestData;
 
-    if (!meetingNumber || role === undefined) {
-      console.error("Missing parameters:", { meetingNumber, role });
+    if (!meetingNumber) {
+      console.error("Missing meeting number:", { meetingNumber, role });
       return new Response(
-        JSON.stringify({ error: 'Missing parameters' }),
+        JSON.stringify({ error: 'Missing meeting number' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    if (role === undefined) {
+      console.error("Missing role parameter:", { meetingNumber, role });
+      return new Response(
+        JSON.stringify({ error: 'Missing role parameter' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
@@ -93,9 +102,13 @@ serve(async (req) => {
     const hmacSignature = hmac("sha256", ZOOM_API_SECRET, msg);
     const signature = encodeBase64(hmacSignature);
 
-    console.log("Signature generated successfully");
+    console.log("Signature generated successfully for meeting:", meetingNumber);
     return new Response(
-      JSON.stringify({ signature }),
+      JSON.stringify({ 
+        signature,
+        timestamp,
+        sdkKey: ZOOM_API_KEY
+      }),
       { 
         status: 200, 
         headers: { 

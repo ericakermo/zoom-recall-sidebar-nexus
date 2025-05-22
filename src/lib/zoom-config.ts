@@ -151,8 +151,12 @@ export const loadZoomSDK = async (): Promise<boolean> => {
   return zoomSDKLoadingPromise;
 };
 
-export const getSignature = async (meetingNumber: string, role: number): Promise<{ signature: string; timestamp?: number }> => {
+export const getSignature = async (meetingNumber: string, role: number): Promise<{ signature: string; timestamp: number; sdkKey: string }> => {
   try {
+    if (!meetingNumber) {
+      throw new Error('Meeting number is required to generate a signature');
+    }
+    
     const tokenData = localStorage.getItem('sb-qsxlvwwebbakmzpwjfbb-auth-token');
     if (!tokenData) {
       throw new Error('Authentication required to join meetings');
@@ -165,7 +169,7 @@ export const getSignature = async (meetingNumber: string, role: number): Promise
     }
 
     console.log(`Requesting signature for meeting: ${meetingNumber}, role: ${role}`);
-    const response = await fetch(`${SUPABASE_URL}/functions/v1/generate-zoom-signature`, {
+    const response = await fetch(`https://qsxlvwwebbakmzpwjfbb.supabase.co/functions/v1/generate-zoom-signature`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -186,7 +190,8 @@ export const getSignature = async (meetingNumber: string, role: number): Promise
     
     return {
       signature: data.signature,
-      timestamp: data.timestamp
+      timestamp: data.timestamp || 0,
+      sdkKey: data.sdkKey || ZOOM_SDK_KEY
     };
   } catch (error) {
     console.error('Error getting signature:', error);
@@ -328,13 +333,18 @@ export const joinZoomMeeting = async (client: any, params: {
   password?: string;
   userEmail?: string;
   timestamp?: number;
+  sdkKey?: string;
 }): Promise<void> => {
   if (!client) {
     throw new Error('Zoom client instance is required to join a meeting');
   }
   
+  if (!params.meetingNumber) {
+    throw new Error('Meeting number is required to join a meeting');
+  }
+  
   const joinPayload = {
-    sdkKey: ZOOM_SDK_KEY,
+    sdkKey: params.sdkKey || ZOOM_SDK_KEY,
     signature: params.signature,
     meetingNumber: params.meetingNumber,
     userName: params.userName,
@@ -349,10 +359,9 @@ export const joinZoomMeeting = async (client: any, params: {
   };
   
   console.log('Attempting to join Zoom meeting with parameters:', { 
-    ...joinPayload, 
-    signature: '[REDACTED]',
     meetingNumber: joinPayload.meetingNumber,
     userName: joinPayload.userName,
+    sdkKey: joinPayload.sdkKey
   });
   
   try {

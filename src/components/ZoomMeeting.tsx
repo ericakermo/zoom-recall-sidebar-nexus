@@ -152,6 +152,13 @@ export function ZoomMeeting({
       return;
     }
     
+    if (!meetingNumber) {
+      console.error('Meeting number not provided');
+      setError('Meeting ID is required to join a meeting');
+      setIsLoading(false);
+      return;
+    }
+    
     console.log('Container and SDK ready, proceeding with initialization');
     let isMounted = true;
 
@@ -163,7 +170,7 @@ export function ZoomMeeting({
         // Get signature
         console.log('Getting signature for meeting:', meetingNumber);
         const signatureData = await getSignature(meetingNumber, role);
-        console.log('Received signature successfully');
+        console.log('Received signature successfully:', signatureData);
 
         // Verify container
         if (!zoomContainerRef.current) {
@@ -189,7 +196,8 @@ export function ZoomMeeting({
           userName: providedUserName || user?.email || 'Guest',
           password: meetingPassword || '',
           userEmail: user?.email,
-          timestamp: signatureData.timestamp
+          timestamp: signatureData.timestamp,
+          sdkKey: signatureData.sdkKey
         });
         
         if (!isMounted) return;
