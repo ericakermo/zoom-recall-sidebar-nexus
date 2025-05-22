@@ -262,8 +262,7 @@ const Meetings = () => {
                   <div className="mt-4">
                     <ZoomMeeting
                       meetingNumber={currentMeeting.id}
-                      userName="Your Name" // Replace with actual user name
-                      userEmail="your.email@example.com" // Replace with actual user email
+                      userName={user?.email || 'Guest'} 
                     />
                   </div>
                 )}

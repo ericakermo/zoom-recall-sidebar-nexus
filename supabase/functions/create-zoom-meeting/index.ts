@@ -1,6 +1,5 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
-import ZoomMtgEmbedded from "@zoom/meetingsdk/embedded";
 
 const ZOOM_API_URL = 'https://api.zoom.us/v2'
 const ZOOM_SDK_KEY = "eFAZ8Vf7RbG5saQVqL1zGA";
