@@ -151,7 +151,7 @@ export const loadZoomSDK = async (): Promise<boolean> => {
   return zoomSDKLoadingPromise;
 };
 
-export const getSignature = async (meetingNumber: string, role: number): Promise<string> => {
+export const getSignature = async (meetingNumber: string, role: number): Promise<{ signature: string; timestamp?: number }> => {
   try {
     const tokenData = localStorage.getItem('sb-qsxlvwwebbakmzpwjfbb-auth-token');
     if (!tokenData) {
@@ -184,7 +184,10 @@ export const getSignature = async (meetingNumber: string, role: number): Promise
       throw new Error('Invalid response from authentication service');
     }
     
-    return data.signature;
+    return {
+      signature: data.signature,
+      timestamp: data.timestamp
+    };
   } catch (error) {
     console.error('Error getting signature:', error);
     throw error;
@@ -324,6 +327,7 @@ export const joinZoomMeeting = async (client: any, params: {
   userName: string;
   password?: string;
   userEmail?: string;
+  timestamp?: number;
 }): Promise<void> => {
   if (!client) {
     throw new Error('Zoom client instance is required to join a meeting');

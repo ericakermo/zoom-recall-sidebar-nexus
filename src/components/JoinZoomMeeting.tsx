@@ -107,7 +107,7 @@ export function JoinZoomMeeting() {
       setError(null);
       
       // Get signature from backend
-      const signature = await getSignature(formattedMeetingId, 0); // 0 = attendee role
+      const signatureData = await getSignature(formattedMeetingId, 0); // 0 = attendee role
       
       // Create and initialize Zoom client
       const client = await createAndInitializeZoomClient(zoomRootRef.current);
@@ -115,7 +115,7 @@ export function JoinZoomMeeting() {
       
       // Join the meeting
       await joinZoomMeeting(client, {
-        signature,
+        signature: signatureData.signature,
         meetingNumber: formattedMeetingId,
         userName: user.email || 'Zoom User',
         password: password,

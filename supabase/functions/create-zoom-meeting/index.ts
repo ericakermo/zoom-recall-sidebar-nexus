@@ -185,4 +185,4 @@ export const createMeeting = async (params: {
   }
 
   return response.json();
-}; 
+};
