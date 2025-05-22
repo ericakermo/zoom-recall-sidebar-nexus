@@ -6,3 +6,6 @@ verify_jwt = true
 
 [functions.zoom-oauth-callback]
 verify_jwt = false
+
+[functions.create-zoom-meeting]
+verify_jwt = true
