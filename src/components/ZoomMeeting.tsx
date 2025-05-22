@@ -1,4 +1,3 @@
-
 import { useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { loadZoomSDK, createAndInitializeZoomClient, getSignature, joinZoomMeeting, leaveZoomMeeting } from '@/lib/zoom-config';
@@ -6,6 +5,7 @@ import { useAuth } from '@/context/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Mic, MicOff, Video, VideoOff, PhoneOff } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import ZoomMtgEmbedded from '@zoom/meetingsdk/embedded';
 
 interface ZoomMeetingProps {
   meetingNumber: string;
@@ -14,6 +14,9 @@ interface ZoomMeetingProps {
   role?: number;
   onMeetingEnd?: () => void;
 }
+
+const ZOOM_SDK_KEY = "eFAZ8Vf7RbG5saQVqL1zGA";
+const SUPABASE_URL = 'https://qsxlvwwebbakmzpwjfbb.supabase.co';
 
 export function ZoomMeeting({
   meetingNumber,
@@ -168,48 +171,86 @@ export function ZoomMeeting({
         setIsLoading(true);
         setError(null);
         
-        // Get signature
-        console.log('Getting signature for meeting:', meetingNumber);
-        const signatureData = await getSignature(meetingNumber, role);
-        console.log('Received signature data:', signatureData);
+        // Create Zoom client
+        const client = ZoomMtgEmbedded.createClient();
 
-        // Verify container
-        if (!zoomContainerRef.current) {
-          throw new Error('Meeting container disappeared. Please refresh the page.');
+        // Initialize with required parameters
+        await client.init({
+          debug: true,
+          zoomAppRoot: zoomContainerRef.current,
+          language: 'en-US',
+          customize: {
+            meetingInfo: ['topic', 'host', 'mn', 'pwd', 'tel', 'participant', 'dc', 'enctype'],
+            toolbar: {
+              buttons: [
+                {
+                  text: 'Custom Button',
+                  className: 'CustomButton',
+                  onClick: () => {
+                    console.log('custom button');
+                  }
+                }
+              ]
+            }
+          }
+        });
+
+        // Get signature
+        const tokenData = localStorage.getItem('sb-qsxlvwwebbakmzpwjfbb-auth-token');
+        if (!tokenData) {
+          throw new Error('Authentication required');
         }
-        
-        // Initialize client
-        console.log('Creating and initializing Zoom client');
-        const client = await createAndInitializeZoomClient(zoomContainerRef.current);
-        
-        if (!isMounted) {
-          console.log('Component unmounted during initialization, aborting');
-          return;
+
+        const parsedToken = JSON.parse(tokenData);
+        const authToken = parsedToken?.access_token;
+
+        const response = await fetch(`${SUPABASE_URL}/functions/v1/generate-zoom-signature`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${authToken}`
+          },
+          body: JSON.stringify({
+            meetingNumber,
+            role: 1 // 1 for host
+          })
+        });
+
+        if (!response.ok) {
+          throw new Error('Failed to get signature');
         }
-        
-        zoomClientRef.current = client;
-        
-        // Join meeting
-        console.log('Joining meeting:', meetingNumber);
-        await joinZoomMeeting(client, {
-          signature: signatureData.signature,
+
+        const { signature } = await response.json();
+
+        // Join meeting with all required parameters
+        await client.join({
+          sdkKey: ZOOM_SDK_KEY,
+          signature: signature,
           meetingNumber: meetingNumber,
           userName: providedUserName || user?.email || 'Guest',
-          password: meetingPassword || '',
           userEmail: user?.email,
-          timestamp: signatureData.timestamp,
-          sdkKey: signatureData.sdkKey
+          passWord: '', // Required, even if empty
+          success: (success) => {
+            console.log('Join meeting success:', success);
+            setIsLoading(false);
+            setIsConnected(true);
+            toast({
+              title: "Meeting Joined",
+              description: "You have successfully joined the Zoom meeting"
+            });
+          },
+          error: (error) => {
+            console.error('Join meeting error:', error);
+            setError(error);
+            setIsLoading(false);
+            toast({
+              title: "Meeting Error",
+              description: error,
+              variant: "destructive"
+            });
+          }
         });
-        
-        if (!isMounted) return;
-        
-        setIsLoading(false);
-        setIsConnected(true);
-        
-        toast({
-          title: "Meeting Joined",
-          description: "You have successfully joined the Zoom meeting"
-        });
+
       } catch (err: any) {
         console.error('Error during Zoom initialization:', err);
         
