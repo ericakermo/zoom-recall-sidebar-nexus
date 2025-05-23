@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { Button } from '@/components/ui/button';
@@ -10,7 +9,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/context/AuthContext';
 import { Video, VideoOff, X } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
-import { loadZoomSDK, getSignature } from '@/lib/zoom-config';
+import { loadZoomSDK, getZoomAccessToken } from '@/lib/zoom-config';
 
 interface MeetingFormData {
   meetingId: string;
@@ -87,25 +86,24 @@ const Meetings = () => {
       // Generate a test meeting ID for testing
       const testMeetingId = "79014147874"; // Using a fixed test meeting ID
       
-      console.log("Getting signature for meeting:", testMeetingId);
+      console.log("Getting OAuth access token for meeting:", testMeetingId);
       
-      // Get the signature for this meeting
-      const signatureData = await getSignature(testMeetingId, 1); // 1 = host
+      // Get the OAuth access token for this meeting
+      const tokenData = await getZoomAccessToken(testMeetingId, 1); // 1 = host
       
-      console.log("Signature received:", {
-        hasSignature: !!signatureData.signature,
-        signatureLength: signatureData.signature?.length,
-        timestamp: signatureData.timestamp,
-        sdkKey: signatureData.sdkKey
+      console.log("OAuth access token received:", {
+        hasToken: !!tokenData.accessToken,
+        tokenType: tokenData.tokenType,
+        sdkKey: tokenData.sdkKey
       });
       
       setZoomCredentials({
         meetingNumber: testMeetingId,
-        signature: signatureData.signature,
-        sdkKey: signatureData.sdkKey,
+        accessToken: tokenData.accessToken,
+        tokenType: tokenData.tokenType,
+        sdkKey: tokenData.sdkKey,
         userName: user?.email || 'Host',
         userEmail: user?.email,
-        timestamp: signatureData.timestamp,
         role: 1 // Host role
       });
       

@@ -1,7 +1,8 @@
+
 import { ZoomMeetingConfig } from '@/types/zoom';
 
 // Use the client ID directly for sdkKey
-const ZOOM_SDK_KEY = "eFAZ8Vf7RbG5saQVqL1zGA"; // This is your SDK Key (formerly Client ID)
+const ZOOM_SDK_KEY = "eFAZ8Vf7RbG5saQVqL1zGA"; // This is your SDK Key (Client ID)
 const SUPABASE_URL = 'https://qsxlvwwebbakmzpwjfbb.supabase.co';
 
 // State to manage SDK loading
@@ -151,10 +152,10 @@ export const loadZoomSDK = async (): Promise<boolean> => {
   return zoomSDKLoadingPromise;
 };
 
-export const getSignature = async (meetingNumber: string, role: number): Promise<{ signature: string; timestamp: number; sdkKey: string }> => {
+export const getZoomAccessToken = async (meetingNumber: string, role: number): Promise<{ accessToken: string; tokenType: string; sdkKey: string }> => {
   try {
     if (!meetingNumber) {
-      throw new Error('Meeting number is required to generate a signature');
+      throw new Error('Meeting number is required to get access token');
     }
     
     const tokenData = localStorage.getItem('sb-qsxlvwwebbakmzpwjfbb-auth-token');
@@ -168,7 +169,7 @@ export const getSignature = async (meetingNumber: string, role: number): Promise
       throw new Error('Invalid authentication token');
     }
 
-    console.log(`Requesting signature for meeting: ${meetingNumber}, role: ${role}`);
+    console.log(`Requesting OAuth access token for meeting: ${meetingNumber}, role: ${role}`);
     const response = await fetch(`https://qsxlvwwebbakmzpwjfbb.supabase.co/functions/v1/generate-zoom-signature`, {
       method: 'POST',
       headers: {
@@ -183,31 +184,33 @@ export const getSignature = async (meetingNumber: string, role: number): Promise
 
     if (!response.ok) {
       const errorText = await response.text();
-      throw new Error(`Failed to get meeting authentication: ${response.status}`);
+      throw new Error(`Failed to get access token: ${response.status}`);
     }
     
     const data = await response.json();
-    if (!data.signature) {
+    if (!data.accessToken) {
       throw new Error('Invalid response from authentication service');
     }
     
-    console.log("Received signature data:", {
-      signature: data.signature ? `${data.signature.substring(0, 10)}...` : 'undefined',
-      timestamp: data.timestamp,
+    console.log("Received OAuth token data:", {
+      hasToken: !!data.accessToken,
+      tokenType: data.tokenType,
       sdkKey: data.sdkKey
     });
     
-    // Return the full response from the server
     return {
-      signature: data.signature,
-      timestamp: data.timestamp || 0,
+      accessToken: data.accessToken,
+      tokenType: data.tokenType || 'Bearer',
       sdkKey: data.sdkKey || ZOOM_SDK_KEY
     };
   } catch (error) {
-    console.error('Error getting signature:', error);
+    console.error('Error getting OAuth access token:', error);
     throw error;
   }
 };
+
+// Legacy function name for backward compatibility
+export const getSignature = getZoomAccessToken;
 
 export const createAndInitializeZoomClient = async (
   zoomAppRoot: HTMLElement,
@@ -338,46 +341,19 @@ export const createAndInitializeZoomClient = async (
 
 export const joinMeeting = async (client, params) => {
   try {
-    const tokenData = localStorage.getItem('sb-qsxlvwwebbakmzpwjfbb-auth-token');
-    if (!tokenData) {
-      throw new Error('Authentication required');
-    }
-    const parsedToken = JSON.parse(tokenData);
-    const authToken = parsedToken?.access_token;
-
-    // Get signature from your edge function
-    const response = await fetch(`${SUPABASE_URL}/functions/v1/generate-zoom-signature`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${authToken}`
-      },
-      body: JSON.stringify({
-        meetingNumber: params.meetingNumber,
-        role: 1 // 1 for host
-      })
+    // Get OAuth access token instead of signature
+    const tokenData = await getZoomAccessToken(params.meetingNumber, params.role || 0);
+    
+    console.log('Joining meeting with OAuth token:', {
+      hasToken: !!tokenData.accessToken,
+      tokenType: tokenData.tokenType,
+      sdkKey: tokenData.sdkKey
     });
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error('Signature request failed:', {
-        status: response.status,
-        statusText: response.statusText,
-        errorText
-      });
-      throw new Error('Failed to get signature');
-    }
-
-    const { signature } = await response.json();
-    console.log('Signature received:', {
-      hasSignature: !!signature,
-      signatureLength: signature?.length
-    });
-
-    // Join with all required parameters
+    // Join with OAuth access token
     await client.join({
-      sdkKey: ZOOM_SDK_KEY,
-      signature: signature,
+      sdkKey: tokenData.sdkKey,
+      accessToken: tokenData.accessToken,
       meetingNumber: params.meetingNumber,
       userName: params.userName,
       userEmail: params.userEmail,
@@ -387,7 +363,6 @@ export const joinMeeting = async (client, params) => {
       },
       error: (error) => {
         console.error('Join meeting error:', error);
-        // Log detailed error information
         console.error('Error details:', {
           code: error.code,
           message: error.message,

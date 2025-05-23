@@ -1,7 +1,7 @@
 
 import { useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { loadZoomSDK, getSignature } from '@/lib/zoom-config';
+import { loadZoomSDK, getZoomAccessToken } from '@/lib/zoom-config';
 import { useAuth } from '@/context/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Mic, MicOff, Video, VideoOff, PhoneOff } from 'lucide-react';
@@ -215,18 +215,18 @@ export function ZoomMeeting({
 
         console.log("Zoom client initialized successfully");
 
-        // Get signature
-        const signatureData = await getSignature(meetingNumber, role || 0);
-        console.log("Signature data received:", {
-          hasSignature: !!signatureData.signature,
-          sdkKey: signatureData.sdkKey,
-          timestamp: signatureData.timestamp
+        // Get OAuth access token instead of signature
+        const tokenData = await getZoomAccessToken(meetingNumber, role || 0);
+        console.log("OAuth token data received:", {
+          hasToken: !!tokenData.accessToken,
+          tokenType: tokenData.tokenType,
+          sdkKey: tokenData.sdkKey
         });
 
-        // Join meeting with all required parameters
+        // Join meeting with OAuth access token
         await client.join({
-          sdkKey: signatureData.sdkKey || ZOOM_SDK_KEY,
-          signature: signatureData.signature,
+          sdkKey: tokenData.sdkKey || ZOOM_SDK_KEY,
+          accessToken: tokenData.accessToken,
           meetingNumber: meetingNumber,
           userName: providedUserName || user?.email || 'Guest',
           userEmail: user?.email,

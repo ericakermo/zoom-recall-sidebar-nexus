@@ -1,8 +1,6 @@
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
-import { encode as encodeBase64 } from 'https://deno.land/std@0.168.0/encoding/base64.ts'
-import { hmac } from "https://deno.land/x/crypto@v0.10.0/hmac.ts";
 
 // Configure CORS headers to allow requests from any origin
 const corsHeaders = {
@@ -11,9 +9,10 @@ const corsHeaders = {
   'Access-Control-Allow-Methods': 'POST, OPTIONS'
 }
 
-// Set the Zoom SDK credentials
-const ZOOM_API_KEY = "eFAZ8Vf7RbG5saQVqL1zGA";
-const ZOOM_API_SECRET = "iopNR5wnxdK3mEIVE1llzQqAWbxXEB1l";
+// Set the Zoom OAuth credentials (Server-to-Server OAuth)
+const ZOOM_ACCOUNT_ID = "your_account_id"; // Need to be updated with actual values
+const ZOOM_CLIENT_ID = "eFAZ8Vf7RbG5saQVqL1zGA";
+const ZOOM_CLIENT_SECRET = "iopNR5wnxdK3mEIVE1llzQqAWbxXEB1l";
 
 serve(async (req) => {
   console.log("Function called with method:", req.method);
@@ -85,40 +84,40 @@ serve(async (req) => {
       );
     }
 
-    // Current timestamp in milliseconds
-    const timestamp = new Date().getTime();
+    // Get OAuth access token using Server-to-Server OAuth
+    console.log("Getting OAuth access token for Zoom");
     
-    // Format meeting number as string
-    const formattedMeetingNumber = String(meetingNumber);
-    
-    // Format role as number
-    const numericRole = Number(role) || 0;
-    
-    // Create the message string exactly as required by Zoom
-    // Format: SDK_KEY + meetingNumber + timestamp + role
-    const msg = `${ZOOM_API_KEY}${formattedMeetingNumber}${timestamp}${numericRole}`;
-    
-    console.log("Message string for signature:", msg);
-    
-    // Sign the message using HMAC SHA256
-    const msgUint8 = new TextEncoder().encode(msg);
-    const keyUint8 = new TextEncoder().encode(ZOOM_API_SECRET);
-    const hmacSignature = hmac("sha256", keyUint8, msgUint8);
-    
-    // Base64 encode the signature
-    const signature = encodeBase64(hmacSignature);
-    
-    console.log(`Generated signature for meeting ${meetingNumber} with role ${numericRole}`);
-    console.log(`Message used for signing: ${msg}`);
-    console.log(`Timestamp: ${timestamp}`);
+    const tokenResponse = await fetch('https://zoom.us/oauth/token', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'Authorization': `Basic ${btoa(`${ZOOM_CLIENT_ID}:${ZOOM_CLIENT_SECRET}`)}`
+      },
+      body: new URLSearchParams({
+        grant_type: 'account_credentials',
+        account_id: ZOOM_ACCOUNT_ID
+      })
+    });
+
+    if (!tokenResponse.ok) {
+      const errorText = await tokenResponse.text();
+      console.error("Failed to get OAuth token:", errorText);
+      return new Response(
+        JSON.stringify({ error: 'Failed to authenticate with Zoom' }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const tokenData = await tokenResponse.json();
+    console.log("Successfully obtained OAuth access token");
     
     return new Response(
       JSON.stringify({ 
-        signature,
-        sdkKey: ZOOM_API_KEY,
-        meetingNumber: formattedMeetingNumber,
-        timestamp,
-        role: numericRole
+        accessToken: tokenData.access_token,
+        tokenType: tokenData.token_type || 'Bearer',
+        sdkKey: ZOOM_CLIENT_ID,
+        meetingNumber: String(meetingNumber),
+        role: Number(role) || 0
       }),
       { 
         status: 200, 
