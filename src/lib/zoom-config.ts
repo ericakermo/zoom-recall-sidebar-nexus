@@ -1,7 +1,8 @@
+
 import { ZoomMeetingConfig } from '@/types/zoom';
 
 // Use the client ID directly for sdkKey
-const ZOOM_SDK_KEY = "eFAZ8Vf7RbG5saQVqL1zGA"; // This is your SDK Key (Client ID)
+const ZOOM_SDK_KEY = "dkQMavedS2OWM2c73F6pLg"; // This is your SDK Key (Client ID)
 const SUPABASE_URL = 'https://qsxlvwwebbakmzpwjfbb.supabase.co';
 
 // State to manage SDK loading

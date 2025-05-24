@@ -1,4 +1,5 @@
 
+
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
@@ -8,11 +9,11 @@ const corsHeaders = {
 }
 
 // Set the Zoom OAuth credentials
-const ZOOM_CLIENT_ID = "eFAZ8Vf7RbG5saQVqL1zGA";
-const ZOOM_CLIENT_SECRET = "iopNR5wnxdK3mEIVE1llzQqAWbxXEB1l";
+const ZOOM_CLIENT_ID = "dkQMavedS2OWM2c73F6pLg";
+const ZOOM_CLIENT_SECRET = "CFDxugjp3CkE3G07z4eC1qcGjukmYVdt";
 
 // Define default client URL for redirects - use this if environment variable is not set
-const DEFAULT_CLIENT_URL = "https://lovable.dev";
+const DEFAULT_CLIENT_URL = "https://qsxlvwwebbakmzpwjfbb.supabase.co";
 
 serve(async (req) => {
   // Handle CORS preflight requests
@@ -106,3 +107,4 @@ serve(async (req) => {
     return Response.redirect(`${clientUrl}/settings?error=${encodeURIComponent(error.message)}`)
   }
 })
+

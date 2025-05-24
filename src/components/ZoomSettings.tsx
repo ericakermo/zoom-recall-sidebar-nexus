@@ -77,7 +77,7 @@ export function ZoomSettings() {
     }
 
     // Use the client ID from the environment variable
-    const zoomClientId = "eFAZ8Vf7RbG5saQVqL1zGA";
+    const zoomClientId = "dkQMavedS2OWM2c73F6pLg";
     if (!zoomClientId) {
       toast({
         title: "Error",

@@ -121,7 +121,7 @@ const Meetings = () => {
         meetingNumber: meetingData.meetingNumber,
         accessToken: meetingData.accessToken,
         tokenType: 'Bearer',
-        sdkKey: 'eFAZ8Vf7RbG5saQVqL1zGA',
+        sdkKey: 'dkQMavedS2OWM2c73F6pLg',
         userName: user?.email || 'Host',
         userEmail: user?.email,
         role: 1, // Host role
