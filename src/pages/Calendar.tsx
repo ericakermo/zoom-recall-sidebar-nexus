@@ -14,7 +14,7 @@ const Calendar = () => {
             mode="single" 
             selected={date} 
             onSelect={setDate} 
-            className="rounded-lg border border-border p-3 pointer-events-auto [&_.day-selected]:bg-black [&_.day-selected]:text-white [&_.day-selected:hover]:bg-black [&_.day-selected:hover]:text-white" 
+            className="rounded-lg border border-border p-3 pointer-events-auto [&_.rdp-day_selected]:!bg-black [&_.rdp-day_selected]:!text-white [&_.rdp-day_selected:hover]:!bg-black [&_.rdp-day_selected:hover]:!text-white [&_button[aria-selected='true']]:!bg-black [&_button[aria-selected='true']]:!text-white [&_button[aria-selected='true']:hover]:!bg-black [&_button[aria-selected='true']:hover]:!text-white" 
           />
         </div>
         
