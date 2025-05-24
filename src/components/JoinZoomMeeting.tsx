@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
@@ -110,13 +109,8 @@ export function JoinZoomMeeting() {
       const client = await createAndInitializeZoomClient(zoomRootRef.current);
       zoomClientRef.current = client;
       
-      // Get signature for the meeting
-      const signature = await getSignature(formattedMeetingId, 0);
-      
-      // Join the meeting with all required parameters
+      // Join the meeting with OAuth authentication
       await joinMeeting(client, {
-        signature,
-        sdkKey: process.env.VITE_ZOOM_SDK_KEY || '',
         meetingNumber: formattedMeetingId,
         userName: user.email || 'Zoom User',
         password: password,
