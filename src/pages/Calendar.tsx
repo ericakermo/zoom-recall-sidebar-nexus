@@ -21,7 +21,7 @@ const Calendar = () => {
         
         {/* Vertical line */}
         <div className="flex items-center h-full">
-          <div className="w-full h-px bg-black opacity-10"></div>
+          <div className="w-px h-full bg-black opacity-10"></div>
         </div>
         
         {/* Buttons on the right */}
