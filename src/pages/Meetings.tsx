@@ -81,7 +81,6 @@ const Meetings = () => {
     try {
       console.log("Creating new Zoom meeting...");
       
-      // Create a real meeting using the user's Zoom OAuth tokens
       const tokenData = localStorage.getItem('sb-qsxlvwwebbakmzpwjfbb-auth-token');
       if (!tokenData) {
         throw new Error('Authentication required');
@@ -90,7 +89,8 @@ const Meetings = () => {
       const parsedToken = JSON.parse(tokenData);
       const authToken = parsedToken?.access_token;
       
-      const response = await fetch(`https://qsxlvwwebbakmzpwjfbb.supabase.co/functions/v1/create-zoom-meeting`, {
+      // Create meeting first
+      const meetingResponse = await fetch(`https://qsxlvwwebbakmzpwjfbb.supabase.co/functions/v1/create-zoom-meeting`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -98,34 +98,53 @@ const Meetings = () => {
         },
         body: JSON.stringify({
           topic: 'Instant Meeting',
-          type: 1, // Instant meeting
+          type: 1,
           settings: {
             host_video: true,
             participant_video: true,
-            join_before_host: false,
+            join_before_host: true, // Changed to true for host role
             mute_upon_entry: true,
             waiting_room: false
           }
         }),
       });
 
-      if (!response.ok) {
-        const errorData = await response.json();
+      if (!meetingResponse.ok) {
+        const errorData = await meetingResponse.json();
         throw new Error(errorData.error || 'Failed to create meeting');
       }
 
-      const meetingData = await response.json();
+      const meetingData = await meetingResponse.json();
       console.log("Meeting created successfully:", meetingData);
+
+      // Get ZAK token for host role
+      console.log("Getting ZAK token for host...");
+      const zakResponse = await fetch(`https://qsxlvwwebbakmzpwjfbb.supabase.co/functions/v1/get-zoom-zak`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${authToken}`,
+        }
+      });
+
+      if (!zakResponse.ok) {
+        const zakError = await zakResponse.json();
+        throw new Error(`Failed to get ZAK token: ${zakError.error}`);
+      }
+
+      const zakData = await zakResponse.json();
+      console.log("ZAK token retrieved successfully");
       
       setZoomCredentials({
         meetingNumber: meetingData.meetingNumber,
         accessToken: meetingData.accessToken,
         tokenType: 'Bearer',
-        sdkKey: 'eFAZ8Vf7RbG5saQVqL1zGA',
+        sdkKey: 'dkQMavedS2OWM2c73F6pLg', // Updated SDK Key
         userName: user?.email || 'Host',
         userEmail: user?.email,
         role: 1, // Host role
-        password: meetingData.password || ''
+        password: meetingData.password || '',
+        zak: zakData.zak // Add ZAK token for host authentication
       });
       
       setActiveMeeting(meetingData.meetingNumber);
@@ -189,6 +208,7 @@ const Meetings = () => {
             userName={user?.email || 'Guest'} 
             role={isHosting ? 1 : 0} // 1 for host, 0 for attendee
             onMeetingEnd={handleMeetingEnd}
+            zak={zoomCredentials?.zak} // Pass ZAK token to ZoomMeeting component
           />
         </div>
       ) : (
@@ -232,7 +252,7 @@ const Meetings = () => {
             </CardHeader>
             <CardContent className="space-y-4">
               <p className="text-sm text-muted-foreground">
-                Start an instant meeting with a test meeting ID to check the Zoom integration.
+                Start an instant meeting with proper ZAK token authentication for host role.
               </p>
               {error && (
                 <div className="mt-4 p-4 bg-red-100 text-red-700 rounded">

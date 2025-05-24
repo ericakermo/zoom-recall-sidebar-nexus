@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/context/AuthContext';
@@ -76,8 +75,8 @@ export function ZoomSettings() {
       return;
     }
 
-    // Use the client ID from the environment variable
-    const zoomClientId = "eFAZ8Vf7RbG5saQVqL1zGA";
+    // Use the updated client ID
+    const zoomClientId = "dkQMavedS2OWM2c73F6pLg"; // Updated Zoom Client ID
     if (!zoomClientId) {
       toast({
         title: "Error",
@@ -136,7 +135,7 @@ export function ZoomSettings() {
       <CardHeader>
         <CardTitle>Zoom Integration</CardTitle>
         <CardDescription>
-          Connect your Zoom account to join meetings directly from the app
+          Connect your Zoom account to join meetings directly from the app with proper ZAK token authentication
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -147,7 +146,7 @@ export function ZoomSettings() {
         ) : isConnected ? (
           <div className="space-y-4">
             <p className="text-sm text-green-600">
-              Your Zoom account is connected
+              Your Zoom account is connected and ready for host meetings with ZAK authentication
             </p>
             <div className="flex flex-col md:flex-row gap-4">
               <Button 
@@ -225,4 +224,3 @@ export function ZoomSettings() {
     </Card>
   );
 }
-

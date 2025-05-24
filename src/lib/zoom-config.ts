@@ -1,7 +1,7 @@
 import { ZoomMeetingConfig } from '@/types/zoom';
 
-// Use the client ID directly for sdkKey
-const ZOOM_SDK_KEY = "eFAZ8Vf7RbG5saQVqL1zGA"; // This is your SDK Key (Client ID)
+// Use the updated client ID as the SDK Key
+const ZOOM_SDK_KEY = "dkQMavedS2OWM2c73F6pLg"; // Updated SDK Key (Client ID)
 const SUPABASE_URL = 'https://qsxlvwwebbakmzpwjfbb.supabase.co';
 
 // State to manage SDK loading
@@ -339,7 +339,7 @@ export const createAndInitializeZoomClient = async (
   }
 };
 
-// CRITICAL FIX: Updated joinMeeting function to use OAuth tokens correctly
+// UPDATED joinMeeting function with ZAK token support for host role
 export const joinMeeting = async (client, params) => {
   try {
     // Get OAuth access token instead of signature
@@ -349,7 +349,8 @@ export const joinMeeting = async (client, params) => {
       hasToken: !!tokenData.accessToken,
       tokenType: tokenData.tokenType,
       sdkKey: tokenData.sdkKey || ZOOM_SDK_KEY,
-      role: params.role
+      role: params.role,
+      hasZak: !!params.zak
     });
 
     // Add delay before joining
@@ -373,20 +374,25 @@ export const joinMeeting = async (client, params) => {
           code: error.code,
           message: error.message,
           type: error.type,
-          reason: error.reason
+          reason: error.reason,
+          hasZak: !!params.zak,
+          role: params.role
         });
       }
     };
 
-    // Add role-specific configuration
+    // Add role-specific configuration for host
     if (params.role === 1) { // Host role
       joinConfig.role = 1;
+      joinConfig.zak = params.zak; // Add ZAK token for host authentication
       joinConfig.join_before_host = true;
+      console.log('Host configuration applied with ZAK token');
     }
 
-    console.log('Joining with config (OAuth):', {
+    console.log('Joining with config:', {
       sdkKey: joinConfig.sdkKey,
       hasAccessToken: !!joinConfig.accessToken,
+      hasZak: !!joinConfig.zak,
       meetingNumber: joinConfig.meetingNumber,
       userName: joinConfig.userName,
       role: joinConfig.role
