@@ -55,13 +55,14 @@ export function ZoomComponentMeeting({
         await initializeClient(containerRef.current!);
         console.log('Client initialized, joining meeting...');
 
-        // Join meeting with OAuth token
+        // Join meeting with OAuth token and sdkKey
         await joinMeeting({
           meetingNumber,
           userName: providedUserName || user?.email || 'Guest',
-          signature: tokenData.accessToken, // Component SDK expects OAuth token as signature
+          signature: tokenData.accessToken,
           password: meetingPassword || '',
-          userEmail: user?.email || ''
+          userEmail: user?.email || '',
+          sdkKey: tokenData.sdkKey
         });
 
         setHasJoined(true);

@@ -101,7 +101,6 @@ export function useZoomComponentSDK() {
       await client.init({
         zoomAppRoot: container,
         language: 'en-US',
-        sdkKey: 'eFAZ8Vf7RbG5saQVqL1zGA',
         debug: true,
         isSupportAV: true,
         isSupportChat: true,
@@ -131,6 +130,7 @@ export function useZoomComponentSDK() {
     signature: string;
     password?: string;
     userEmail?: string;
+    sdkKey: string;
   }) => {
     if (!clientRef.current) {
       throw new Error('Client not initialized');
@@ -138,8 +138,9 @@ export function useZoomComponentSDK() {
 
     try {
       await clientRef.current.join({
+        sdkKey: params.sdkKey,
         topic: `Meeting ${params.meetingNumber}`,
-        signature: params.signature, // OAuth token goes here in Component SDK
+        signature: params.signature,
         meetingNumber: params.meetingNumber,
         userName: params.userName,
         userEmail: params.userEmail,
@@ -162,9 +163,8 @@ export function useZoomComponentSDK() {
   const cleanup = useCallback(() => {
     if (clientRef.current) {
       try {
-        // Component SDK handles cleanup automatically
-        // No manual leave() call needed
         console.log('Cleaning up Zoom client');
+        // Component SDK handles cleanup automatically
       } catch (error) {
         console.error('Error during cleanup:', error);
       }
