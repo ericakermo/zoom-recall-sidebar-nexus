@@ -1,4 +1,3 @@
-
 export interface ZoomMeetingConfig {
   signature: string;
   meetingNumber: string;
@@ -25,4 +24,43 @@ declare global {
     React?: any;
     ReactDOM?: any;
   }
+}
+
+export interface ZoomJoinParams {
+  meetingNumber: string;
+  userName: string;
+  signature: string;
+  password?: string;
+  userEmail?: string;
+  sdkKey: string;
+  role?: number;
+  zak?: string;
+}
+
+export interface ZoomJoinConfig {
+  sdkKey: string;
+  signature: string;
+  meetingNumber: string;
+  userName: string;
+  userEmail?: string;
+  passWord: string;
+  role: number;
+  zak?: string;
+  join_before_host?: boolean;
+  success: (success: any) => void;
+  error: (error: any) => void;
+}
+
+export interface ZoomTokenData {
+  accessToken: string;
+  tokenType: string;
+  sdkKey: string;
+  zak?: string;
+}
+
+export interface MeetingStatus {
+  status: string;
+  startTime: string;
+  duration: number;
+  joinBeforeHost: boolean;
 } 

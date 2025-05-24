@@ -1,5 +1,4 @@
-
-import { ZoomMeetingConfig } from '@/types/zoom';
+import { ZoomMeetingConfig, ZoomJoinParams, ZoomJoinConfig, ZoomTokenData, MeetingStatus } from '@/types/zoom';
 
 // Use the updated client ID as the SDK Key
 const ZOOM_SDK_KEY = "dkQMavedS2OWM2c73F6pLg"; // Updated SDK Key (Client ID)
@@ -152,60 +151,88 @@ export const loadZoomSDK = async (): Promise<boolean> => {
   return zoomSDKLoadingPromise;
 };
 
-export const getZoomAccessToken = async (meetingNumber: string, role: number): Promise<{ accessToken: string; tokenType: string; sdkKey: string }> => {
+export const getZoomAccessToken = async (meetingNumber: string, role: number = 0): Promise<ZoomTokenData> => {
   try {
-    if (!meetingNumber) {
-      throw new Error('Meeting number is required to get access token');
-    }
-    
     const tokenData = localStorage.getItem('sb-qsxlvwwebbakmzpwjfbb-auth-token');
     if (!tokenData) {
-      throw new Error('Authentication required to join meetings');
+      throw new Error('Authentication required');
     }
     
     const parsedToken = JSON.parse(tokenData);
     const authToken = parsedToken?.access_token;
-    if (!authToken) {
-      throw new Error('Invalid authentication token');
-    }
-
-    console.log(`Requesting user's Zoom OAuth token for meeting: ${meetingNumber}, role: ${role}`);
     
+    // Get OAuth token
     const response = await fetch(`https://qsxlvwwebbakmzpwjfbb.supabase.co/functions/v1/get-zoom-token`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${authToken}`,
       },
-      body: JSON.stringify({ 
-        meetingNumber: meetingNumber,
-        role: role
+      body: JSON.stringify({
+        meetingNumber,
+        role
       }),
     });
 
     if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`Failed to get access token: ${response.status}`);
+      throw new Error('Failed to get Zoom token');
     }
-    
+
     const data = await response.json();
-    if (!data.accessToken) {
-      throw new Error('Invalid response from authentication service');
+    
+    // If host role, get ZAK token
+    if (role === 1) {
+      const zakResponse = await fetch(`https://qsxlvwwebbakmzpwjfbb.supabase.co/functions/v1/get-zoom-zak`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${authToken}`,
+        }
+      });
+
+      if (!zakResponse.ok) {
+        throw new Error('Failed to get ZAK token');
+      }
+
+      const zakData = await zakResponse.json();
+      data.zak = zakData.zak;
     }
-    
-    console.log("Received user's Zoom OAuth token:", {
-      hasToken: !!data.accessToken,
-      tokenType: data.tokenType,
-      sdkKey: data.sdkKey || ZOOM_SDK_KEY
-    });
-    
+
     return {
       accessToken: data.accessToken,
-      tokenType: data.tokenType || 'Bearer',
-      sdkKey: data.sdkKey || ZOOM_SDK_KEY
+      tokenType: data.tokenType,
+      sdkKey: data.sdkKey || ZOOM_SDK_KEY,
+      zak: data.zak
     };
   } catch (error) {
-    console.error('Error getting user Zoom OAuth token:', error);
+    console.error('Error getting Zoom token:', error);
+    throw error;
+  }
+};
+
+export const checkMeetingStatus = async (meetingNumber: string): Promise<MeetingStatus> => {
+  try {
+    const tokenData = await getZoomAccessToken(meetingNumber);
+    
+    const response = await fetch(`https://api.zoom.us/v2/meetings/${meetingNumber}`, {
+      headers: {
+        'Authorization': `Bearer ${tokenData.accessToken}`
+      }
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to check meeting status');
+    }
+
+    const data = await response.json();
+    return {
+      status: data.status,
+      startTime: data.start_time,
+      duration: data.duration,
+      joinBeforeHost: data.settings?.join_before_host
+    };
+  } catch (error) {
+    console.error('Error checking meeting status:', error);
     throw error;
   }
 };
@@ -341,12 +368,15 @@ export const createAndInitializeZoomClient = async (
 };
 
 // UPDATED joinMeeting function with ZAK token support for host role
-export const joinMeeting = async (client: any, params: any) => {
+export const joinMeeting = async (client: any, params: ZoomJoinParams) => {
   try {
-    // Get OAuth access token instead of signature
+    // Get OAuth token and check meeting status
     const tokenData = await getZoomAccessToken(params.meetingNumber, params.role || 0);
+    const meetingStatus = await checkMeetingStatus(params.meetingNumber);
     
-    console.log('Joining meeting with OAuth token:', {
+    console.log('Joining meeting with status:', {
+      status: meetingStatus.status,
+      joinBeforeHost: meetingStatus.joinBeforeHost,
       hasToken: !!tokenData.accessToken,
       tokenType: tokenData.tokenType,
       sdkKey: tokenData.sdkKey || ZOOM_SDK_KEY,
@@ -356,16 +386,16 @@ export const joinMeeting = async (client: any, params: any) => {
 
     // Add delay before joining
     console.log('Waiting before joining meeting...');
-    await new Promise(resolve => setTimeout(resolve, 2000)); // 2 second delay
+    await new Promise(resolve => setTimeout(resolve, 2000));
 
-    // CRITICAL: For Zoom SDK v3.13.2, use accessToken directly
-    const joinConfig: any = {
+    const joinConfig: ZoomJoinConfig = {
       sdkKey: tokenData.sdkKey || ZOOM_SDK_KEY,
-      accessToken: tokenData.accessToken,
+      signature: tokenData.accessToken,
       meetingNumber: params.meetingNumber,
       userName: params.userName,
       userEmail: params.userEmail,
       passWord: params.password || '',
+      role: params.role || 0,
       success: (success: any) => {
         console.log('Join meeting success:', success);
       },
@@ -382,17 +412,16 @@ export const joinMeeting = async (client: any, params: any) => {
       }
     };
 
-    // Add role-specific configuration for host
+    // Add role-specific configuration
     if (params.role === 1) { // Host role
-      joinConfig.role = 1;
-      joinConfig.zak = params.zak; // Add ZAK token for host authentication
+      joinConfig.zak = tokenData.zak;
       joinConfig.join_before_host = true;
       console.log('Host configuration applied with ZAK token');
     }
 
     console.log('Joining with config:', {
       sdkKey: joinConfig.sdkKey,
-      hasAccessToken: !!joinConfig.accessToken,
+      hasSignature: !!joinConfig.signature,
       hasZak: !!joinConfig.zak,
       meetingNumber: joinConfig.meetingNumber,
       userName: joinConfig.userName,

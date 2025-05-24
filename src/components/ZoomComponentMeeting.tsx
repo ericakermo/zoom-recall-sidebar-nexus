@@ -3,6 +3,7 @@ import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { useZoomComponentSDK } from '@/hooks/useZoomComponentSDK';
 import { getZoomAccessToken } from '@/lib/zoom-config';
+import { ZoomJoinParams } from '@/types/zoom';
 
 interface ZoomComponentMeetingProps {
   meetingNumber: string;
@@ -48,7 +49,7 @@ export function ZoomComponentMeeting({
       setIsJoining(true);
       
       try {
-        // Get OAuth token
+        // Get OAuth token and ZAK token for host
         const tokenData = await getZoomAccessToken(meetingNumber, role || 0);
         console.log('Got OAuth token for Component SDK');
 
@@ -56,15 +57,19 @@ export function ZoomComponentMeeting({
         await initializeClient(containerRef.current!);
         console.log('Client initialized, joining meeting...');
 
-        // Join meeting with OAuth token and sdkKey
-        await joinMeeting({
+        // Join meeting with proper configuration
+        const joinParams: ZoomJoinParams = {
           meetingNumber,
           userName: providedUserName || user?.email || 'Guest',
           signature: tokenData.accessToken,
           password: meetingPassword || '',
           userEmail: user?.email || '',
-          sdkKey: tokenData.sdkKey
-        });
+          sdkKey: tokenData.sdkKey,
+          role: role,
+          zak: role === 1 ? tokenData.zak : undefined
+        };
+
+        await joinMeeting(joinParams);
 
         setHasJoined(true);
         onMeetingJoined?.();
