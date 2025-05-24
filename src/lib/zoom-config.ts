@@ -348,7 +348,8 @@ export const joinMeeting = async (client, params) => {
     console.log('Joining meeting with OAuth token:', {
       hasToken: !!tokenData.accessToken,
       tokenType: tokenData.tokenType,
-      sdkKey: tokenData.sdkKey || ZOOM_SDK_KEY
+      sdkKey: tokenData.sdkKey || ZOOM_SDK_KEY,
+      role: params.role
     });
 
     // Add delay before joining
@@ -380,7 +381,7 @@ export const joinMeeting = async (client, params) => {
     // Add role-specific configuration
     if (params.role === 1) { // Host role
       joinConfig.role = 1;
-      joinConfig.join_before_host = true; // Allow joining before host
+      joinConfig.join_before_host = true;
     }
 
     console.log('Joining with config (OAuth):', {
