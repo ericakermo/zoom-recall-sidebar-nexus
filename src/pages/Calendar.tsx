@@ -1,21 +1,28 @@
+
 import React, { useState } from 'react';
 import { Calendar as CalendarComponent } from '@/components/ui/calendar';
 import { Button } from '@/components/ui/button';
 import { Plus, ChevronLeft, ChevronRight } from 'lucide-react';
+
 const Calendar = () => {
   const [date, setDate] = useState<Date | undefined>(new Date());
-  return <div className="p-6 h-full">
+
+  return (
+    <div className="p-6 h-full">
       <div className="flex items-start gap-6 h-full">
         {/* Calendar on the left */}
         <div className="flex-shrink-0">
-          <CalendarComponent mode="single" selected={date} onSelect={setDate} className="rounded-lg border border-border p-3 pointer-events-auto [&_.rdp-day_selected]:!bg-black [&_.rdp-day_selected]:!text-white [&_.rdp-day_selected:hover]:!bg-black [&_.rdp-day_selected:hover]:!text-white [&_button[aria-selected='true']]:!bg-black [&_button[aria-selected='true']]:!text-white [&_button[aria-selected='true']:hover]:!bg-black [&_button[aria-selected='true']:hover]:!text-white" />
+          <CalendarComponent 
+            mode="single" 
+            selected={date} 
+            onSelect={setDate} 
+            className="rounded-lg border border-border p-3 pointer-events-auto [&_.rdp-day_selected]:!bg-black [&_.rdp-day_selected]:!text-white [&_.rdp-day_selected:hover]:!bg-black [&_.rdp-day_selected:hover]:!text-white [&_button[aria-selected='true']]:!bg-black [&_button[aria-selected='true']]:!text-white [&_button[aria-selected='true']:hover]:!bg-black [&_button[aria-selected='true']:hover]:!text-white" 
+          />
         </div>
         
         {/* Vertical line */}
-        <div className="flex-shrink-0">
-          <div className="w-px bg-black opacity-20" style={{
-          height: '95%'
-        }}></div>
+        <div className="flex-shrink-0 flex items-center">
+          <div className="w-px bg-black opacity-20" style={{ height: '95%' }}></div>
         </div>
         
         {/* Buttons on the right */}
@@ -37,6 +44,8 @@ const Calendar = () => {
           </div>
         </div>
       </div>
-    </div>;
+    </div>
+  );
 };
+
 export default Calendar;
