@@ -11,6 +11,7 @@ interface ZoomMeetingProps {
   userName?: string;
   role?: number;
   onMeetingEnd?: () => void;
+  zak?: string; // Add ZAK token property
 }
 
 export function ZoomMeeting({
@@ -18,7 +19,8 @@ export function ZoomMeeting({
   meetingPassword,
   userName,
   role = 0,
-  onMeetingEnd
+  onMeetingEnd,
+  zak
 }: ZoomMeetingProps) {
   const [error, setError] = useState<string | null>(null);
   const [isConnected, setIsConnected] = useState(false);
@@ -90,6 +92,7 @@ export function ZoomMeeting({
           role={role}
           onMeetingJoined={handleMeetingJoined}
           onMeetingError={handleMeetingError}
+          zak={zak} // Pass ZAK token to ZoomComponentMeeting
         />
       </div>
       

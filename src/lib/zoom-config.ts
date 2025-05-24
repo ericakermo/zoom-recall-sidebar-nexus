@@ -1,3 +1,4 @@
+
 import { ZoomMeetingConfig } from '@/types/zoom';
 
 // Use the updated client ID as the SDK Key
@@ -340,7 +341,7 @@ export const createAndInitializeZoomClient = async (
 };
 
 // UPDATED joinMeeting function with ZAK token support for host role
-export const joinMeeting = async (client, params) => {
+export const joinMeeting = async (client: any, params: any) => {
   try {
     // Get OAuth access token instead of signature
     const tokenData = await getZoomAccessToken(params.meetingNumber, params.role || 0);
@@ -358,17 +359,17 @@ export const joinMeeting = async (client, params) => {
     await new Promise(resolve => setTimeout(resolve, 2000)); // 2 second delay
 
     // CRITICAL: For Zoom SDK v3.13.2, use accessToken directly
-    const joinConfig = {
+    const joinConfig: any = {
       sdkKey: tokenData.sdkKey || ZOOM_SDK_KEY,
       accessToken: tokenData.accessToken,
       meetingNumber: params.meetingNumber,
       userName: params.userName,
       userEmail: params.userEmail,
       passWord: params.password || '',
-      success: (success) => {
+      success: (success: any) => {
         console.log('Join meeting success:', success);
       },
-      error: (error) => {
+      error: (error: any) => {
         console.error('Join meeting error:', error);
         console.error('Error details:', {
           code: error.code,
