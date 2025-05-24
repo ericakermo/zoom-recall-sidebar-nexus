@@ -1,4 +1,5 @@
 import { ZoomMeetingConfig, ZoomJoinParams, ZoomJoinConfig, ZoomTokenData, MeetingStatus } from '@/types/zoom';
+import { createHash } from 'crypto';
 
 // Use the updated client ID as the SDK Key
 const ZOOM_SDK_KEY = "dkQMavedS2OWM2c73F6pLg"; // Updated SDK Key (Client ID)
@@ -180,6 +181,12 @@ export const getZoomAccessToken = async (meetingNumber: string, role: number = 0
 
     const data = await response.json();
     
+    // Generate signature using SDK key and meeting number
+    const timestamp = Math.floor(Date.now() / 1000);
+    const signature = createHash('sha256')
+      .update(`${ZOOM_SDK_KEY}${meetingNumber}${timestamp}${role}`)
+      .digest('hex');
+    
     // If host role, get ZAK token
     if (role === 1) {
       const zakResponse = await fetch(`https://qsxlvwwebbakmzpwjfbb.supabase.co/functions/v1/get-zoom-zak`, {
@@ -202,6 +209,7 @@ export const getZoomAccessToken = async (meetingNumber: string, role: number = 0
       accessToken: data.accessToken,
       tokenType: data.tokenType,
       sdkKey: data.sdkKey || ZOOM_SDK_KEY,
+      signature,
       zak: data.zak
     };
   } catch (error) {
@@ -381,7 +389,8 @@ export const joinMeeting = async (client: any, params: ZoomJoinParams) => {
       tokenType: tokenData.tokenType,
       sdkKey: tokenData.sdkKey || ZOOM_SDK_KEY,
       role: params.role,
-      hasZak: !!params.zak
+      hasZak: !!params.zak,
+      hasSignature: !!tokenData.signature
     });
 
     // Add delay before joining
@@ -390,7 +399,7 @@ export const joinMeeting = async (client: any, params: ZoomJoinParams) => {
 
     const joinConfig: ZoomJoinConfig = {
       sdkKey: tokenData.sdkKey || ZOOM_SDK_KEY,
-      signature: tokenData.accessToken,
+      signature: tokenData.signature,
       meetingNumber: params.meetingNumber,
       userName: params.userName,
       userEmail: params.userEmail,
@@ -407,7 +416,8 @@ export const joinMeeting = async (client: any, params: ZoomJoinParams) => {
           type: error.type,
           reason: error.reason,
           hasZak: !!params.zak,
-          role: params.role
+          role: params.role,
+          hasSignature: !!tokenData.signature
         });
       }
     };

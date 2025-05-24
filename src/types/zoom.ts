@@ -55,6 +55,7 @@ export interface ZoomTokenData {
   accessToken: string;
   tokenType: string;
   sdkKey: string;
+  signature: string;
   zak?: string;
 }
 
