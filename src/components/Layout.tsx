@@ -1,7 +1,6 @@
 
 import React, { ReactNode } from "react";
 import { SidebarDemo } from "./SidebarDemo";
-import { UserMenu } from "./UserMenu";
 
 interface LayoutProps {
   children: ReactNode;
@@ -10,8 +9,9 @@ interface LayoutProps {
 const Layout = ({ children }: LayoutProps) => {
   return (
     <div className="h-screen w-full overflow-hidden">
-      <SidebarDemo />
-      {children}
+      <SidebarDemo>
+        {children}
+      </SidebarDemo>
     </div>
   );
 };

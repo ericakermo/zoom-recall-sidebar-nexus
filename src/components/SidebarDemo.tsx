@@ -1,12 +1,15 @@
-
-import React, { useState } from "react";
+import React, { useState, ReactNode } from "react";
 import { Sidebar, SidebarBody, SidebarLink } from "@/components/ui/sidebar";
 import { LayoutDashboard, UserCog, Settings, LogOut, Video, Calendar } from "lucide-react";
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
 
-export function SidebarDemo() {
+interface SidebarDemoProps {
+  children: ReactNode;
+}
+
+export function SidebarDemo({ children }: SidebarDemoProps) {
   const links = [
     {
       label: "Dashboard",
@@ -88,7 +91,7 @@ export function SidebarDemo() {
       </Sidebar>
       <div className="flex flex-1">
         <div className="p-2 md:p-10 rounded-tl-2xl border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 flex flex-col gap-2 flex-1 w-full h-full overflow-auto">
-          {/* Main content will be rendered here */}
+          {children}
         </div>
       </div>
     </div>
