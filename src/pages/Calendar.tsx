@@ -20,7 +20,7 @@ const Calendar = () => {
         
         {/* Vertical line on the right */}
         <div className="flex-1 flex justify-center">
-          <div className="w-px h-full bg-black opacity-20"></div>
+          <div className="h-full w-px bg-black opacity-20"></div>
         </div>
       </div>
     </div>
