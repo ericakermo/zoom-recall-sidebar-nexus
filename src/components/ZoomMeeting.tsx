@@ -186,16 +186,26 @@ export function ZoomMeeting({
         if (!zoomContainerRef.current || !window.ZoomMtgEmbedded) {
           throw new Error("Zoom container or SDK not available");
         }
+
+        // Get OAuth access token FIRST
+        const tokenData = await getZoomAccessToken(meetingNumber, role || 0);
+        console.log("OAuth token data received:", {
+          hasToken: !!tokenData.accessToken,
+          tokenType: tokenData.tokenType,
+          sdkKey: tokenData.sdkKey
+        });
         
         // Create Zoom client
         const client = window.ZoomMtgEmbedded.createClient();
         zoomClientRef.current = client;
 
-        // Initialize with required parameters
+        // CRITICAL FIX: Initialize with OAuth access token
         await client.init({
           debug: true,
           zoomAppRoot: zoomContainerRef.current,
           language: 'en-US',
+          sdkKey: tokenData.sdkKey || ZOOM_SDK_KEY,
+          accessToken: tokenData.accessToken, // Pass OAuth token during init
           customize: {
             meetingInfo: ['topic', 'host', 'mn', 'pwd', 'tel', 'participant', 'dc', 'enctype'],
             toolbar: {
@@ -212,20 +222,10 @@ export function ZoomMeeting({
           }
         });
 
-        console.log("Zoom client initialized successfully");
+        console.log("Zoom client initialized successfully with OAuth token");
 
-        // Get OAuth access token
-        const tokenData = await getZoomAccessToken(meetingNumber, role || 0);
-        console.log("OAuth token data received:", {
-          hasToken: !!tokenData.accessToken,
-          tokenType: tokenData.tokenType,
-          sdkKey: tokenData.sdkKey
-        });
-
-        // CRITICAL FIX: Join meeting with OAuth access token (no signature)
+        // CRITICAL FIX: Join meeting WITHOUT accessToken (already provided in init)
         const joinConfig = {
-          sdkKey: tokenData.sdkKey || ZOOM_SDK_KEY,
-          accessToken: tokenData.accessToken, // Use OAuth token directly
           meetingNumber: meetingNumber,
           userName: providedUserName || user?.email || 'Guest',
           userEmail: user?.email,
@@ -262,11 +262,10 @@ export function ZoomMeeting({
           }
         };
 
-        console.log('Joining with OAuth config:', {
-          sdkKey: joinConfig.sdkKey,
-          hasAccessToken: !!joinConfig.accessToken,
+        console.log('Joining with config (OAuth in init):', {
           meetingNumber: joinConfig.meetingNumber,
-          userName: joinConfig.userName
+          userName: joinConfig.userName,
+          hasPassword: !!joinConfig.passWord
         });
 
         await client.join(joinConfig);
