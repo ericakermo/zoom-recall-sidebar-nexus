@@ -199,12 +199,16 @@ export function ZoomMeeting({
         const client = window.ZoomMtgEmbedded.createClient();
         zoomClientRef.current = client;
 
-        // CRITICAL FIX: Initialize with OAuth access token
+        // CRITICAL FIX: Ensure sdkKey is always present
+        const sdkKey = tokenData.sdkKey || ZOOM_SDK_KEY;
+        console.log("Using sdkKey for initialization:", sdkKey);
+
+        // CRITICAL FIX: Initialize with OAuth access token and ensure sdkKey is present
         await client.init({
           debug: true,
           zoomAppRoot: zoomContainerRef.current,
           language: 'en-US',
-          sdkKey: tokenData.sdkKey || ZOOM_SDK_KEY,
+          sdkKey: sdkKey, // Ensure sdkKey is never empty
           accessToken: tokenData.accessToken, // Pass OAuth token during init
           customize: {
             meetingInfo: ['topic', 'host', 'mn', 'pwd', 'tel', 'participant', 'dc', 'enctype'],
@@ -222,7 +226,7 @@ export function ZoomMeeting({
           }
         });
 
-        console.log("Zoom client initialized successfully with OAuth token");
+        console.log("Zoom client initialized successfully with OAuth token and sdkKey:", sdkKey);
 
         // CRITICAL FIX: Join meeting WITHOUT accessToken (already provided in init)
         const joinConfig = {
