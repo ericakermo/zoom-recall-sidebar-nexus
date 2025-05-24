@@ -351,6 +351,10 @@ export const joinMeeting = async (client, params) => {
       sdkKey: tokenData.sdkKey || ZOOM_SDK_KEY
     });
 
+    // Add delay before joining
+    console.log('Waiting before joining meeting...');
+    await new Promise(resolve => setTimeout(resolve, 2000)); // 2 second delay
+
     // CRITICAL: For Zoom SDK v3.13.2, use accessToken directly
     const joinConfig = {
       sdkKey: tokenData.sdkKey || ZOOM_SDK_KEY,
@@ -373,11 +377,18 @@ export const joinMeeting = async (client, params) => {
       }
     };
 
+    // Add role-specific configuration
+    if (params.role === 1) { // Host role
+      joinConfig.role = 1;
+      joinConfig.join_before_host = true; // Allow joining before host
+    }
+
     console.log('Joining with config (OAuth):', {
       sdkKey: joinConfig.sdkKey,
       hasAccessToken: !!joinConfig.accessToken,
       meetingNumber: joinConfig.meetingNumber,
-      userName: joinConfig.userName
+      userName: joinConfig.userName,
+      role: joinConfig.role
     });
 
     await client.join(joinConfig);
