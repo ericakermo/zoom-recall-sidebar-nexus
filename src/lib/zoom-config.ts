@@ -1,4 +1,3 @@
-
 import { ZoomMeetingConfig } from '@/types/zoom';
 
 // Use the client ID directly for sdkKey
@@ -169,8 +168,11 @@ export const getZoomAccessToken = async (meetingNumber: string, role: number): P
       throw new Error('Invalid authentication token');
     }
 
-    console.log(`Requesting OAuth access token for meeting: ${meetingNumber}, role: ${role}`);
-    const response = await fetch(`https://qsxlvwwebbakmzpwjfbb.supabase.co/functions/v1/generate-zoom-signature`, {
+    console.log(`Requesting user's Zoom OAuth token for meeting: ${meetingNumber}, role: ${role}`);
+    
+    // For joining existing meetings, we still need to get the user's access token
+    // but we use a different endpoint that doesn't require Server-to-Server credentials
+    const response = await fetch(`https://qsxlvwwebbakmzpwjfbb.supabase.co/functions/v1/get-zoom-token`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -192,7 +194,7 @@ export const getZoomAccessToken = async (meetingNumber: string, role: number): P
       throw new Error('Invalid response from authentication service');
     }
     
-    console.log("Received OAuth token data:", {
+    console.log("Received user's Zoom OAuth token:", {
       hasToken: !!data.accessToken,
       tokenType: data.tokenType,
       sdkKey: data.sdkKey
@@ -204,7 +206,7 @@ export const getZoomAccessToken = async (meetingNumber: string, role: number): P
       sdkKey: data.sdkKey || ZOOM_SDK_KEY
     };
   } catch (error) {
-    console.error('Error getting OAuth access token:', error);
+    console.error('Error getting user Zoom OAuth token:', error);
     throw error;
   }
 };

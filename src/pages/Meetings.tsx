@@ -18,11 +18,9 @@ interface MeetingFormData {
 const Meetings = () => {
   const [activeMeeting, setActiveMeeting] = useState<string | null>(null);
   const [isHosting, setIsHosting] = useState(false);
-  const [isConnectingToZoom, setIsConnectingToZoom] = useState(false);
   const { register, handleSubmit, formState: { errors }, reset } = useForm<MeetingFormData>();
   const { toast } = useToast();
   const { user } = useAuth();
-  const [currentMeeting, setCurrentMeeting] = useState<any>(null);
   const [isStartingMeeting, setIsStartingMeeting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [sdkLoaded, setSdkLoaded] = useState(false);
@@ -81,45 +79,68 @@ const Meetings = () => {
     setError(null);
     
     try {
-      console.log("Starting meeting...");
+      console.log("Creating new Zoom meeting...");
       
-      // Generate a test meeting ID for testing
-      const testMeetingId = "79014147874"; // Using a fixed test meeting ID
+      // Create a real meeting using the user's Zoom OAuth tokens
+      const tokenData = localStorage.getItem('sb-qsxlvwwebbakmzpwjfbb-auth-token');
+      if (!tokenData) {
+        throw new Error('Authentication required');
+      }
       
-      console.log("Getting OAuth access token for meeting:", testMeetingId);
+      const parsedToken = JSON.parse(tokenData);
+      const authToken = parsedToken?.access_token;
       
-      // Get the OAuth access token for this meeting
-      const tokenData = await getZoomAccessToken(testMeetingId, 1); // 1 = host
-      
-      console.log("OAuth access token received:", {
-        hasToken: !!tokenData.accessToken,
-        tokenType: tokenData.tokenType,
-        sdkKey: tokenData.sdkKey
+      const response = await fetch(`https://qsxlvwwebbakmzpwjfbb.supabase.co/functions/v1/create-zoom-meeting`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${authToken}`,
+        },
+        body: JSON.stringify({
+          topic: 'Instant Meeting',
+          type: 1, // Instant meeting
+          settings: {
+            host_video: true,
+            participant_video: true,
+            join_before_host: false,
+            mute_upon_entry: true,
+            waiting_room: false
+          }
+        }),
       });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to create meeting');
+      }
+
+      const meetingData = await response.json();
+      console.log("Meeting created successfully:", meetingData);
       
       setZoomCredentials({
-        meetingNumber: testMeetingId,
-        accessToken: tokenData.accessToken,
-        tokenType: tokenData.tokenType,
-        sdkKey: tokenData.sdkKey,
+        meetingNumber: meetingData.meetingNumber,
+        accessToken: meetingData.accessToken,
+        tokenType: 'Bearer',
+        sdkKey: 'eFAZ8Vf7RbG5saQVqL1zGA',
         userName: user?.email || 'Host',
         userEmail: user?.email,
-        role: 1 // Host role
+        role: 1, // Host role
+        password: meetingData.password || ''
       });
       
-      setActiveMeeting(testMeetingId);
+      setActiveMeeting(meetingData.meetingNumber);
       setIsHosting(true);
       
       toast({
-        title: "Meeting Started",
-        description: `You are now hosting meeting ${testMeetingId}`,
+        title: "Meeting Created",
+        description: `Meeting ${meetingData.meetingNumber} created successfully`,
       });
     } catch (error: any) {
-      console.error('Failed to start meeting:', error);
-      setError(error.message || 'Failed to start meeting');
+      console.error('Failed to create meeting:', error);
+      setError(error.message || 'Failed to create meeting');
       toast({
         title: "Error",
-        description: error.message || "Failed to start meeting",
+        description: error.message || "Failed to create meeting",
         variant: "destructive"
       });
     } finally {
