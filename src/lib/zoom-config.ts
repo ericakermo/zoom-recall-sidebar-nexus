@@ -1,8 +1,7 @@
 import { ZoomMeetingConfig } from '@/types/zoom';
 
-// Use the new client ID directly for sdkKey
-const ZOOM_SDK_KEY = "dkQMavedS2OWM2c73F6pLg"; // Updated SDK Key (Client ID)
-const ZOOM_CLIENT_SECRET = "CFDxugjp3CkE3G07z4eC1qcGjukmYVdt"; // Updated Client Secret
+// Use the client ID directly for sdkKey
+const ZOOM_SDK_KEY = "eFAZ8Vf7RbG5saQVqL1zGA"; // This is your SDK Key (Client ID)
 const SUPABASE_URL = 'https://qsxlvwwebbakmzpwjfbb.supabase.co';
 
 // State to manage SDK loading
@@ -196,13 +195,13 @@ export const getZoomAccessToken = async (meetingNumber: string, role: number): P
     console.log("Received user's Zoom OAuth token:", {
       hasToken: !!data.accessToken,
       tokenType: data.tokenType,
-      sdkKey: ZOOM_SDK_KEY // Always use the new SDK key
+      sdkKey: data.sdkKey || ZOOM_SDK_KEY
     });
     
     return {
       accessToken: data.accessToken,
       tokenType: data.tokenType || 'Bearer',
-      sdkKey: ZOOM_SDK_KEY // Always return the new SDK key
+      sdkKey: data.sdkKey || ZOOM_SDK_KEY
     };
   } catch (error) {
     console.error('Error getting user Zoom OAuth token:', error);
@@ -343,21 +342,21 @@ export const createAndInitializeZoomClient = async (
 // CRITICAL FIX: Updated joinMeeting function to use OAuth tokens correctly
 export const joinMeeting = async (client, params) => {
   try {
+    // Get OAuth access token instead of signature
     const tokenData = await getZoomAccessToken(params.meetingNumber, params.role || 0);
     
-    console.log('Token verification:', {
-      hasAccessToken: !!tokenData.accessToken,
-      tokenLength: tokenData.accessToken?.length,
-      role: params.role,
-      isHost: params.role === 1
+    console.log('Joining meeting with OAuth token:', {
+      hasToken: !!tokenData.accessToken,
+      tokenType: tokenData.tokenType,
+      sdkKey: tokenData.sdkKey || ZOOM_SDK_KEY,
+      role: params.role
     });
 
-    const isMeetingReady = await checkMeetingStatus(params.meetingNumber, tokenData.accessToken);
-    if (!isMeetingReady) {
-      console.log('Meeting not ready, waiting...');
-      await new Promise(resolve => setTimeout(resolve, 5000)); // 5 second delay
-    }
+    // Add delay before joining
+    console.log('Waiting before joining meeting...');
+    await new Promise(resolve => setTimeout(resolve, 2000)); // 2 second delay
 
+    // CRITICAL: For Zoom SDK v3.13.2, use accessToken directly
     const joinConfig = {
       sdkKey: tokenData.sdkKey || ZOOM_SDK_KEY,
       accessToken: tokenData.accessToken,
@@ -365,7 +364,6 @@ export const joinMeeting = async (client, params) => {
       userName: params.userName,
       userEmail: params.userEmail,
       passWord: params.password || '',
-      zak: params.role === 1 ? params.zak : undefined, // Add ZAK for host
       success: (success) => {
         console.log('Join meeting success:', success);
       },
@@ -375,18 +373,23 @@ export const joinMeeting = async (client, params) => {
           code: error.code,
           message: error.message,
           type: error.type,
-          reason: error.reason,
-          hasZak: !!params.zak,
-          role: params.role
+          reason: error.reason
         });
       }
     };
 
+    // Add role-specific configuration
+    if (params.role === 1) { // Host role
+      joinConfig.role = 1;
+      joinConfig.join_before_host = true;
+    }
+
     console.log('Joining with config (OAuth):', {
-      sdkKey: joinConfig.sdkKey, // Log the new SDK key
+      sdkKey: joinConfig.sdkKey,
       hasAccessToken: !!joinConfig.accessToken,
       meetingNumber: joinConfig.meetingNumber,
-      userName: joinConfig.userName
+      userName: joinConfig.userName,
+      role: joinConfig.role
     });
 
     await client.join(joinConfig);
@@ -457,14 +460,4 @@ export const createZoomMeeting = async (params: {
     console.error('Error creating Zoom meeting:', error);
     throw error;
   }
-};
-
-const checkMeetingStatus = async (meetingNumber: string, accessToken: string) => {
-  const response = await fetch(`https://api.zoom.us/v2/meetings/${meetingNumber}`, {
-    headers: {
-      'Authorization': `Bearer ${accessToken}`
-    }
-  });
-  const data = await response.json();
-  return data.status === 'waiting' ? false : true;
 };
