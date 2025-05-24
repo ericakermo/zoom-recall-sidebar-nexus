@@ -25,30 +25,27 @@ const Calendar = () => {
         </div>
         
         {/* Buttons on the right */}
-        <div className="flex flex-col items-start gap-4">
-          {/* Top row with plus and chevrons */}
+        <div className="flex flex-col gap-4 flex-1">
           <div className="flex items-center gap-2">
             {/* Circle button with plus */}
             <Button size="icon" className="rounded-full bg-black hover:bg-black/80 text-white w-10 h-10">
               <Plus className="h-4 w-4" />
             </Button>
 
-            {/* Chevron buttons with horizontal line below */}
-            <div className="flex flex-col gap-2">
-              <div className="flex gap-1">
-                <Button size="icon" className="rounded-md bg-black hover:bg-black/80 text-white w-8 h-8">
-                  <ChevronLeft className="h-4 w-4" />
-                </Button>
-
-                <Button size="icon" className="rounded-md bg-black hover:bg-black/80 text-white w-8 h-8">
-                  <ChevronRight className="h-4 w-4" />
-                </Button>
-              </div>
-
-              {/* Horizontal line */}
-              <div className="w-full h-px bg-black opacity-20 mt-2"></div>
+            {/* Chevron buttons */}
+            <div className="flex gap-1">
+              <Button size="icon" className="rounded-md bg-black hover:bg-black/80 text-white w-8 h-8">
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+              
+              <Button size="icon" className="rounded-md bg-black hover:bg-black/80 text-white w-8 h-8">
+                <ChevronRight className="h-4 w-4" />
+              </Button>
             </div>
           </div>
+
+          {/* Horizontal line below all buttons */}
+          <div className="w-full h-px bg-black opacity-20"></div>
         </div>
       </div>
     </div>
