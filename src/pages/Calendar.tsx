@@ -1,6 +1,8 @@
 
 import React, { useState } from 'react';
 import { Calendar as CalendarComponent } from '@/components/ui/calendar';
+import { Button } from '@/components/ui/button';
+import { Plus, ChevronLeft, ChevronRight } from 'lucide-react';
 
 const Calendar = () => {
   const [date, setDate] = useState<Date | undefined>(new Date());
@@ -18,9 +20,37 @@ const Calendar = () => {
           />
         </div>
         
-        {/* Vertical line on the right */}
-        <div className="flex-1 flex justify-center">
-          <div className="h-full w-px bg-black opacity-20"></div>
+        {/* Vertical line */}
+        <div className="flex-shrink-0">
+          <div className="w-px bg-black opacity-20" style={{ height: '95%' }}></div>
+        </div>
+        
+        {/* Buttons on the right */}
+        <div className="flex items-start gap-2">
+          {/* Circle button with plus */}
+          <Button 
+            size="icon"
+            className="rounded-full bg-black hover:bg-black/80 text-white w-10 h-10"
+          >
+            <Plus className="h-4 w-4" />
+          </Button>
+          
+          {/* Square buttons with chevrons */}
+          <div className="flex gap-1">
+            <Button 
+              size="icon"
+              className="rounded-md bg-black hover:bg-black/80 text-white w-8 h-8"
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+            
+            <Button 
+              size="icon"
+              className="rounded-md bg-black hover:bg-black/80 text-white w-8 h-8"
+            >
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+          </div>
         </div>
       </div>
     </div>
