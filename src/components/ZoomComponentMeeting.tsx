@@ -61,13 +61,22 @@ export function ZoomComponentMeeting({
         const joinParams: ZoomJoinParams = {
           meetingNumber,
           userName: providedUserName || user?.email || 'Guest',
-          signature: tokenData.accessToken,
+          signature: tokenData.signature,
           password: meetingPassword || '',
           userEmail: user?.email || '',
           sdkKey: tokenData.sdkKey,
           role: role,
           zak: role === 1 ? tokenData.zak : undefined
         };
+
+        console.log('Joining with params:', {
+          meetingNumber: joinParams.meetingNumber,
+          userName: joinParams.userName,
+          hasSignature: !!joinParams.signature,
+          hasPassword: !!joinParams.password,
+          role: joinParams.role,
+          hasZak: !!joinParams.zak
+        });
 
         await joinMeeting(joinParams);
 

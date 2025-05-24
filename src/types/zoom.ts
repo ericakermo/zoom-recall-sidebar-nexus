@@ -43,7 +43,7 @@ export interface ZoomJoinConfig {
   meetingNumber: string;
   userName: string;
   userEmail?: string;
-  passWord: string;
+  password: string;
   role: number;
   zak?: string;
   join_before_host?: boolean;

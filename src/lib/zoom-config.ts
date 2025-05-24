@@ -397,13 +397,18 @@ export const joinMeeting = async (client: any, params: ZoomJoinParams) => {
     console.log('Waiting before joining meeting...');
     await new Promise(resolve => setTimeout(resolve, 2000));
 
+    // Validate meeting number format
+    if (!/^\d{9,11}$/.test(params.meetingNumber)) {
+      throw new Error('Invalid meeting number format. Must be 9-11 digits.');
+    }
+
     const joinConfig: ZoomJoinConfig = {
       sdkKey: tokenData.sdkKey || ZOOM_SDK_KEY,
       signature: tokenData.signature,
       meetingNumber: params.meetingNumber,
       userName: params.userName,
       userEmail: params.userEmail,
-      passWord: params.password || '',
+      password: params.password || '',
       role: params.role || 0,
       success: (success: any) => {
         console.log('Join meeting success:', success);
@@ -417,7 +422,9 @@ export const joinMeeting = async (client: any, params: ZoomJoinParams) => {
           reason: error.reason,
           hasZak: !!params.zak,
           role: params.role,
-          hasSignature: !!tokenData.signature
+          hasSignature: !!tokenData.signature,
+          meetingNumber: params.meetingNumber,
+          userName: params.userName
         });
       }
     };
@@ -435,7 +442,8 @@ export const joinMeeting = async (client: any, params: ZoomJoinParams) => {
       hasZak: !!joinConfig.zak,
       meetingNumber: joinConfig.meetingNumber,
       userName: joinConfig.userName,
-      role: joinConfig.role
+      role: joinConfig.role,
+      hasPassword: !!joinConfig.password
     });
 
     await client.join(joinConfig);
