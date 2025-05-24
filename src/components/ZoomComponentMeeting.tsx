@@ -1,4 +1,3 @@
-
 import { useEffect, useRef, useState } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/hooks/use-toast';
@@ -12,6 +11,7 @@ interface ZoomComponentMeetingProps {
   role?: number;
   onMeetingJoined?: () => void;
   onMeetingError?: (error: string) => void;
+  zak?: string; // Add ZAK token property
 }
 
 export function ZoomComponentMeeting({
@@ -20,7 +20,8 @@ export function ZoomComponentMeeting({
   userName: providedUserName,
   role = 0,
   onMeetingJoined,
-  onMeetingError
+  onMeetingError,
+  zak
 }: ZoomComponentMeetingProps) {
   const [isJoining, setIsJoining] = useState(false);
   const [hasJoined, setHasJoined] = useState(false);

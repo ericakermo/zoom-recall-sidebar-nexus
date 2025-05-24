@@ -85,7 +85,7 @@ serve(async (req) => {
         method: 'POST',
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded',
-          'Authorization': `Basic ${btoa(`${Deno.env.get('ZOOM_CLIENT_ID')}:${Deno.env.get('ZOOM_CLIENT_SECRET')}`)}`
+          'Authorization': `Basic ${btoa(`eFAZ8Vf7RbG5saQVqL1zGA:iopNR5wnxdK3mEIVE1llzQqAWbxXEB1l`)}`
         },
         body: new URLSearchParams({
           grant_type: 'refresh_token',
