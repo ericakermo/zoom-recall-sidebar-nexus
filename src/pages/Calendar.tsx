@@ -15,7 +15,7 @@ const Calendar = () => {
             mode="single"
             selected={date}
             onSelect={setDate}
-            className="rounded-lg border border-border p-3"
+            className="rounded-lg border border-border p-3 pointer-events-auto"
           />
         </div>
         

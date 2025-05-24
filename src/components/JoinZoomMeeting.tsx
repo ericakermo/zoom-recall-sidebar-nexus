@@ -109,13 +109,18 @@ export function JoinZoomMeeting() {
       const client = await createAndInitializeZoomClient(zoomRootRef.current);
       zoomClientRef.current = client;
       
+      // Get signature for the meeting
+      const signature = await getSignature(formattedMeetingId);
+      
       // Join the meeting with OAuth authentication
       await joinMeeting(client, {
         meetingNumber: formattedMeetingId,
         userName: user.email || 'Zoom User',
         password: password,
         userEmail: user.email,
-        role: 0 // 0 = attendee role
+        role: 0, // 0 = attendee role
+        signature: signature,
+        sdkKey: import.meta.env.VITE_ZOOM_SDK_KEY || ''
       });
       
       setIsInMeeting(true);
