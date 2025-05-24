@@ -1,4 +1,3 @@
-
 import { ZoomMeetingConfig } from '@/types/zoom';
 
 // Use the new client ID directly for sdkKey
@@ -344,28 +343,29 @@ export const createAndInitializeZoomClient = async (
 // CRITICAL FIX: Updated joinMeeting function to use OAuth tokens correctly
 export const joinMeeting = async (client, params) => {
   try {
-    // Get OAuth access token instead of signature
     const tokenData = await getZoomAccessToken(params.meetingNumber, params.role || 0);
     
-    console.log('Joining meeting with OAuth token:', {
-      hasToken: !!tokenData.accessToken,
-      tokenType: tokenData.tokenType,
-      sdkKey: ZOOM_SDK_KEY, // Use the new SDK key
-      role: params.role
+    console.log('Token verification:', {
+      hasAccessToken: !!tokenData.accessToken,
+      tokenLength: tokenData.accessToken?.length,
+      role: params.role,
+      isHost: params.role === 1
     });
 
-    // Add delay before joining
-    console.log('Waiting before joining meeting...');
-    await new Promise(resolve => setTimeout(resolve, 2000)); // 2 second delay
+    const isMeetingReady = await checkMeetingStatus(params.meetingNumber, tokenData.accessToken);
+    if (!isMeetingReady) {
+      console.log('Meeting not ready, waiting...');
+      await new Promise(resolve => setTimeout(resolve, 5000)); // 5 second delay
+    }
 
-    // CRITICAL: For Zoom SDK v3.13.2, use accessToken directly with new SDK key
     const joinConfig = {
-      sdkKey: ZOOM_SDK_KEY, // Always use the new SDK key
+      sdkKey: tokenData.sdkKey || ZOOM_SDK_KEY,
       accessToken: tokenData.accessToken,
       meetingNumber: params.meetingNumber,
       userName: params.userName,
       userEmail: params.userEmail,
       passWord: params.password || '',
+      zak: params.role === 1 ? params.zak : undefined, // Add ZAK for host
       success: (success) => {
         console.log('Join meeting success:', success);
       },
@@ -375,13 +375,15 @@ export const joinMeeting = async (client, params) => {
           code: error.code,
           message: error.message,
           type: error.type,
-          reason: error.reason
+          reason: error.reason,
+          hasZak: !!params.zak,
+          role: params.role
         });
       }
     };
 
     console.log('Joining with config (OAuth):', {
-      sdkKey: ZOOM_SDK_KEY, // Log the new SDK key
+      sdkKey: joinConfig.sdkKey, // Log the new SDK key
       hasAccessToken: !!joinConfig.accessToken,
       meetingNumber: joinConfig.meetingNumber,
       userName: joinConfig.userName
@@ -455,4 +457,14 @@ export const createZoomMeeting = async (params: {
     console.error('Error creating Zoom meeting:', error);
     throw error;
   }
+};
+
+const checkMeetingStatus = async (meetingNumber: string, accessToken: string) => {
+  const response = await fetch(`https://api.zoom.us/v2/meetings/${meetingNumber}`, {
+    headers: {
+      'Authorization': `Bearer ${accessToken}`
+    }
+  });
+  const data = await response.json();
+  return data.status === 'waiting' ? false : true;
 };
