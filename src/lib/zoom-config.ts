@@ -162,7 +162,7 @@ export const getZoomAccessToken = async (meetingNumber: string, role: number = 0
     const parsedToken = JSON.parse(tokenData);
     const authToken = parsedToken?.access_token;
     
-    // Get OAuth token
+    // Get OAuth token and signature
     const response = await fetch(`https://qsxlvwwebbakmzpwjfbb.supabase.co/functions/v1/get-zoom-token`, {
       method: 'POST',
       headers: {
@@ -171,7 +171,8 @@ export const getZoomAccessToken = async (meetingNumber: string, role: number = 0
       },
       body: JSON.stringify({
         meetingNumber,
-        role
+        role,
+        expirationSeconds: 7200 // 2 hours
       }),
     });
 
@@ -180,12 +181,6 @@ export const getZoomAccessToken = async (meetingNumber: string, role: number = 0
     }
 
     const data = await response.json();
-    
-    // Generate signature using SDK key and meeting number
-    const timestamp = Math.floor(Date.now() / 1000);
-    const signature = createHash('sha256')
-      .update(`${ZOOM_SDK_KEY}${meetingNumber}${timestamp}${role}`)
-      .digest('hex');
     
     // If host role, get ZAK token
     if (role === 1) {
@@ -209,7 +204,7 @@ export const getZoomAccessToken = async (meetingNumber: string, role: number = 0
       accessToken: data.accessToken,
       tokenType: data.tokenType,
       sdkKey: data.sdkKey || ZOOM_SDK_KEY,
-      signature,
+      signature: data.signature,
       zak: data.zak
     };
   } catch (error) {
@@ -387,7 +382,7 @@ export const joinMeeting = async (client: any, params: ZoomJoinParams) => {
       joinBeforeHost: meetingStatus.joinBeforeHost,
       hasToken: !!tokenData.accessToken,
       tokenType: tokenData.tokenType,
-      sdkKey: tokenData.sdkKey || ZOOM_SDK_KEY,
+      sdkKey: tokenData.sdkKey,
       role: params.role,
       hasZak: !!params.zak,
       hasSignature: !!tokenData.signature
@@ -403,7 +398,7 @@ export const joinMeeting = async (client: any, params: ZoomJoinParams) => {
     }
 
     const joinConfig: ZoomJoinConfig = {
-      sdkKey: tokenData.sdkKey || ZOOM_SDK_KEY,
+      sdkKey: tokenData.sdkKey,
       signature: tokenData.signature,
       meetingNumber: params.meetingNumber,
       userName: params.userName,

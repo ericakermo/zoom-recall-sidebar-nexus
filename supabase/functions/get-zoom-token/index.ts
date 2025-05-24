@@ -1,6 +1,6 @@
-
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { encode as base64Encode } from 'https://deno.land/std@0.168.0/encoding/base64.ts'
 
 // Configure CORS headers to allow requests from any origin
 const corsHeaders = {
@@ -23,13 +23,8 @@ serve(async (req) => {
 
   try {
     const supabaseClient = createClient(
-      Deno.env.get('SUPABASE_URL') || 'https://qsxlvwwebbakmzpwjfbb.supabase.co',
-      Deno.env.get('SUPABASE_ANON_KEY') || '',
-      {
-        global: {
-          headers: { Authorization: req.headers.get('Authorization')! },
-        },
-      }
+      Deno.env.get('SUPABASE_URL') || '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || ''
     );
 
     // Get the JWT from the authorization header
@@ -88,7 +83,7 @@ serve(async (req) => {
         method: 'POST',
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded',
-          'Authorization': `Basic ${btoa(`${Deno.env.get('ZOOM_CLIENT_ID')}:${Deno.env.get('ZOOM_CLIENT_SECRET')}`)}`
+          'Authorization': `Basic ${base64Encode(`${Deno.env.get('ZOOM_CLIENT_ID')}:${Deno.env.get('ZOOM_CLIENT_SECRET')}`)}`
         },
         body: new URLSearchParams({
           grant_type: 'refresh_token',
@@ -109,24 +104,57 @@ serve(async (req) => {
       accessToken = tokenData.access_token;
 
       // Update the stored tokens
-      const newExpiresAt = new Date(now.getTime() + (tokenData.expires_in * 1000));
       await supabaseClient
         .from('zoom_connections')
         .update({
           access_token: tokenData.access_token,
           refresh_token: tokenData.refresh_token || zoomConnection.refresh_token,
-          expires_at: newExpiresAt.toISOString()
+          expires_at: new Date(now.getTime() + (tokenData.expires_in * 1000)).toISOString()
         })
         .eq('user_id', user.id);
 
       console.log("Token refreshed successfully");
     }
     
+    // Parse request body
+    const { meetingNumber, role, expirationSeconds } = await req.json();
+    
+    // Generate JWT signature
+    const iat = Math.floor(Date.now() / 1000);
+    const exp = expirationSeconds ? iat + expirationSeconds : iat + 7200; // Default 2 hours
+    
+    const header = { alg: 'HS256', typ: 'JWT' };
+    const payload = {
+      appKey: Deno.env.get('ZOOM_CLIENT_ID'),
+      sdkKey: Deno.env.get('ZOOM_CLIENT_ID'),
+      mn: meetingNumber,
+      role,
+      iat,
+      exp,
+      tokenExp: exp
+    };
+
+    const encodedHeader = base64Encode(JSON.stringify(header));
+    const encodedPayload = base64Encode(JSON.stringify(payload));
+    
+    const signatureInput = `${encodedHeader}.${encodedPayload}`;
+    const signature = await crypto.subtle.importKey(
+      'raw',
+      new TextEncoder().encode(Deno.env.get('ZOOM_CLIENT_SECRET')),
+      { name: 'HMAC', hash: 'SHA-256' },
+      false,
+      ['sign']
+    ).then(key => crypto.subtle.sign('HMAC', key, new TextEncoder().encode(signatureInput)))
+      .then(signature => base64Encode(new Uint8Array(signature)));
+    
+    const jwt = `${encodedHeader}.${encodedPayload}.${signature}`;
+    
     return new Response(
       JSON.stringify({ 
-        accessToken: accessToken,
+        accessToken,
         tokenType: 'Bearer',
-        sdkKey: Deno.env.get('ZOOM_CLIENT_ID') || 'eFAZ8Vf7RbG5saQVqL1zGA'
+        sdkKey: Deno.env.get('ZOOM_CLIENT_ID'),
+        signature: jwt
       }),
       { 
         status: 200, 
