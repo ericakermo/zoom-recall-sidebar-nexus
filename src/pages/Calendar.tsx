@@ -1,31 +1,28 @@
 
-import React from 'react';
+import React, { useState } from 'react';
+import { Calendar as CalendarComponent } from '@/components/ui/calendar';
 
 const Calendar = () => {
+  const [date, setDate] = useState<Date | undefined>(new Date());
+
   return (
-    <div className="p-6">
+    <div className="p-6 h-full">
       <h1 className="text-3xl font-bold mb-6">Calendar</h1>
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        {[1, 2, 3, 4].map((item) => (
-          <div 
-            key={item}
-            className="h-24 rounded-lg bg-gray-100 dark:bg-neutral-800 animate-pulse"
-          ></div>
-        ))}
-      </div>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-6">
-        {[1, 2].map((item) => (
-          <div 
-            key={item}
-            className="h-64 rounded-lg bg-gray-100 dark:bg-neutral-800 animate-pulse"
-          ></div>
-        ))}
-      </div>
-      <div className="mt-6 p-4 border border-gray-200 dark:border-gray-700 rounded-lg">
-        <h2 className="text-xl font-semibold mb-2">Ready for Integration</h2>
-        <p className="text-gray-600 dark:text-gray-300">
-          This clean layout is ready for calendar functionality. The sidebar provides easy navigation between features.
-        </p>
+      <div className="flex items-start gap-6 h-full">
+        {/* Calendar on the left */}
+        <div className="flex-shrink-0">
+          <CalendarComponent
+            mode="single"
+            selected={date}
+            onSelect={setDate}
+            className="rounded-lg border border-border p-3"
+          />
+        </div>
+        
+        {/* Horizontal line on the right */}
+        <div className="flex-1 flex items-center">
+          <div className="w-full h-px bg-black opacity-20"></div>
+        </div>
       </div>
     </div>
   );
