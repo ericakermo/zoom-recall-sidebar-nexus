@@ -3,6 +3,8 @@ import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
 const ZOOM_API_URL = 'https://api.zoom.us/v2'
+const ZOOM_CLIENT_ID = 'dkQMavedS2OWM2c73F6pLg'
+const ZOOM_CLIENT_SECRET = 'CFDxugjp3CkE3G07z4eC1qcGjukmYVdt'
 
 // Configure CORS headers to allow requests from any origin
 const corsHeaders = {
@@ -85,7 +87,7 @@ serve(async (req) => {
         method: 'POST',
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded',
-          'Authorization': `Basic ${btoa(`${Deno.env.get('ZOOM_CLIENT_ID')}:${Deno.env.get('ZOOM_CLIENT_SECRET')}`)}`
+          'Authorization': `Basic ${btoa(`${ZOOM_CLIENT_ID}:${ZOOM_CLIENT_SECRET}`)}`
         },
         body: new URLSearchParams({
           grant_type: 'refresh_token',

@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/context/AuthContext';
@@ -76,7 +75,7 @@ export function ZoomSettings() {
       return;
     }
 
-    // Use the client ID from the environment variable
+    // Use the new client ID
     const zoomClientId = "dkQMavedS2OWM2c73F6pLg";
     if (!zoomClientId) {
       toast({
@@ -225,4 +224,3 @@ export function ZoomSettings() {
     </Card>
   );
 }
-

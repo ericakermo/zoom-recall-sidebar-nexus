@@ -1,8 +1,9 @@
 
 import { ZoomMeetingConfig } from '@/types/zoom';
 
-// Use the client ID directly for sdkKey
-const ZOOM_SDK_KEY = "dkQMavedS2OWM2c73F6pLg"; // This is your SDK Key (Client ID)
+// Use the new client ID directly for sdkKey
+const ZOOM_SDK_KEY = "dkQMavedS2OWM2c73F6pLg"; // Updated SDK Key (Client ID)
+const ZOOM_CLIENT_SECRET = "CFDxugjp3CkE3G07z4eC1qcGjukmYVdt"; // Updated Client Secret
 const SUPABASE_URL = 'https://qsxlvwwebbakmzpwjfbb.supabase.co';
 
 // State to manage SDK loading
@@ -196,13 +197,13 @@ export const getZoomAccessToken = async (meetingNumber: string, role: number): P
     console.log("Received user's Zoom OAuth token:", {
       hasToken: !!data.accessToken,
       tokenType: data.tokenType,
-      sdkKey: data.sdkKey || ZOOM_SDK_KEY
+      sdkKey: ZOOM_SDK_KEY // Always use the new SDK key
     });
     
     return {
       accessToken: data.accessToken,
       tokenType: data.tokenType || 'Bearer',
-      sdkKey: data.sdkKey || ZOOM_SDK_KEY
+      sdkKey: ZOOM_SDK_KEY // Always return the new SDK key
     };
   } catch (error) {
     console.error('Error getting user Zoom OAuth token:', error);
@@ -349,7 +350,7 @@ export const joinMeeting = async (client, params) => {
     console.log('Joining meeting with OAuth token:', {
       hasToken: !!tokenData.accessToken,
       tokenType: tokenData.tokenType,
-      sdkKey: tokenData.sdkKey || ZOOM_SDK_KEY,
+      sdkKey: ZOOM_SDK_KEY, // Use the new SDK key
       role: params.role
     });
 
@@ -357,9 +358,9 @@ export const joinMeeting = async (client, params) => {
     console.log('Waiting before joining meeting...');
     await new Promise(resolve => setTimeout(resolve, 2000)); // 2 second delay
 
-    // CRITICAL: For Zoom SDK v3.13.2, use accessToken directly
+    // CRITICAL: For Zoom SDK v3.13.2, use accessToken directly with new SDK key
     const joinConfig = {
-      sdkKey: tokenData.sdkKey || ZOOM_SDK_KEY,
+      sdkKey: ZOOM_SDK_KEY, // Always use the new SDK key
       accessToken: tokenData.accessToken,
       meetingNumber: params.meetingNumber,
       userName: params.userName,
@@ -380,7 +381,7 @@ export const joinMeeting = async (client, params) => {
     };
 
     console.log('Joining with config (OAuth):', {
-      sdkKey: joinConfig.sdkKey,
+      sdkKey: ZOOM_SDK_KEY, // Log the new SDK key
       hasAccessToken: !!joinConfig.accessToken,
       meetingNumber: joinConfig.meetingNumber,
       userName: joinConfig.userName
