@@ -1,4 +1,3 @@
-
 import { useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { loadZoomSDK, getZoomAccessToken } from '@/lib/zoom-config';
@@ -215,7 +214,7 @@ export function ZoomMeeting({
 
         console.log("Zoom client initialized successfully");
 
-        // Get OAuth access token instead of signature
+        // Get OAuth access token
         const tokenData = await getZoomAccessToken(meetingNumber, role || 0);
         console.log("OAuth token data received:", {
           hasToken: !!tokenData.accessToken,
@@ -223,10 +222,10 @@ export function ZoomMeeting({
           sdkKey: tokenData.sdkKey
         });
 
-        // Join meeting with OAuth access token
-        await client.join({
+        // CRITICAL FIX: Join meeting with OAuth access token (no signature)
+        const joinConfig = {
           sdkKey: tokenData.sdkKey || ZOOM_SDK_KEY,
-          accessToken: tokenData.accessToken,
+          accessToken: tokenData.accessToken, // Use OAuth token directly
           meetingNumber: meetingNumber,
           userName: providedUserName || user?.email || 'Guest',
           userEmail: user?.email,
@@ -261,7 +260,16 @@ export function ZoomMeeting({
               });
             }
           }
+        };
+
+        console.log('Joining with OAuth config:', {
+          sdkKey: joinConfig.sdkKey,
+          hasAccessToken: !!joinConfig.accessToken,
+          meetingNumber: joinConfig.meetingNumber,
+          userName: joinConfig.userName
         });
+
+        await client.join(joinConfig);
 
       } catch (err: any) {
         console.error('Error during Zoom initialization:', err);

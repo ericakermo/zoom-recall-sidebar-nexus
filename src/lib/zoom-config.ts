@@ -170,8 +170,6 @@ export const getZoomAccessToken = async (meetingNumber: string, role: number): P
 
     console.log(`Requesting user's Zoom OAuth token for meeting: ${meetingNumber}, role: ${role}`);
     
-    // For joining existing meetings, we still need to get the user's access token
-    // but we use a different endpoint that doesn't require Server-to-Server credentials
     const response = await fetch(`https://qsxlvwwebbakmzpwjfbb.supabase.co/functions/v1/get-zoom-token`, {
       method: 'POST',
       headers: {
@@ -341,6 +339,7 @@ export const createAndInitializeZoomClient = async (
   }
 };
 
+// CRITICAL FIX: Updated joinMeeting function to use OAuth tokens correctly
 export const joinMeeting = async (client, params) => {
   try {
     // Get OAuth access token instead of signature
@@ -352,10 +351,10 @@ export const joinMeeting = async (client, params) => {
       sdkKey: tokenData.sdkKey
     });
 
-    // Join with OAuth access token
-    await client.join({
+    // CRITICAL: For Zoom SDK v3.13.2, use accessToken directly - NO signature parameter
+    const joinConfig = {
       sdkKey: tokenData.sdkKey,
-      accessToken: tokenData.accessToken,
+      accessToken: tokenData.accessToken, // Use accessToken directly
       meetingNumber: params.meetingNumber,
       userName: params.userName,
       userEmail: params.userEmail,
@@ -372,7 +371,16 @@ export const joinMeeting = async (client, params) => {
           reason: error.reason
         });
       }
+    };
+
+    console.log('Joining with config (OAuth):', {
+      sdkKey: joinConfig.sdkKey,
+      hasAccessToken: !!joinConfig.accessToken,
+      meetingNumber: joinConfig.meetingNumber,
+      userName: joinConfig.userName
     });
+
+    await client.join(joinConfig);
   } catch (error) {
     console.error('Error joining meeting:', error);
     throw error;

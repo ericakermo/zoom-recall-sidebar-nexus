@@ -151,7 +151,6 @@ const Meetings = () => {
   const handleMeetingEnd = () => {
     setActiveMeeting(null);
     setIsHosting(false);
-    setCurrentMeeting(null);
     setZoomCredentials(null);
     toast({
       title: "Meeting Ended",
