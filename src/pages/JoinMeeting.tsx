@@ -1,5 +1,5 @@
 
-import { JoinZoomMeeting } from '@/components/JoinZoomMeeting';
+import JoinZoomMeeting from '@/components/JoinZoomMeeting';
 
 export default function JoinMeeting() {
   return (
@@ -9,4 +9,3 @@ export default function JoinMeeting() {
     </div>
   );
 }
-
