@@ -1,10 +1,13 @@
-import { useEffect, useState, useRef } from 'react';
+
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { loadZoomSDK, getZoomAccessToken } from '@/lib/zoom-config';
 import { useAuth } from '@/context/AuthContext';
 import { Button } from '@/components/ui/button';
-import { Mic, MicOff, Video, VideoOff, PhoneOff } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { useZoomSDK } from '@/hooks/useZoomSDK';
+import { useMeetingControls } from '@/hooks/useMeetingControls';
+import { ZoomMeetingContainer } from './ZoomMeetingContainer';
+import { ZoomMeetingControls } from './ZoomMeetingControls';
 
 interface ZoomMeetingProps {
   meetingNumber: string;
@@ -14,314 +17,88 @@ interface ZoomMeetingProps {
   onMeetingEnd?: () => void;
 }
 
-const ZOOM_SDK_KEY = "eFAZ8Vf7RbG5saQVqL1zGA";
-
 export function ZoomMeeting({
   meetingNumber,
   meetingPassword,
-  userName: providedUserName,
+  userName,
   role = 0,
   onMeetingEnd
 }: ZoomMeetingProps) {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [isMuted, setIsMuted] = useState(false);
-  const [isVideoOff, setIsVideoOff] = useState(false);
   const [isConnected, setIsConnected] = useState(false);
-  const [containerReady, setContainerReady] = useState(false);
-  const [sdkLoaded, setSdkLoaded] = useState(false);
-  const zoomContainerRef = useRef<HTMLDivElement>(null);
-  const zoomClientRef = useRef<any>(null);
   const navigate = useNavigate();
   const { user } = useAuth();
   const { toast } = useToast();
 
-  // Handle meeting controls
-  const toggleMute = () => {
-    if (!window.ZoomMtgEmbedded || !zoomClientRef.current) return;
-    
-    try {
-      if (isMuted) {
-        zoomClientRef.current.unmuteAudio();
-        setIsMuted(false);
-      } else {
-        zoomClientRef.current.muteAudio();
-        setIsMuted(true);
-      }
-    } catch (err) {
-      console.error("Failed to toggle audio:", err);
-    }
-  };
+  const { sdkLoaded, error: sdkError, createClient, cleanup, client } = useZoomSDK();
+  const { isMuted, isVideoOff, toggleMute, toggleVideo, leaveMeeting } = useMeetingControls(client);
 
-  const toggleVideo = () => {
-    if (!window.ZoomMtgEmbedded || !zoomClientRef.current) return;
-    
-    try {
-      if (isVideoOff) {
-        zoomClientRef.current.startVideo();
-        setIsVideoOff(false);
-      } else {
-        zoomClientRef.current.stopVideo();
-        setIsVideoOff(true);
-      }
-    } catch (err) {
-      console.error("Failed to toggle video:", err);
-    }
-  };
-
-  const leaveMeeting = () => {
-    if (!zoomClientRef.current) {
-      console.log("No active Zoom client found for leaving meeting");
-      onMeetingEnd?.();
-      return;
-    }
-    
-    try {
-      zoomClientRef.current.leave();
-      console.log('Left the meeting');
-      setIsConnected(false);
-      onMeetingEnd?.();
-    } catch (error) {
-      console.error('Error leaving meeting:', error);
-      // Even if there's an error, still call the onMeetingEnd callback
-      onMeetingEnd?.();
-    }
-  };
-
-  // Container setup check
+  // Create client when SDK is loaded
   useEffect(() => {
-    if (!zoomContainerRef.current) return;
-    
-    console.log('Starting container setup check');
-    
-    const container = zoomContainerRef.current;
-    const parentElement = container.parentElement;
-    
-    console.log('Container parent dimensions:', {
-      width: parentElement?.offsetWidth,
-      height: parentElement?.offsetHeight,
-      display: parentElement ? window.getComputedStyle(parentElement).display : 'none'
-    });
-    
-    // Ensure container has explicit dimensions and ID
-    if (container) {
-      console.log('Setting container dimensions and ID');
-      container.style.width = '100%';
-      container.style.height = '100%';
-      container.style.minHeight = '500px';
-      container.id = 'meetingSDKElement';
-    }
-    
-    // Check after a short delay to ensure styles are applied
-    const checkContainer = () => {
-      if (!zoomContainerRef.current) return;
-      
-      const dimensions = {
-        width: container.offsetWidth,
-        height: container.offsetHeight,
-        id: container.id,
-        display: window.getComputedStyle(container).display,
-        position: window.getComputedStyle(container).position
-      };
-      
-      console.log('Container dimensions check:', dimensions);
-      
-      if (dimensions.width > 0 && dimensions.height > 0) {
-        console.log('Container dimensions verified:', dimensions);
-        setContainerReady(true);
-      } else {
-        console.log('Container dimensions not ready, retrying...');
-        setTimeout(checkContainer, 200);
-      }
-    };
-    
-    // Initial delay to ensure DOM is settled
-    setTimeout(checkContainer, 300);
-    
-    return () => {
-      setContainerReady(false);
-    };
-  }, []);
-  
-  // Load Zoom SDK
-  useEffect(() => {
-    console.log('Loading Zoom SDK separately');
-    
-    const loadSdk = async () => {
+    if (sdkLoaded && !client) {
       try {
-        await loadZoomSDK();
-        console.log('SDK loaded successfully');
-        setSdkLoaded(true);
-      } catch (err) {
-        console.error('Failed to load Zoom SDK:', err);
-        setError('Failed to load Zoom meetings SDK. Please try refreshing the page.');
-      }
-    };
-    
-    loadSdk();
-  }, []);
-
-  // Main initialization useEffect
-  useEffect(() => {
-    if (!containerReady || !sdkLoaded) {
-      console.log('Waiting for container and SDK to be ready:', { containerReady, sdkLoaded });
-      return;
-    }
-    
-    if (!meetingNumber) {
-      console.error('Meeting number not provided');
-      setError('Meeting ID is required to join a meeting');
-      setIsLoading(false);
-      return;
-    }
-    
-    console.log('Container and SDK ready, proceeding with initialization');
-    let isMounted = true;
-
-    const initializeZoom = async () => {
-      try {
-        setIsLoading(true);
-        setError(null);
-        
-        if (!zoomContainerRef.current || !window.ZoomMtgEmbedded) {
-          throw new Error("Zoom container or SDK not available");
-        }
-
-        // Get OAuth access token FIRST
-        const tokenData = await getZoomAccessToken(meetingNumber, role || 0);
-        console.log("OAuth token data received:", {
-          hasToken: !!tokenData.accessToken,
-          tokenType: tokenData.tokenType,
-          sdkKey: tokenData.sdkKey
-        });
-        
-        // Create Zoom client
-        const client = window.ZoomMtgEmbedded.createClient();
-        zoomClientRef.current = client;
-
-        // CRITICAL FIX: Ensure sdkKey is always present
-        const sdkKey = tokenData.sdkKey || ZOOM_SDK_KEY;
-        console.log("Using sdkKey for initialization:", sdkKey);
-
-        // CRITICAL FIX: Initialize with OAuth access token and ensure sdkKey is present
-        await client.init({
-          debug: true,
-          zoomAppRoot: zoomContainerRef.current,
-          language: 'en-US',
-          sdkKey: sdkKey, // Ensure sdkKey is never empty
-          accessToken: tokenData.accessToken, // Pass OAuth token during init
-          customize: {
-            meetingInfo: ['topic', 'host', 'mn', 'pwd', 'tel', 'participant', 'dc', 'enctype'],
-            toolbar: {
-              buttons: [
-                {
-                  text: 'Custom Button',
-                  className: 'CustomButton',
-                  onClick: () => {
-                    console.log('custom button');
-                  }
-                }
-              ]
-            }
-          }
-        });
-
-        console.log("Zoom client initialized successfully with OAuth token and sdkKey:", sdkKey);
-
-        // CRITICAL FIX: Join meeting WITHOUT accessToken (already provided in init)
-        const joinConfig = {
-          meetingNumber: meetingNumber,
-          userName: providedUserName || user?.email || 'Guest',
-          userEmail: user?.email,
-          passWord: meetingPassword || '', // Required, even if empty
-          success: (success: any) => {
-            console.log('Join meeting success:', success);
-            if (isMounted) {
-              setIsLoading(false);
-              setIsConnected(true);
-              toast({
-                title: "Meeting Joined",
-                description: "You have successfully joined the Zoom meeting"
-              });
-            }
-          },
-          error: (error: any) => {
-            console.error('Join meeting error:', error);
-            console.error('Error details:', {
-              code: error.code,
-              message: error.message,
-              type: error.type,
-              reason: error.reason
-            });
-            
-            if (isMounted) {
-              setError(`Failed to join meeting: ${error.message || 'Unknown error'}`);
-              setIsLoading(false);
-              toast({
-                title: "Meeting Error",
-                description: error.message || 'Failed to join meeting',
-                variant: "destructive"
-              });
-            }
-          }
-        };
-
-        console.log('Joining with config (OAuth in init):', {
-          meetingNumber: joinConfig.meetingNumber,
-          userName: joinConfig.userName,
-          hasPassword: !!joinConfig.passWord
-        });
-
-        await client.join(joinConfig);
-
+        createClient();
+        console.log('Zoom client created successfully');
       } catch (err: any) {
-        console.error('Error during Zoom initialization:', err);
-        
-        if (isMounted) {
-          const errorMessage = err.message || 'Failed to initialize Zoom meeting';
-          setError(errorMessage);
-          setIsLoading(false);
-          
-          toast({
-            title: "Meeting Error",
-            description: errorMessage,
-            variant: "destructive"
-          });
-        }
+        console.error('Failed to create Zoom client:', err);
+        setError(err.message);
       }
-    };
+    }
+  }, [sdkLoaded, client, createClient]);
 
-    initializeZoom();
+  // Handle SDK loading
+  useEffect(() => {
+    if (sdkError) {
+      setError(sdkError);
+      setIsLoading(false);
+    } else if (sdkLoaded) {
+      setIsLoading(false);
+    }
+  }, [sdkLoaded, sdkError]);
 
-    return () => {
-      isMounted = false;
-      if (zoomClientRef.current) {
-        try {
-          zoomClientRef.current.leave();
-        } catch (error) {
-          console.error('Error leaving meeting during cleanup:', error);
-        }
-      }
-    };
-  }, [containerReady, sdkLoaded, meetingNumber, meetingPassword, providedUserName, role, user, toast]);
+  const handleMeetingJoined = () => {
+    setIsConnected(true);
+    setIsLoading(false);
+  };
 
-  // Handle keyboard shortcuts
+  const handleMeetingError = (errorMessage: string) => {
+    setError(errorMessage);
+    setIsLoading(false);
+    toast({
+      title: "Meeting Error",
+      description: errorMessage,
+      variant: "destructive"
+    });
+  };
+
+  const handleLeaveMeeting = () => {
+    leaveMeeting();
+    setIsConnected(false);
+    cleanup();
+    onMeetingEnd?.();
+  };
+
+  // Keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (!isConnected) return;
       
-      if (e.key === 'm') {
-        toggleMute();
-      } else if (e.key === 'v') {
-        toggleVideo();
-      } else if (e.key === 'l' && e.ctrlKey) {
-        leaveMeeting();
-      }
+      if (e.key === 'm') toggleMute();
+      else if (e.key === 'v') toggleVideo();
+      else if (e.key === 'l' && e.ctrlKey) handleLeaveMeeting();
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isConnected, isMuted, isVideoOff]);
+  }, [isConnected, toggleMute, toggleVideo, handleLeaveMeeting]);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      cleanup();
+    };
+  }, [cleanup]);
 
   if (error) {
     return (
@@ -341,8 +118,7 @@ export function ZoomMeeting({
             onClick={() => {
               setError(null);
               setIsLoading(true);
-              setSdkLoaded(false);
-              loadZoomSDK().then(() => setSdkLoaded(true)).catch(e => setError(e.message));
+              window.location.reload();
             }}
             className="px-4 py-2 bg-primary text-primary-foreground rounded-md"
           >
@@ -362,49 +138,35 @@ export function ZoomMeeting({
 
   return (
     <div className="flex flex-col h-full">
-      <div 
-        ref={zoomContainerRef} 
-        className="w-full h-full min-h-[500px]"
-        style={{ position: 'relative', height: '100%', width: '100%' }}
-      >
+      <div className="w-full h-full min-h-[500px] relative">
         {isLoading && (
-          <div className="flex flex-col items-center justify-center h-full w-full">
+          <div className="flex flex-col items-center justify-center h-full w-full absolute inset-0 bg-background/80">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mb-4"></div>
             <p>Loading Zoom meeting...</p>
           </div>
         )}
+        
+        {client && (
+          <ZoomMeetingContainer
+            meetingNumber={meetingNumber}
+            meetingPassword={meetingPassword}
+            userName={userName}
+            role={role}
+            client={client}
+            onMeetingJoined={handleMeetingJoined}
+            onMeetingError={handleMeetingError}
+          />
+        )}
       </div>
       
-      {isConnected && (
-        <div className="flex items-center justify-center gap-4 p-4 bg-background border-t">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={toggleMute}
-            className={isMuted ? 'bg-destructive/10 text-destructive' : ''}
-          >
-            {isMuted ? <MicOff className="h-5 w-5" /> : <Mic className="h-5 w-5" />}
-          </Button>
-          
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={toggleVideo}
-            className={isVideoOff ? 'bg-destructive/10 text-destructive' : ''}
-          >
-            {isVideoOff ? <VideoOff className="h-5 w-5" /> : <Video className="h-5 w-5" />}
-          </Button>
-          
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={leaveMeeting}
-            className="bg-destructive/10 text-destructive"
-          >
-            <PhoneOff className="h-5 w-5" />
-          </Button>
-        </div>
-      )}
+      <ZoomMeetingControls
+        isMuted={isMuted}
+        isVideoOff={isVideoOff}
+        onToggleMute={toggleMute}
+        onToggleVideo={toggleVideo}
+        onLeaveMeeting={handleLeaveMeeting}
+        isConnected={isConnected}
+      />
     </div>
   );
 }
