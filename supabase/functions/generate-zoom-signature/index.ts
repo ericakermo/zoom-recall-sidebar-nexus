@@ -1,4 +1,3 @@
-
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
@@ -10,9 +9,15 @@ const corsHeaders = {
 }
 
 // Set the Zoom OAuth credentials (Server-to-Server OAuth)
-const ZOOM_ACCOUNT_ID = "your_account_id"; // Need to be updated with actual values
-const ZOOM_CLIENT_ID = "eFAZ8Vf7RbG5saQVqL1zGA";
-const ZOOM_CLIENT_SECRET = "iopNR5wnxdK3mEIVE1llzQqAWbxXEB1l";
+const ZOOM_ACCOUNT_ID = Deno.env.get('ZOOM_ACCOUNT_ID') || '';
+const ZOOM_CLIENT_ID = Deno.env.get('ZOOM_CLIENT_ID') || '';
+const ZOOM_CLIENT_SECRET = Deno.env.get('ZOOM_CLIENT_SECRET') || '';
+
+// Validate required environment variables
+if (!ZOOM_ACCOUNT_ID || !ZOOM_CLIENT_ID || !ZOOM_CLIENT_SECRET) {
+  console.error("Missing required Zoom environment variables");
+  throw new Error("Missing required Zoom environment variables");
+}
 
 serve(async (req) => {
   console.log("Function called with method:", req.method);
