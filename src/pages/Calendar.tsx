@@ -1,7 +1,9 @@
+
 import React, { useState } from 'react';
 import { Calendar as CalendarComponent } from '@/components/ui/calendar';
 import { Button } from '@/components/ui/button';
-import { Plus, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Alert } from '@/components/ui/alert';
+import { Plus, ChevronLeft, ChevronRight, CircleCheck, X } from 'lucide-react';
 
 const Calendar = () => {
   const [date, setDate] = useState<Date | undefined>(new Date());
@@ -21,11 +23,12 @@ const Calendar = () => {
         
         {/* Vertical line */}
         <div className="flex items-center h-full">
-          <div className="w-px h-full bg-black opacity-10"></div>
+          <div className="w-0.5 h-[95%] bg-black opacity-20"></div>
         </div>
         
-        {/* Buttons on the right */}
+        {/* Right side content */}
         <div className="flex flex-col gap-4 flex-1">
+          {/* Buttons section */}
           <div className="flex items-center gap-2 self-start">
             {/* Circle button with plus */}
             <Button size="icon" className="rounded-full bg-black hover:bg-black/80 text-white w-10 h-10">
@@ -46,6 +49,116 @@ const Calendar = () => {
 
           {/* Horizontal line below all buttons */}
           <div className="w-full h-px bg-black opacity-10"></div>
+
+          {/* Alert components section */}
+          <div className="flex flex-col gap-4">
+            <Alert
+              layout="row"
+              isNotification
+              className="min-w-[400px]"
+              icon={
+                <CircleCheck
+                  className="text-emerald-500"
+                  size={16}
+                  strokeWidth={2}
+                  aria-hidden="true"
+                />
+              }
+              action={
+                <div className="flex items-center gap-3">
+                  <Button size="sm">Undo</Button>
+                  <Button
+                    variant="ghost"
+                    className="group -my-1.5 -me-2 size-8 shrink-0 p-0 hover:bg-transparent"
+                    aria-label="Close banner"
+                  >
+                    <X
+                      size={16}
+                      strokeWidth={2}
+                      className="opacity-60 transition-opacity group-hover:opacity-100"
+                      aria-hidden="true"
+                    />
+                  </Button>
+                </div>
+              }
+            >
+              <div className="flex grow items-center justify-between gap-12">
+                <p className="text-sm">You've made changes!</p>
+              </div>
+            </Alert>
+
+            <Alert
+              layout="row"
+              isNotification
+              className="min-w-[400px]"
+              variant="warning"
+              icon={
+                <CircleCheck
+                  className="text-amber-500"
+                  size={16}
+                  strokeWidth={2}
+                  aria-hidden="true"
+                />
+              }
+              action={
+                <div className="flex items-center gap-3">
+                  <Button size="sm">Review</Button>
+                  <Button
+                    variant="ghost"
+                    className="group -my-1.5 -me-2 size-8 shrink-0 p-0 hover:bg-transparent"
+                    aria-label="Close banner"
+                  >
+                    <X
+                      size={16}
+                      strokeWidth={2}
+                      className="opacity-60 transition-opacity group-hover:opacity-100"
+                      aria-hidden="true"
+                    />
+                  </Button>
+                </div>
+              }
+            >
+              <div className="flex grow items-center justify-between gap-12">
+                <p className="text-sm">Warning: Please review!</p>
+              </div>
+            </Alert>
+
+            <Alert
+              layout="row"
+              isNotification
+              className="min-w-[400px]"
+              variant="info"
+              icon={
+                <CircleCheck
+                  className="text-blue-500"
+                  size={16}
+                  strokeWidth={2}
+                  aria-hidden="true"
+                />
+              }
+              action={
+                <div className="flex items-center gap-3">
+                  <Button size="sm">View</Button>
+                  <Button
+                    variant="ghost"
+                    className="group -my-1.5 -me-2 size-8 shrink-0 p-0 hover:bg-transparent"
+                    aria-label="Close banner"
+                  >
+                    <X
+                      size={16}
+                      strokeWidth={2}
+                      className="opacity-60 transition-opacity group-hover:opacity-100"
+                      aria-hidden="true"
+                    />
+                  </Button>
+                </div>
+              }
+            >
+              <div className="flex grow items-center justify-between gap-12">
+                <p className="text-sm">New information available!</p>
+              </div>
+            </Alert>
+          </div>
         </div>
       </div>
     </div>
