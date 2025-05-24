@@ -379,18 +379,11 @@ export const joinMeeting = async (client, params) => {
       }
     };
 
-    // Add role-specific configuration
-    if (params.role === 1) { // Host role
-      joinConfig.role = 1;
-      joinConfig.join_before_host = true;
-    }
-
     console.log('Joining with config (OAuth):', {
       sdkKey: joinConfig.sdkKey,
       hasAccessToken: !!joinConfig.accessToken,
       meetingNumber: joinConfig.meetingNumber,
-      userName: joinConfig.userName,
-      role: joinConfig.role
+      userName: joinConfig.userName
     });
 
     await client.join(joinConfig);
