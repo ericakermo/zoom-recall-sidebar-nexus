@@ -195,7 +195,7 @@ export const getZoomAccessToken = async (meetingNumber: string, role: number): P
     console.log("Received user's Zoom OAuth token:", {
       hasToken: !!data.accessToken,
       tokenType: data.tokenType,
-      sdkKey: data.sdkKey
+      sdkKey: data.sdkKey || ZOOM_SDK_KEY
     });
     
     return {
@@ -348,17 +348,17 @@ export const joinMeeting = async (client, params) => {
     console.log('Joining meeting with OAuth token:', {
       hasToken: !!tokenData.accessToken,
       tokenType: tokenData.tokenType,
-      sdkKey: tokenData.sdkKey
+      sdkKey: tokenData.sdkKey || ZOOM_SDK_KEY
     });
 
-    // CRITICAL: For Zoom SDK v3.13.2, use accessToken directly - NO signature parameter
+    // CRITICAL: For Zoom SDK v3.13.2, use accessToken directly
     const joinConfig = {
-      sdkKey: tokenData.sdkKey,
-      accessToken: tokenData.accessToken, // Use accessToken directly
+      sdkKey: tokenData.sdkKey || ZOOM_SDK_KEY,
+      accessToken: tokenData.accessToken,
       meetingNumber: params.meetingNumber,
       userName: params.userName,
       userEmail: params.userEmail,
-      passWord: params.password || '', // Required, even if empty
+      passWord: params.password || '',
       success: (success) => {
         console.log('Join meeting success:', success);
       },
