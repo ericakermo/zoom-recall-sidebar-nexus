@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Calendar as CalendarComponent } from '@/components/ui/calendar';
 import { Button } from '@/components/ui/button';
@@ -9,15 +8,88 @@ import { format } from 'date-fns';
 import { useNavigate } from 'react-router-dom';
 import CreateMeetingPopover from '@/components/CreateMeetingPopover';
 import MeetingDetailsPopover from '@/components/MeetingDetailsPopover';
+import { toast } from '@/components/ui/use-toast';
+import { supabase } from '@/lib/supabase';
 
 const Calendar = () => {
   const [date, setDate] = useState<Date | undefined>(new Date());
   const navigate = useNavigate();
   const { meetings, isLoading, isSyncing, syncMeetings } = useZoomMeetings(date);
 
-  const handleJoinMeeting = (meetingId: string, event: React.MouseEvent) => {
+  const handleJoinMeeting = async (meetingId: string, event: React.MouseEvent) => {
     event.stopPropagation(); // Prevent popover from opening
-    navigate(`/meeting/${meetingId}`);
+    console.log('🎯 Starting meeting join process for meeting ID:', meetingId);
+    
+    try {
+      // Get user session
+      console.log('🔄 Getting user session...');
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        console.error('❌ User not authenticated');
+        throw new Error('User not authenticated');
+      }
+      console.log('✅ User authenticated:', user.email);
+
+      // Get meeting details
+      console.log('🔄 Fetching meeting details...');
+      const { data: meeting, error: meetingError } = await supabase
+        .from('zoom_meetings')
+        .select('*')
+        .eq('id', meetingId)
+        .single();
+
+      if (meetingError) {
+        console.error('❌ Error fetching meeting details:', meetingError);
+        throw meetingError;
+      }
+      console.log('✅ Meeting details retrieved:', {
+        meetingId: meeting.id,
+        title: meeting.title,
+        startTime: meeting.start_time,
+        duration: meeting.duration
+      });
+
+      // Get Zoom token and signature
+      console.log('🔄 Requesting Zoom token and signature...');
+      const { data: tokenData, error: tokenError } = await supabase.functions.invoke('get-zoom-token', {
+        body: { 
+          meetingNumber: meeting.meeting_id,
+          role: meeting.user_id === user.id ? 1 : 0 // 1 for host, 0 for participant
+        }
+      });
+
+      if (tokenError) {
+        console.error('❌ Error getting Zoom token:', tokenError);
+        throw tokenError;
+      }
+      console.log('✅ Zoom token and signature received');
+
+      // Get ZAK token if user is the host
+      let zakToken = null;
+      if (meeting.user_id === user.id) {
+        console.log('🔄 User is host, requesting ZAK token...');
+        const { data: zakData, error: zakError } = await supabase.functions.invoke('get-zoom-zak');
+        if (zakError) {
+          console.error('❌ Error getting ZAK token:', zakError);
+          throw zakError;
+        }
+        zakToken = zakData.zak;
+        console.log('✅ ZAK token received');
+      }
+
+      // Navigate to meeting page
+      console.log('🔄 Navigating to meeting page...');
+      navigate(`/meeting/${meetingId}`);
+      console.log('✅ Navigation complete');
+
+    } catch (err: any) {
+      console.error('❌ Meeting join error:', err);
+      toast({
+        title: "Error",
+        description: err.message,
+        variant: "destructive",
+      });
+    }
   };
 
   const handleCloseMeeting = (event: React.MouseEvent) => {

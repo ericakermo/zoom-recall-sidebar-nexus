@@ -1,4 +1,3 @@
-
 import React, { useEffect, useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import ZoomMtgEmbedded from '@zoom/meetingsdk/embedded';
@@ -33,54 +32,82 @@ const Meeting = () => {
 
   useEffect(() => {
     const initializeMeeting = async () => {
+      console.log('🎯 Initializing Zoom meeting component...');
       try {
         setIsLoading(true);
         setError(null);
 
         if (!user) {
+          console.error('❌ User not authenticated');
           throw new Error('User not authenticated');
         }
+        console.log('✅ User authenticated:', user.email);
 
         // Get meeting details from Supabase
+        console.log('🔄 Fetching meeting details...');
         const { data: meeting, error: meetingError } = await supabase
           .from('zoom_meetings')
           .select('*')
           .eq('id', id)
           .single();
 
-        if (meetingError) throw meetingError;
-        if (!meeting) throw new Error('Meeting not found');
+        if (meetingError) {
+          console.error('❌ Error fetching meeting:', meetingError);
+          throw meetingError;
+        }
+        if (!meeting) {
+          console.error('❌ Meeting not found');
+          throw new Error('Meeting not found');
+        }
+        console.log('✅ Meeting details retrieved:', {
+          meetingId: meeting.id,
+          title: meeting.title,
+          startTime: meeting.start_time,
+          duration: meeting.duration
+        });
 
         setMeetingData(meeting);
 
         // Determine if user is host
         const isHost = meeting.user_id === user.id;
+        console.log(`ℹ️ User role: ${isHost ? 'Host' : 'Participant'}`);
 
         // Get Zoom token and signature
+        console.log('🔄 Requesting Zoom token and signature...');
         const { data: tokenData, error: tokenError } = await supabase.functions.invoke('get-zoom-token', {
           body: { 
             meetingNumber: meeting.meeting_id,
-            role: isHost ? 1 : 0, // 1 for host, 0 for participant
+            role: isHost ? 1 : 0,
             expirationSeconds: 7200 // 2 hours
           }
         });
 
-        if (tokenError) throw tokenError;
+        if (tokenError) {
+          console.error('❌ Error getting Zoom token:', tokenError);
+          throw tokenError;
+        }
+        console.log('✅ Zoom token and signature received');
 
         // Get ZAK token if user is the host
         let zakToken = null;
         if (isHost) {
+          console.log('🔄 User is host, requesting ZAK token...');
           const { data: zakData, error: zakError } = await supabase.functions.invoke('get-zoom-zak');
           if (!zakError && zakData) {
             zakToken = zakData.zak;
+            console.log('✅ ZAK token received');
+          } else {
+            console.warn('⚠️ Could not get ZAK token, continuing without it');
           }
         }
 
         // Initialize Zoom client
+        console.log('🔄 Initializing Zoom client...');
         const client = ZoomMtgEmbedded.createClient();
         clientRef.current = client;
 
         // Initialize the client
+        console.log('🔄 Setting up Zoom client configuration...');
         await client.init({
           zoomAppRoot: meetingContainerRef.current,
           language: 'en-US',
@@ -92,6 +119,7 @@ const Meeting = () => {
                   text: 'Leave Meeting',
                   className: 'CustomLeaveButton',
                   onClick: () => {
+                    console.log('🔘 Leave meeting button clicked');
                     if (clientRef.current) {
                       clientRef.current.leave();
                     }
@@ -102,18 +130,20 @@ const Meeting = () => {
             }
           }
         });
+        console.log('✅ Zoom client initialized');
 
         // Join the meeting
+        console.log('🔄 Joining Zoom meeting...');
         await client.join({
           sdkKey: tokenData.sdkKey,
           signature: tokenData.signature,
           meetingNumber: meeting.meeting_id,
-          password: '', // Leave empty as we don't store passwords in our database
+          password: '',
           userName: user.email || 'Anonymous',
           userEmail: user.email,
           zak: zakToken,
           success: (success: any) => {
-            console.log('Join meeting success:', success);
+            console.log('✅ Successfully joined meeting:', success);
             setIsLoading(false);
             toast({
               title: "Success",
@@ -121,14 +151,14 @@ const Meeting = () => {
             });
           },
           error: (error: any) => {
-            console.error('Join meeting error:', error);
+            console.error('❌ Error joining meeting:', error);
             setError(error.message || 'Failed to join meeting');
             setIsLoading(false);
           }
         });
 
       } catch (err: any) {
-        console.error('Meeting initialization error:', err);
+        console.error('❌ Meeting initialization error:', err);
         setError(err.message || 'Failed to initialize meeting');
         setIsLoading(false);
         toast({
@@ -147,9 +177,11 @@ const Meeting = () => {
     return () => {
       if (clientRef.current) {
         try {
+          console.log('🧹 Cleaning up meeting resources...');
           clientRef.current.leave();
+          console.log('✅ Meeting cleanup complete');
         } catch (error) {
-          console.error('Error leaving meeting:', error);
+          console.error('❌ Error during meeting cleanup:', error);
         }
       }
     };
