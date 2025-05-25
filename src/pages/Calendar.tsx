@@ -6,6 +6,7 @@ import { Alert } from '@/components/ui/alert';
 import { Plus, ChevronLeft, ChevronRight, X, RefreshCw, ExternalLink } from 'lucide-react';
 import { useZoomMeetings } from '@/hooks/useZoomMeetings';
 import { format } from 'date-fns';
+import CreateMeetingPopover from '@/components/CreateMeetingPopover';
 
 const Calendar = () => {
   const [date, setDate] = useState<Date | undefined>(new Date());
@@ -48,15 +49,26 @@ const Calendar = () => {
         <div className="flex flex-col gap-4 flex-1">
           {/* Buttons section */}
           <div className="flex items-center gap-2 self-start">
-            {/* Sync button with refresh icon */}
+            {/* Refresh button */}
             <Button 
               size="icon" 
-              className="rounded-full bg-black hover:bg-black/80 text-white w-10 h-10"
+              variant="ghost"
               onClick={syncMeetings}
               disabled={isSyncing}
+              className="w-10 h-10 p-0 hover:bg-black hover:bg-opacity-10"
             >
-              <RefreshCw className={`h-4 w-4 ${isSyncing ? 'animate-spin' : ''}`} />
+              <RefreshCw className={`h-4 w-4 text-black opacity-10 ${isSyncing ? 'animate-spin' : ''}`} />
             </Button>
+
+            {/* Plus button with popover */}
+            <CreateMeetingPopover>
+              <Button 
+                size="icon" 
+                className="rounded-full bg-black hover:bg-black/80 text-white w-10 h-10"
+              >
+                <Plus className="h-4 w-4" />
+              </Button>
+            </CreateMeetingPopover>
 
             {/* Chevron buttons */}
             <div className="flex gap-1">
