@@ -2,8 +2,9 @@
 import React, { useState } from 'react';
 import { Calendar as CalendarComponent } from '@/components/ui/calendar';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { Alert } from '@/components/ui/alert';
-import { Plus, ChevronLeft, ChevronRight, CircleCheck, X } from 'lucide-react';
+import { Plus, ChevronLeft, ChevronRight, X } from 'lucide-react';
 
 const Calendar = () => {
   const [date, setDate] = useState<Date | undefined>(new Date());
@@ -56,14 +57,6 @@ const Calendar = () => {
               layout="row"
               isNotification
               className="w-[90%] bg-background"
-              icon={
-                <CircleCheck
-                  className="text-emerald-500"
-                  size={16}
-                  strokeWidth={2}
-                  aria-hidden="true"
-                />
-              }
               action={
                 <div className="flex items-center gap-3">
                   <Button size="sm">Connect to meeting</Button>
@@ -82,8 +75,18 @@ const Calendar = () => {
                 </div>
               }
             >
-              <div className="flex grow items-center justify-between gap-12">
-                <p className="text-sm">You've made changes!</p>
+              <div className="flex grow items-center gap-4">
+                <div className="flex flex-col gap-1">
+                  <Input 
+                    placeholder="12:30" 
+                    className="h-6 text-xs w-16 px-2 py-1" 
+                  />
+                  <Input 
+                    placeholder="13:00" 
+                    className="h-6 text-xs w-16 px-2 py-1" 
+                  />
+                </div>
+                <p className="text-sm font-medium">Eric <> Corp LLC - intro</p>
               </div>
             </Alert>
 
@@ -92,14 +95,6 @@ const Calendar = () => {
               isNotification
               className="w-[90%] bg-background"
               variant="warning"
-              icon={
-                <CircleCheck
-                  className="text-amber-500"
-                  size={16}
-                  strokeWidth={2}
-                  aria-hidden="true"
-                />
-              }
               action={
                 <div className="flex items-center gap-3">
                   <Button size="sm">Connect to meeting</Button>
@@ -118,8 +113,18 @@ const Calendar = () => {
                 </div>
               }
             >
-              <div className="flex grow items-center justify-between gap-12">
-                <p className="text-sm">Warning: Please review!</p>
+              <div className="flex grow items-center gap-4">
+                <div className="flex flex-col gap-1">
+                  <Input 
+                    placeholder="14:00" 
+                    className="h-6 text-xs w-16 px-2 py-1" 
+                  />
+                  <Input 
+                    placeholder="15:30" 
+                    className="h-6 text-xs w-16 px-2 py-1" 
+                  />
+                </div>
+                <p className="text-sm font-medium">Eric <> Corp LLC - intro</p>
               </div>
             </Alert>
 
@@ -128,14 +133,6 @@ const Calendar = () => {
               isNotification
               className="w-[90%] bg-background"
               variant="info"
-              icon={
-                <CircleCheck
-                  className="text-blue-500"
-                  size={16}
-                  strokeWidth={2}
-                  aria-hidden="true"
-                />
-              }
               action={
                 <div className="flex items-center gap-3">
                   <Button size="sm">Connect to meeting</Button>
@@ -154,8 +151,18 @@ const Calendar = () => {
                 </div>
               }
             >
-              <div className="flex grow items-center justify-between gap-12">
-                <p className="text-sm">New information available!</p>
+              <div className="flex grow items-center gap-4">
+                <div className="flex flex-col gap-1">
+                  <Input 
+                    placeholder="16:15" 
+                    className="h-6 text-xs w-16 px-2 py-1" 
+                  />
+                  <Input 
+                    placeholder="17:00" 
+                    className="h-6 text-xs w-16 px-2 py-1" 
+                  />
+                </div>
+                <p className="text-sm font-medium">Eric <> Corp LLC - intro</p>
               </div>
             </Alert>
           </div>
