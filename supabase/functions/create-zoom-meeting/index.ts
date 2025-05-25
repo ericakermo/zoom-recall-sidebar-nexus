@@ -80,12 +80,24 @@ serve(async (req) => {
     if (now >= expiresAt) {
       console.log("Access token expired, refreshing...");
       
+      // Get Zoom OAuth credentials from environment
+      const zoomClientId = Deno.env.get('ZOOM_CLIENT_ID');
+      const zoomClientSecret = Deno.env.get('ZOOM_CLIENT_SECRET');
+      
+      if (!zoomClientId || !zoomClientSecret) {
+        console.error("Missing Zoom OAuth credentials");
+        return new Response(
+          JSON.stringify({ error: 'Zoom OAuth not configured properly' }),
+          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+      
       // Refresh the access token
       const refreshResponse = await fetch('https://zoom.us/oauth/token', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded',
-          'Authorization': `Basic ${btoa(`eFAZ8Vf7RbG5saQVqL1zGA:iopNR5wnxdK3mEIVE1llzQqAWbxXEB1l`)}`
+          'Authorization': `Basic ${btoa(`${zoomClientId}:${zoomClientSecret}`)}`
         },
         body: new URLSearchParams({
           grant_type: 'refresh_token',
@@ -124,44 +136,78 @@ serve(async (req) => {
     try {
       if (req.headers.get('content-type')?.includes('application/json')) {
         meetingSettings = await req.json();
+        console.log("Received meeting settings:", meetingSettings);
       }
     } catch (e) {
       console.log("No JSON body provided, using default settings");
     }
 
     // Create a new meeting via Zoom API using the user's access token
-    console.log("Creating new Zoom meeting");
+    console.log("Creating new Zoom meeting with settings:", meetingSettings);
+    const meetingPayload = {
+      topic: meetingSettings.topic || 'Instant Meeting',
+      type: meetingSettings.type || 2, // Scheduled meeting
+      start_time: meetingSettings.start_time,
+      duration: meetingSettings.duration || 30,
+      timezone: meetingSettings.timezone || 'UTC',
+      settings: {
+        host_video: meetingSettings.settings?.host_video ?? true,
+        participant_video: meetingSettings.settings?.participant_video ?? true,
+        join_before_host: meetingSettings.settings?.join_before_host ?? false,
+        mute_upon_entry: meetingSettings.settings?.mute_upon_entry ?? true,
+        waiting_room: meetingSettings.settings?.waiting_room ?? true,
+        ...meetingSettings.settings
+      }
+    };
+
+    console.log("Final meeting payload:", JSON.stringify(meetingPayload, null, 2));
+
     const meetingResponse = await fetch(`${ZOOM_API_URL}/users/me/meetings`, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${accessToken}`,
         'Content-Type': 'application/json'
       },
-      body: JSON.stringify({
-        topic: meetingSettings.topic || 'Instant Meeting',
-        type: meetingSettings.type || 1, // Instant meeting
-        settings: {
-          host_video: meetingSettings.settings?.host_video ?? true,
-          participant_video: meetingSettings.settings?.participant_video ?? true,
-          join_before_host: meetingSettings.settings?.join_before_host ?? false,
-          mute_upon_entry: meetingSettings.settings?.mute_upon_entry ?? true,
-          waiting_room: meetingSettings.settings?.waiting_room ?? false,
-          ...meetingSettings.settings
-        }
-      })
+      body: JSON.stringify(meetingPayload)
     });
 
     if (!meetingResponse.ok) {
       const errorText = await meetingResponse.text();
-      console.error("Failed to create meeting:", errorText);
+      console.error("Failed to create meeting:", meetingResponse.status, errorText);
       return new Response(
-        JSON.stringify({ error: 'Failed to create Zoom meeting' }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        JSON.stringify({ error: `Failed to create Zoom meeting: ${errorText}` }),
+        { status: meetingResponse.status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
     const meetingData = await meetingResponse.json();
     console.log("Meeting created successfully:", meetingData.id);
+
+    // Store the meeting in our database
+    try {
+      const { data: storedMeeting, error: storeError } = await supabaseClient
+        .from('zoom_meetings')
+        .insert({
+          user_id: user.id,
+          meeting_id: meetingData.id.toString(),
+          title: meetingData.topic,
+          start_time: meetingData.start_time,
+          duration: meetingData.duration,
+          join_url: meetingData.join_url,
+        })
+        .select()
+        .single();
+
+      if (storeError) {
+        console.error("Failed to store meeting in database:", storeError);
+        // Don't fail the entire request if we can't store it
+      } else {
+        console.log("Meeting stored in database:", storedMeeting.id);
+      }
+    } catch (dbError) {
+      console.error("Database error:", dbError);
+      // Continue even if database storage fails
+    }
     
     return new Response(JSON.stringify({
       id: meetingData.id,
@@ -169,14 +215,19 @@ serve(async (req) => {
       join_url: meetingData.join_url,
       start_url: meetingData.start_url,
       password: meetingData.password,
+      start_time: meetingData.start_time,
+      duration: meetingData.duration,
       meetingNumber: meetingData.id.toString(),
-      accessToken: accessToken // Return the access token for SDK authentication
+      success: true
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     });
   } catch (error) {
     console.error('Error creating meeting:', error);
-    return new Response(JSON.stringify({ error: error.message }), {
+    return new Response(JSON.stringify({ 
+      error: error.message || 'Internal server error',
+      details: error.toString()
+    }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     });
