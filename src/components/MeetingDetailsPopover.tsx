@@ -80,14 +80,16 @@ export const MeetingDetailsPopover: React.FC<MeetingDetailsPopoverProps> = ({ ch
           
           {/* Action Buttons Row */}
           <div className="flex items-center gap-6">
-            {/* Join Zoom Button */}
-            <Button 
-              onClick={handleJoinMeeting}
-              className="bg-blue-600 hover:bg-blue-700 text-white rounded-lg pl-4 pr-6 py-2 flex items-center gap-3"
-            >
+            {/* Join Zoom Button with SVG on the left */}
+            <div className="flex items-center gap-3">
               <ZoomIcon />
-              <span>Join Zoom Meeting</span>
-            </Button>
+              <Button 
+                onClick={handleJoinMeeting}
+                className="bg-blue-600 hover:bg-blue-700 text-white rounded-lg px-6 py-2"
+              >
+                Join Zoom Meeting
+              </Button>
+            </div>
             
             {/* Copy Button */}
             <Button
@@ -108,12 +110,10 @@ export const MeetingDetailsPopover: React.FC<MeetingDetailsPopoverProps> = ({ ch
           </div>
           
           {/* Description */}
-          {meeting.description && (
-            <div className="space-y-2">
-              <h4 className="text-sm font-medium">Description</h4>
-              <p className="text-sm text-gray-600">{meeting.description}</p>
-            </div>
-          )}
+          <div className="space-y-2">
+            <h4 className="text-sm font-medium">Description</h4>
+            <p className="text-sm text-gray-600">{meeting.description || 'No description available'}</p>
+          </div>
         </div>
       </PopoverContent>
     </Popover>
