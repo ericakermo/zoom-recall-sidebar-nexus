@@ -31,6 +31,97 @@ const Meeting = () => {
   const clientRef = useRef<any>(null);
   const meetingContainerRef = useRef<HTMLDivElement>(null);
 
+  const getMeetingPassword = async (meetingId: string, isHost: boolean) => {
+    console.log('🔄 Attempting to get meeting password...', { meetingId, isHost });
+    
+    try {
+      // First, try to get password from Zoom API if user is host
+      if (isHost) {
+        console.log('🔄 Host detected, fetching meeting details from Zoom API...');
+        const { data: tokenData } = await supabase.functions.invoke('get-zoom-token', {
+          body: { 
+            meetingNumber: meetingId,
+            role: 1 // Host role
+          }
+        });
+
+        // Get meeting details from Zoom API
+        const meetingResponse = await fetch(`https://api.zoom.us/v2/meetings/${meetingId}`, {
+          headers: {
+            'Authorization': `Bearer ${tokenData.accessToken}`,
+            'Content-Type': 'application/json'
+          }
+        });
+
+        if (meetingResponse.ok) {
+          const meetingDetails = await meetingResponse.json();
+          console.log('✅ Meeting details from Zoom API:', {
+            hasPassword: !!meetingDetails.password,
+            waitingRoom: meetingDetails.settings?.waiting_room,
+            joinBeforeHost: meetingDetails.settings?.join_before_host
+          });
+          return meetingDetails.password || '';
+        }
+      }
+
+      // Fallback: return empty password
+      console.log('ℹ️ No password found, using empty string');
+      return '';
+    } catch (error) {
+      console.error('⚠️ Error getting meeting password:', error);
+      return '';
+    }
+  };
+
+  const handleJoinError = (error: any, meetingId: string, isHost: boolean) => {
+    console.error('❌ Meeting join error details:', {
+      error,
+      errorCode: error.errorCode,
+      reason: error.reason,
+      type: error.type,
+      meetingId,
+      isHost
+    });
+
+    let errorMessage = 'Failed to join meeting';
+    let suggestion = '';
+
+    switch (error.errorCode) {
+      case 3004:
+        errorMessage = 'Meeting password is required or incorrect';
+        suggestion = isHost 
+          ? 'As the host, try creating a new meeting without a password'
+          : 'Please contact the meeting host for the correct password';
+        break;
+      case 3001:
+        errorMessage = 'Meeting not found or has ended';
+        suggestion = 'Please check the meeting ID and try again';
+        break;
+      case 3002:
+        errorMessage = 'Meeting has not started yet';
+        suggestion = 'Please wait for the host to start the meeting';
+        break;
+      case 3003:
+        errorMessage = 'Meeting has ended';
+        suggestion = 'This meeting is no longer active';
+        break;
+      case 3005:
+        errorMessage = 'Meeting is locked by host';
+        suggestion = 'Please contact the host to unlock the meeting';
+        break;
+      default:
+        errorMessage = error.reason || error.message || 'Unknown error occurred';
+        suggestion = 'Please try again or contact support';
+    }
+
+    setError(`${errorMessage}. ${suggestion}`);
+    toast({
+      title: "Meeting Join Failed",
+      description: `${errorMessage}. ${suggestion}`,
+      variant: "destructive",
+    });
+  };
+
   useEffect(() => {
     const initializeMeeting = async () => {
       console.log('🎯 Initializing Zoom meeting component...');
@@ -45,7 +136,7 @@ const Meeting = () => {
         console.log('✅ User authenticated:', user.email);
 
         // Get meeting details from Supabase
-        console.log('🔄 Fetching meeting details...');
+        console.log('🔄 Fetching meeting details from database...');
         const { data: meeting, error: meetingError } = await supabase
           .from('zoom_meetings')
           .select('*')
@@ -62,6 +153,7 @@ const Meeting = () => {
         }
         console.log('✅ Meeting details retrieved:', {
           meetingId: meeting.id,
+          zoomMeetingId: meeting.meeting_id,
           title: meeting.title,
           startTime: meeting.start_time,
           duration: meeting.duration
@@ -72,6 +164,11 @@ const Meeting = () => {
         // Determine if user is host
         const isHost = meeting.user_id === user.id;
         console.log(`ℹ️ User role: ${isHost ? 'Host' : 'Participant'}`);
+
+        // Get meeting password
+        console.log('🔄 Getting meeting password...');
+        const meetingPassword = await getMeetingPassword(meeting.meeting_id, isHost);
+        console.log('✅ Meeting password retrieved:', { hasPassword: !!meetingPassword });
 
         // Get Zoom token and signature
         console.log('🔄 Requesting Zoom token and signature...');
@@ -133,16 +230,14 @@ const Meeting = () => {
         });
         console.log('✅ Zoom client initialized');
 
-        // Join the meeting
-        console.log('🔄 Joining Zoom meeting...');
-        await client.join({
+        // Prepare join configuration
+        const joinConfig: any = {
           sdkKey: tokenData.sdkKey,
           signature: tokenData.signature,
           meetingNumber: meeting.meeting_id,
-          password: '',
+          password: meetingPassword, // Use the retrieved password
           userName: user.email || 'Anonymous',
           userEmail: user.email,
-          zak: zakToken,
           success: (success: any) => {
             console.log('✅ Successfully joined meeting:', success);
             setIsLoading(false);
@@ -153,10 +248,26 @@ const Meeting = () => {
           },
           error: (error: any) => {
             console.error('❌ Error joining meeting:', error);
-            setError(error.message || 'Failed to join meeting');
+            handleJoinError(error, meeting.meeting_id, isHost);
             setIsLoading(false);
           }
+        };
+
+        // Add ZAK token for hosts
+        if (isHost && zakToken) {
+          joinConfig.zak = zakToken;
+          console.log('✅ ZAK token added to join configuration');
+        }
+
+        // Join the meeting
+        console.log('🔄 Joining Zoom meeting with configuration:', {
+          meetingNumber: joinConfig.meetingNumber,
+          hasPassword: !!joinConfig.password,
+          hasZak: !!joinConfig.zak,
+          role: isHost ? 'Host' : 'Participant'
         });
+
+        await client.join(joinConfig);
 
       } catch (err: any) {
         console.error('❌ Meeting initialization error:', err);
@@ -237,8 +348,8 @@ const Meeting = () => {
         
         {error && (
           <div className="absolute inset-0 flex items-center justify-center bg-background/80 z-50">
-            <div className="text-center">
-              <p className="text-destructive mb-4">{error}</p>
+            <div className="text-center max-w-md mx-auto p-6">
+              <p className="text-destructive mb-4 text-sm leading-relaxed">{error}</p>
               <div className="flex gap-2 justify-center">
                 <Button onClick={() => window.location.reload()}>
                   Retry

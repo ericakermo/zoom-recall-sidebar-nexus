@@ -1,3 +1,4 @@
+
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { encode as base64Encode } from 'https://deno.land/std@0.168.0/encoding/base64.ts'
@@ -119,7 +120,13 @@ serve(async (req) => {
     // Parse request body
     const { meetingNumber, role, expirationSeconds } = await req.json();
     
-    // Generate JWT signature
+    console.log("Generating token for:", {
+      meetingNumber,
+      role: role === 1 ? 'host' : 'participant',
+      expirationSeconds: expirationSeconds || 7200
+    });
+    
+    // Generate JWT signature with enhanced payload
     const iat = Math.floor(Date.now() / 1000);
     const exp = expirationSeconds ? iat + expirationSeconds : iat + 7200; // Default 2 hours
     
@@ -131,8 +138,16 @@ serve(async (req) => {
       role,
       iat,
       exp,
-      tokenExp: exp
+      tokenExp: exp,
+      // Add additional claims for better compatibility
+      alg: 'HS256'
     };
+
+    console.log("JWT payload created:", {
+      meetingNumber: payload.mn,
+      role: payload.role,
+      tokenExpiration: new Date(payload.exp * 1000).toISOString()
+    });
 
     const encodedHeader = base64Encode(JSON.stringify(header));
     const encodedPayload = base64Encode(JSON.stringify(payload));
@@ -148,6 +163,8 @@ serve(async (req) => {
       .then(signature => base64Encode(new Uint8Array(signature)));
     
     const jwt = `${encodedHeader}.${encodedPayload}.${signature}`;
+    
+    console.log("JWT signature generated successfully");
     
     return new Response(
       JSON.stringify({ 
@@ -165,7 +182,7 @@ serve(async (req) => {
       }
     );
   } catch (error) {
-    console.error('Error:', error);
+    console.error('Error in get-zoom-token function:', error);
     return new Response(
       JSON.stringify({ error: error.message }),
       { 

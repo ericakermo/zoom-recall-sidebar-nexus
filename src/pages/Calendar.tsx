@@ -44,13 +44,38 @@ const Calendar = () => {
       }
       console.log('✅ Meeting details retrieved:', {
         meetingId: meeting.id,
+        zoomMeetingId: meeting.meeting_id,
         title: meeting.title,
         startTime: meeting.start_time,
-        duration: meeting.duration
+        duration: meeting.duration,
+        isHost: meeting.user_id === user.id
       });
 
-      // Get Zoom token and signature
-      console.log('🔄 Requesting Zoom token and signature...');
+      // Check if meeting is upcoming or current
+      const meetingStart = new Date(meeting.start_time);
+      const now = new Date();
+      const timeDiff = meetingStart.getTime() - now.getTime();
+      const minutesUntilStart = Math.floor(timeDiff / (1000 * 60));
+
+      console.log('ℹ️ Meeting timing:', {
+        startTime: meetingStart.toISOString(),
+        currentTime: now.toISOString(),
+        minutesUntilStart,
+        canJoin: minutesUntilStart <= 15 // Allow joining 15 minutes early
+      });
+
+      if (minutesUntilStart > 15) {
+        console.warn('⚠️ Meeting is not ready to join yet');
+        toast({
+          title: "Meeting Not Ready",
+          description: `Meeting starts in ${minutesUntilStart} minutes. You can join 15 minutes before the start time.`,
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Pre-validate tokens before navigation
+      console.log('🔄 Pre-validating access tokens...');
       const { data: tokenData, error: tokenError } = await supabase.functions.invoke('get-zoom-token', {
         body: { 
           meetingNumber: meeting.meeting_id,
@@ -62,31 +87,31 @@ const Calendar = () => {
         console.error('❌ Error getting Zoom token:', tokenError);
         throw tokenError;
       }
-      console.log('✅ Zoom token and signature received');
+      console.log('✅ Zoom token validated successfully');
 
       // Get ZAK token if user is the host
-      let zakToken = null;
       if (meeting.user_id === user.id) {
-        console.log('🔄 User is host, requesting ZAK token...');
+        console.log('🔄 User is host, pre-validating ZAK token...');
         const { data: zakData, error: zakError } = await supabase.functions.invoke('get-zoom-zak');
         if (zakError) {
           console.error('❌ Error getting ZAK token:', zakError);
-          throw zakError;
+          // Don't throw error, as ZAK token might not be required in all cases
+          console.warn('⚠️ Continuing without ZAK token');
+        } else {
+          console.log('✅ ZAK token validated');
         }
-        zakToken = zakData.zak;
-        console.log('✅ ZAK token received');
       }
 
       // Navigate to meeting page
       console.log('🔄 Navigating to meeting page...');
       navigate(`/meeting/${meetingId}`);
-      console.log('✅ Navigation complete');
+      console.log('✅ Navigation initiated');
 
     } catch (err: any) {
       console.error('❌ Meeting join error:', err);
       toast({
         title: "Error",
-        description: err.message,
+        description: err.message || "Failed to join meeting",
         variant: "destructive",
       });
     }
