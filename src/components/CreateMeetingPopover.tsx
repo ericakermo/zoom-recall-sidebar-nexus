@@ -15,9 +15,9 @@ interface CreateMeetingPopoverProps {
 const CreateMeetingPopover = ({ children }: CreateMeetingPopoverProps) => {
   const [title, setTitle] = useState('');
   const [startDate, setStartDate] = useState<Date | undefined>();
-  const [startTime, setStartTime] = useState('');
+  const [startTime, setStartTime] = useState('15:00');
   const [endDate, setEndDate] = useState<Date | undefined>();
-  const [endTime, setEndTime] = useState('');
+  const [endTime, setEndTime] = useState('15:30');
   const [attendees, setAttendees] = useState<string[]>(['']);
   const [meetingType, setMeetingType] = useState<string>('');
   const [open, setOpen] = useState(false);
@@ -104,7 +104,7 @@ const CreateMeetingPopover = ({ children }: CreateMeetingPopoverProps) => {
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               placeholder="Enter meeting title"
-              className="border-[0.5px] border-black border-opacity-10 focus:border-black focus:border-opacity-20"
+              className="border-[0.5px] border-black border-opacity-10 focus:border-black focus:border-opacity-20 placeholder:text-black placeholder:opacity-20"
             />
           </div>
 
@@ -119,7 +119,9 @@ const CreateMeetingPopover = ({ children }: CreateMeetingPopoverProps) => {
                     className="w-full justify-start text-left font-normal border-[0.5px] border-black border-opacity-10 hover:bg-black hover:bg-opacity-5"
                   >
                     <CalendarIcon className="mr-2 h-3 w-3" />
-                    {startDate ? formatDisplayDate(startDate) : "Pick date"}
+                    <span className={startDate ? "text-black" : "text-black opacity-20"}>
+                      {startDate ? formatDisplayDate(startDate) : "Pick date"}
+                    </span>
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-auto p-0 border-[0.5px] border-black border-opacity-10 z-[110]" align="start">
@@ -136,7 +138,7 @@ const CreateMeetingPopover = ({ children }: CreateMeetingPopoverProps) => {
               <label className="text-sm font-medium text-black">Start Time</label>
               <Select value={startTime} onValueChange={setStartTime}>
                 <SelectTrigger className="border-[0.5px] border-black border-opacity-10 focus:border-black focus:border-opacity-20">
-                  <SelectValue placeholder="Select time" />
+                  <SelectValue placeholder="Select time" className="text-black opacity-20" />
                 </SelectTrigger>
                 <SelectContent className="bg-white border-[0.5px] border-black border-opacity-10 z-[110]">
                   {timeOptions.map((time) => (
@@ -160,7 +162,9 @@ const CreateMeetingPopover = ({ children }: CreateMeetingPopoverProps) => {
                     className="w-full justify-start text-left font-normal border-[0.5px] border-black border-opacity-10 hover:bg-black hover:bg-opacity-5"
                   >
                     <CalendarIcon className="mr-2 h-3 w-3" />
-                    {endDate ? formatDisplayDate(endDate) : "Pick date"}
+                    <span className={endDate ? "text-black" : "text-black opacity-20"}>
+                      {endDate ? formatDisplayDate(endDate) : "Pick date"}
+                    </span>
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-auto p-0 border-[0.5px] border-black border-opacity-10 z-[110]" align="start">
@@ -177,7 +181,7 @@ const CreateMeetingPopover = ({ children }: CreateMeetingPopoverProps) => {
               <label className="text-sm font-medium text-black">End Time</label>
               <Select value={endTime} onValueChange={setEndTime}>
                 <SelectTrigger className="border-[0.5px] border-black border-opacity-10 focus:border-black focus:border-opacity-20">
-                  <SelectValue placeholder="Select time" />
+                  <SelectValue placeholder="Select time" className="text-black opacity-20" />
                 </SelectTrigger>
                 <SelectContent className="bg-white border-[0.5px] border-black border-opacity-10 z-[110]">
                   {timeOptions.map((time) => (
@@ -199,7 +203,7 @@ const CreateMeetingPopover = ({ children }: CreateMeetingPopoverProps) => {
                   value={attendee}
                   onChange={(e) => updateAttendee(index, e.target.value)}
                   placeholder="Enter email address"
-                  className="flex-1 border-[0.5px] border-black border-opacity-10 focus:border-black focus:border-opacity-20"
+                  className="flex-1 border-[0.5px] border-black border-opacity-10 focus:border-black focus:border-opacity-20 placeholder:text-black placeholder:opacity-20"
                 />
                 {attendees.length > 1 && (
                   <Button
@@ -228,7 +232,7 @@ const CreateMeetingPopover = ({ children }: CreateMeetingPopoverProps) => {
             <label className="text-sm font-medium text-black">Meeting Type</label>
             <Select value={meetingType} onValueChange={setMeetingType}>
               <SelectTrigger className="border-[0.5px] border-black border-opacity-10 focus:border-black focus:border-opacity-20">
-                <SelectValue placeholder="Select meeting type" />
+                <SelectValue placeholder="Select meeting type" className="text-black opacity-20" />
               </SelectTrigger>
               <SelectContent className="bg-white border-[0.5px] border-black border-opacity-10 z-[110]">
                 <SelectItem value="intro">Intro</SelectItem>
