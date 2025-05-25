@@ -6,18 +6,18 @@ import { Alert } from '@/components/ui/alert';
 import { Plus, ChevronLeft, ChevronRight, X, RefreshCw, ExternalLink } from 'lucide-react';
 import { useZoomMeetings } from '@/hooks/useZoomMeetings';
 import { format } from 'date-fns';
+import { useNavigate } from 'react-router-dom';
 import CreateMeetingPopover from '@/components/CreateMeetingPopover';
 import MeetingDetailsPopover from '@/components/MeetingDetailsPopover';
 
 const Calendar = () => {
   const [date, setDate] = useState<Date | undefined>(new Date());
+  const navigate = useNavigate();
   const { meetings, isLoading, isSyncing, syncMeetings } = useZoomMeetings(date);
 
-  const handleJoinMeeting = (joinUrl: string, event: React.MouseEvent) => {
+  const handleJoinMeeting = (meetingId: string, event: React.MouseEvent) => {
     event.stopPropagation(); // Prevent popover from opening
-    if (joinUrl) {
-      window.open(joinUrl, '_blank');
-    }
+    navigate(`/meeting/${meetingId}`);
   };
 
   const handleCloseMeeting = (event: React.MouseEvent) => {
@@ -131,8 +131,7 @@ const Calendar = () => {
                         <div className="flex items-center gap-3">
                           <Button 
                             size="sm"
-                            onClick={(e) => handleJoinMeeting(meeting.join_url, e)}
-                            disabled={!meeting.join_url}
+                            onClick={(e) => handleJoinMeeting(meeting.id, e)}
                           >
                             <ExternalLink className="h-3 w-3 mr-1" />
                             Join Meeting

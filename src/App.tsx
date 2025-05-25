@@ -10,6 +10,7 @@ import Calendar from "./pages/Calendar";
 import Profile from "./pages/Profile";
 import Settings from "./pages/Settings";
 import Meetings from "./pages/Meetings";
+import Meeting from "./pages/Meeting";
 import ZoomSample from "./pages/ZoomSample";
 import JoinMeeting from "./pages/JoinMeeting";
 import NotFound from "./pages/NotFound";
@@ -39,6 +40,13 @@ const App = () => (
               <ProtectedRoute>
                 <Layout>
                   <Calendar />
+                </Layout>
+              </ProtectedRoute>
+            } />
+            <Route path="/meeting/:id" element={
+              <ProtectedRoute>
+                <Layout>
+                  <Meeting />
                 </Layout>
               </ProtectedRoute>
             } />
