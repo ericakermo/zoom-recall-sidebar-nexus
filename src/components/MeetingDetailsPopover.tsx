@@ -19,9 +19,9 @@ interface MeetingDetailsPopoverProps {
 }
 
 const ZoomIcon = () => (
-  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-    <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8z" fill="#2D8CFF"/>
-    <path d="M12 6.5c-3.03 0-5.5 2.47-5.5 5.5s2.47 5.5 5.5 5.5 5.5-2.47 5.5-5.5-2.47-5.5-5.5-5.5zm0 9c-1.93 0-3.5-1.57-3.5-3.5s1.57-3.5 3.5-3.5 3.5 1.57 3.5 3.5-1.57 3.5-3.5 3.5z" fill="#2D8CFF"/>
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <rect x="2" y="6" width="20" height="12" rx="4" fill="#2D8CFF"/>
+    <path d="M8 10v4l4-2-4-2z" fill="white"/>
   </svg>
 );
 
@@ -67,10 +67,10 @@ export const MeetingDetailsPopover: React.FC<MeetingDetailsPopoverProps> = ({ ch
       <PopoverTrigger asChild>
         {children}
       </PopoverTrigger>
-      <PopoverContent className="w-80 p-4" align="start" side="right">
-        <div className="space-y-4">
+      <PopoverContent className="w-80 p-6 h-96" align="start" side="right" sideOffset={10}>
+        <div className="space-y-6">
           {/* Title */}
-          <h3 className="text-lg font-semibold leading-tight">{meeting.title}</h3>
+          <h3 className="text-xl font-medium leading-tight">{meeting.title}</h3>
           
           {/* Date and Time */}
           <div className="space-y-1">
@@ -78,30 +78,33 @@ export const MeetingDetailsPopover: React.FC<MeetingDetailsPopoverProps> = ({ ch
             <p className="text-sm text-gray-600">{time}</p>
           </div>
           
-          {/* Join Zoom Button */}
-          <Button 
-            onClick={handleJoinMeeting}
-            className="w-full bg-blue-600 hover:bg-blue-700 text-white"
-          >
-            <ZoomIcon />
-            <span className="ml-2">Join Zoom Meeting</span>
-          </Button>
+          {/* Action Buttons Row */}
+          <div className="flex items-center gap-6">
+            {/* Join Zoom Button */}
+            <Button 
+              onClick={handleJoinMeeting}
+              className="bg-blue-600 hover:bg-blue-700 text-white rounded-lg pl-4 pr-6 py-2 flex items-center gap-3"
+            >
+              <ZoomIcon />
+              <span>Join Zoom Meeting</span>
+            </Button>
+            
+            {/* Copy Button */}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleCopyUrl}
+              className="ml-4 h-8 w-8 p-0"
+            >
+              <Copy className="h-3 w-3" />
+            </Button>
+          </div>
           
-          {/* Meeting URL with Copy */}
+          {/* Meeting URL */}
           <div className="space-y-2">
-            <div className="flex items-center gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleCopyUrl}
-                className="flex-shrink-0"
-              >
-                <Copy className="h-3 w-3" />
-              </Button>
-              <p className="text-sm text-gray-500 opacity-60 truncate flex-1">
-                {meeting.join_url}
-              </p>
-            </div>
+            <p className="text-sm text-gray-500 opacity-20 break-all">
+              {meeting.join_url}
+            </p>
           </div>
           
           {/* Description */}
