@@ -22,6 +22,20 @@ const CreateMeetingPopover = ({ children }: CreateMeetingPopoverProps) => {
   const [meetingType, setMeetingType] = useState<string>('');
   const [open, setOpen] = useState(false);
 
+  // Generate time options with 15-minute intervals
+  const generateTimeOptions = () => {
+    const times = [];
+    for (let hour = 0; hour < 24; hour++) {
+      for (let minute = 0; minute < 60; minute += 15) {
+        const timeString = `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`;
+        times.push(timeString);
+      }
+    }
+    return times;
+  };
+
+  const timeOptions = generateTimeOptions();
+
   const addAttendee = () => {
     setAttendees([...attendees, '']);
   };
@@ -64,7 +78,7 @@ const CreateMeetingPopover = ({ children }: CreateMeetingPopoverProps) => {
         {children}
       </PopoverTrigger>
       <PopoverContent 
-        className="w-96 p-6 bg-white border-[0.5px] border-black border-opacity-10" 
+        className="w-96 p-6 bg-white border-[0.5px] border-black border-opacity-10 z-[100]" 
         align="start"
         side="right"
         sideOffset={8}
@@ -104,11 +118,11 @@ const CreateMeetingPopover = ({ children }: CreateMeetingPopoverProps) => {
                     variant="outline"
                     className="w-full justify-start text-left font-normal border-[0.5px] border-black border-opacity-10 hover:bg-black hover:bg-opacity-5"
                   >
-                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    <CalendarIcon className="mr-2 h-3 w-3" />
                     {startDate ? formatDisplayDate(startDate) : "Pick date"}
                   </Button>
                 </PopoverTrigger>
-                <PopoverContent className="w-auto p-0 border-[0.5px] border-black border-opacity-10" align="start">
+                <PopoverContent className="w-auto p-0 border-[0.5px] border-black border-opacity-10 z-[110]" align="start">
                   <Calendar
                     mode="single"
                     selected={startDate}
@@ -120,12 +134,18 @@ const CreateMeetingPopover = ({ children }: CreateMeetingPopoverProps) => {
             </div>
             <div className="space-y-2">
               <label className="text-sm font-medium text-black">Start Time</label>
-              <Input
-                type="time"
-                value={startTime}
-                onChange={(e) => setStartTime(e.target.value)}
-                className="border-[0.5px] border-black border-opacity-10 focus:border-black focus:border-opacity-20"
-              />
+              <Select value={startTime} onValueChange={setStartTime}>
+                <SelectTrigger className="border-[0.5px] border-black border-opacity-10 focus:border-black focus:border-opacity-20">
+                  <SelectValue placeholder="Select time" />
+                </SelectTrigger>
+                <SelectContent className="bg-white border-[0.5px] border-black border-opacity-10 z-[110]">
+                  {timeOptions.map((time) => (
+                    <SelectItem key={time} value={time}>
+                      {time}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           </div>
 
@@ -139,11 +159,11 @@ const CreateMeetingPopover = ({ children }: CreateMeetingPopoverProps) => {
                     variant="outline"
                     className="w-full justify-start text-left font-normal border-[0.5px] border-black border-opacity-10 hover:bg-black hover:bg-opacity-5"
                   >
-                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    <CalendarIcon className="mr-2 h-3 w-3" />
                     {endDate ? formatDisplayDate(endDate) : "Pick date"}
                   </Button>
                 </PopoverTrigger>
-                <PopoverContent className="w-auto p-0 border-[0.5px] border-black border-opacity-10" align="start">
+                <PopoverContent className="w-auto p-0 border-[0.5px] border-black border-opacity-10 z-[110]" align="start">
                   <Calendar
                     mode="single"
                     selected={endDate}
@@ -155,12 +175,18 @@ const CreateMeetingPopover = ({ children }: CreateMeetingPopoverProps) => {
             </div>
             <div className="space-y-2">
               <label className="text-sm font-medium text-black">End Time</label>
-              <Input
-                type="time"
-                value={endTime}
-                onChange={(e) => setEndTime(e.target.value)}
-                className="border-[0.5px] border-black border-opacity-10 focus:border-black focus:border-opacity-20"
-              />
+              <Select value={endTime} onValueChange={setEndTime}>
+                <SelectTrigger className="border-[0.5px] border-black border-opacity-10 focus:border-black focus:border-opacity-20">
+                  <SelectValue placeholder="Select time" />
+                </SelectTrigger>
+                <SelectContent className="bg-white border-[0.5px] border-black border-opacity-10 z-[110]">
+                  {timeOptions.map((time) => (
+                    <SelectItem key={time} value={time}>
+                      {time}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           </div>
 
@@ -204,7 +230,7 @@ const CreateMeetingPopover = ({ children }: CreateMeetingPopoverProps) => {
               <SelectTrigger className="border-[0.5px] border-black border-opacity-10 focus:border-black focus:border-opacity-20">
                 <SelectValue placeholder="Select meeting type" />
               </SelectTrigger>
-              <SelectContent className="bg-white border-[0.5px] border-black border-opacity-10">
+              <SelectContent className="bg-white border-[0.5px] border-black border-opacity-10 z-[110]">
                 <SelectItem value="intro">Intro</SelectItem>
                 <SelectItem value="discovery">Discovery</SelectItem>
                 <SelectItem value="closing">Closing</SelectItem>
