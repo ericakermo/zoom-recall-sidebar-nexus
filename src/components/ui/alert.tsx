@@ -1,4 +1,3 @@
-
 import * as React from "react"
 import { cva, type VariantProps } from "class-variance-authority"
 import { cn } from "@/lib/utils"
@@ -17,7 +16,7 @@ const alertVariants = cva("relative rounded-lg border", {
       lg: "p-4",
     },
     isNotification: {
-      true: "z-[100] max-w-[400px] bg-background shadow-lg shadow-black/5",
+      true: "z-[100] bg-background",
       false: "",
     },
   },

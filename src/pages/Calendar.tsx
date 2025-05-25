@@ -51,11 +51,11 @@ const Calendar = () => {
           <div className="w-full h-px bg-black opacity-10"></div>
 
           {/* Alert components section */}
-          <div className="flex flex-col gap-4">
+          <div className="flex flex-col gap-4 w-full">
             <Alert
               layout="row"
               isNotification
-              className="min-w-[400px]"
+              className="w-[90%] bg-background"
               icon={
                 <CircleCheck
                   className="text-emerald-500"
@@ -66,7 +66,7 @@ const Calendar = () => {
               }
               action={
                 <div className="flex items-center gap-3">
-                  <Button size="sm">Undo</Button>
+                  <Button size="sm">Connect to meeting</Button>
                   <Button
                     variant="ghost"
                     className="group -my-1.5 -me-2 size-8 shrink-0 p-0 hover:bg-transparent"
@@ -90,7 +90,7 @@ const Calendar = () => {
             <Alert
               layout="row"
               isNotification
-              className="min-w-[400px]"
+              className="w-[90%] bg-background"
               variant="warning"
               icon={
                 <CircleCheck
@@ -102,7 +102,7 @@ const Calendar = () => {
               }
               action={
                 <div className="flex items-center gap-3">
-                  <Button size="sm">Review</Button>
+                  <Button size="sm">Connect to meeting</Button>
                   <Button
                     variant="ghost"
                     className="group -my-1.5 -me-2 size-8 shrink-0 p-0 hover:bg-transparent"
@@ -126,7 +126,7 @@ const Calendar = () => {
             <Alert
               layout="row"
               isNotification
-              className="min-w-[400px]"
+              className="w-[90%] bg-background"
               variant="info"
               icon={
                 <CircleCheck
@@ -138,7 +138,7 @@ const Calendar = () => {
               }
               action={
                 <div className="flex items-center gap-3">
-                  <Button size="sm">View</Button>
+                  <Button size="sm">Connect to meeting</Button>
                   <Button
                     variant="ghost"
                     className="group -my-1.5 -me-2 size-8 shrink-0 p-0 hover:bg-transparent"
