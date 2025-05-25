@@ -12,6 +12,18 @@ export interface ZoomConnection {
   updated_at: string;
 }
 
+export interface ZoomMeeting {
+  id: string;
+  user_id: string;
+  meeting_id: string;
+  title: string;
+  start_time: string;
+  duration: number;
+  join_url: string;
+  created_at: string;
+  updated_at: string;
+}
+
 // Add this declaration to extend the Supabase Database types
 declare module '@supabase/supabase-js' {
   interface Database {
@@ -21,6 +33,11 @@ declare module '@supabase/supabase-js' {
           Row: ZoomConnection;
           Insert: Omit<ZoomConnection, 'id' | 'created_at' | 'updated_at'>;
           Update: Partial<Omit<ZoomConnection, 'id' | 'created_at' | 'updated_at'>>;
+        };
+        zoom_meetings: {
+          Row: ZoomMeeting;
+          Insert: Omit<ZoomMeeting, 'id' | 'created_at' | 'updated_at'>;
+          Update: Partial<Omit<ZoomMeeting, 'id' | 'created_at' | 'updated_at'>>;
         };
       };
     };

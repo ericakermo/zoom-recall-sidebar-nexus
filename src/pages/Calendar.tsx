@@ -3,10 +3,28 @@ import React, { useState } from 'react';
 import { Calendar as CalendarComponent } from '@/components/ui/calendar';
 import { Button } from '@/components/ui/button';
 import { Alert } from '@/components/ui/alert';
-import { Plus, ChevronLeft, ChevronRight, X } from 'lucide-react';
+import { Plus, ChevronLeft, ChevronRight, X, RefreshCw, ExternalLink } from 'lucide-react';
+import { useZoomMeetings } from '@/hooks/useZoomMeetings';
+import { format } from 'date-fns';
 
 const Calendar = () => {
   const [date, setDate] = useState<Date | undefined>(new Date());
+  const { meetings, isLoading, isSyncing, syncMeetings } = useZoomMeetings(date);
+
+  const handleJoinMeeting = (joinUrl: string) => {
+    if (joinUrl) {
+      window.open(joinUrl, '_blank');
+    }
+  };
+
+  const formatMeetingTime = (startTime: string, duration: number) => {
+    const start = new Date(startTime);
+    const end = new Date(start.getTime() + duration * 60000);
+    return {
+      startTime: format(start, 'HH:mm'),
+      endTime: format(end, 'HH:mm')
+    };
+  };
 
   return (
     <div className="p-6 h-full">
@@ -30,9 +48,14 @@ const Calendar = () => {
         <div className="flex flex-col gap-4 flex-1">
           {/* Buttons section */}
           <div className="flex items-center gap-2 self-start">
-            {/* Circle button with plus */}
-            <Button size="icon" className="rounded-full bg-black hover:bg-black/80 text-white w-10 h-10">
-              <Plus className="h-4 w-4" />
+            {/* Sync button with refresh icon */}
+            <Button 
+              size="icon" 
+              className="rounded-full bg-black hover:bg-black/80 text-white w-10 h-10"
+              onClick={syncMeetings}
+              disabled={isSyncing}
+            >
+              <RefreshCw className={`h-4 w-4 ${isSyncing ? 'animate-spin' : ''}`} />
             </Button>
 
             {/* Chevron buttons */}
@@ -51,104 +74,77 @@ const Calendar = () => {
           <div className="w-full h-px bg-black opacity-10"></div>
 
           {/* Today header */}
-          <p className="text-sm font-medium text-left">Today</p>
+          <p className="text-sm font-medium text-left">
+            {date ? format(date, 'EEEE, MMMM d') : 'Today'}
+          </p>
 
-          {/* Alert components section */}
+          {/* Loading state */}
+          {isLoading && (
+            <div className="flex items-center justify-center py-8">
+              <RefreshCw className="h-6 w-6 animate-spin" />
+              <span className="ml-2 text-sm text-gray-600">Loading meetings...</span>
+            </div>
+          )}
+
+          {/* Meetings section */}
           <div className="flex flex-col gap-4 w-full">
-            <Alert
-              layout="row"
-              isNotification
-              className="w-[90%] bg-background"
-              action={
-                <div className="flex items-center gap-3">
-                  <Button size="sm">Connect to meeting</Button>
-                  <Button
-                    variant="ghost"
-                    className="group -my-1.5 -me-2 size-8 shrink-0 p-0 hover:bg-transparent"
-                    aria-label="Close banner"
-                  >
-                    <X
-                      size={16}
-                      strokeWidth={2}
-                      className="opacity-60 transition-opacity group-hover:opacity-100"
-                      aria-hidden="true"
-                    />
-                  </Button>
-                </div>
-              }
-            >
-              <div className="flex grow items-center gap-4">
-                <div className="flex flex-col gap-1">
-                  <p className="h-6 text-xs w-16 px-2 py-1">12:30</p>
-                  <p className="h-6 text-xs w-16 px-2 py-1">13:00</p>
-                </div>
-                <p className="text-sm font-medium">Eric &lt;&gt; Corp LLC - intro</p>
+            {!isLoading && meetings.length === 0 && (
+              <div className="text-center py-8 text-gray-500">
+                <p className="text-sm">No meetings scheduled for this day</p>
+                <p className="text-xs mt-1">Click the sync button to fetch your Zoom meetings</p>
               </div>
-            </Alert>
+            )}
 
-            <Alert
-              layout="row"
-              isNotification
-              className="w-[90%] bg-background"
-              variant="warning"
-              action={
-                <div className="flex items-center gap-3">
-                  <Button size="sm">Connect to meeting</Button>
-                  <Button
-                    variant="ghost"
-                    className="group -my-1.5 -me-2 size-8 shrink-0 p-0 hover:bg-transparent"
-                    aria-label="Close banner"
-                  >
-                    <X
-                      size={16}
-                      strokeWidth={2}
-                      className="opacity-60 transition-opacity group-hover:opacity-100"
-                      aria-hidden="true"
-                    />
-                  </Button>
-                </div>
-              }
-            >
-              <div className="flex grow items-center gap-4">
-                <div className="flex flex-col gap-1">
-                  <p className="h-6 text-xs w-16 px-2 py-1">14:00</p>
-                  <p className="h-6 text-xs w-16 px-2 py-1">15:30</p>
-                </div>
-                <p className="text-sm font-medium">Eric &lt;&gt; Corp LLC - intro</p>
-              </div>
-            </Alert>
+            {meetings.map((meeting, index) => {
+              const { startTime, endTime } = formatMeetingTime(meeting.start_time, meeting.duration);
+              const variants = ['default', 'warning', 'info'] as const;
+              const variant = variants[index % variants.length];
 
-            <Alert
-              layout="row"
-              isNotification
-              className="w-[90%] bg-background"
-              variant="info"
-              action={
-                <div className="flex items-center gap-3">
-                  <Button size="sm">Connect to meeting</Button>
-                  <Button
-                    variant="ghost"
-                    className="group -my-1.5 -me-2 size-8 shrink-0 p-0 hover:bg-transparent"
-                    aria-label="Close banner"
-                  >
-                    <X
-                      size={16}
-                      strokeWidth={2}
-                      className="opacity-60 transition-opacity group-hover:opacity-100"
-                      aria-hidden="true"
-                    />
-                  </Button>
-                </div>
-              }
-            >
-              <div className="flex grow items-center gap-4">
-                <div className="flex flex-col gap-1">
-                  <p className="h-6 text-xs w-16 px-2 py-1">16:15</p>
-                  <p className="h-6 text-xs w-16 px-2 py-1">17:00</p>
-                </div>
-                <p className="text-sm font-medium">Eric &lt;&gt; Corp LLC - intro</p>
-              </div>
-            </Alert>
+              return (
+                <Alert
+                  key={meeting.id}
+                  layout="row"
+                  isNotification
+                  className="w-[90%] bg-background"
+                  variant={variant}
+                  action={
+                    <div className="flex items-center gap-3">
+                      <Button 
+                        size="sm"
+                        onClick={() => handleJoinMeeting(meeting.join_url)}
+                        disabled={!meeting.join_url}
+                      >
+                        <ExternalLink className="h-3 w-3 mr-1" />
+                        Join Meeting
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        className="group -my-1.5 -me-2 size-8 shrink-0 p-0 hover:bg-transparent"
+                        aria-label="Close banner"
+                      >
+                        <X
+                          size={16}
+                          strokeWidth={2}
+                          className="opacity-60 transition-opacity group-hover:opacity-100"
+                          aria-hidden="true"
+                        />
+                      </Button>
+                    </div>
+                  }
+                >
+                  <div className="flex grow items-center gap-4">
+                    <div className="flex flex-col gap-1">
+                      <p className="h-6 text-xs w-16 px-2 py-1">{startTime}</p>
+                      <p className="h-6 text-xs w-16 px-2 py-1">{endTime}</p>
+                    </div>
+                    <div className="flex flex-col">
+                      <p className="text-sm font-medium">{meeting.title}</p>
+                      <p className="text-xs text-gray-500">{meeting.duration} minutes</p>
+                    </div>
+                  </div>
+                </Alert>
+              );
+            })}
           </div>
         </div>
       </div>
