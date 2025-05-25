@@ -7,15 +7,22 @@ import { Plus, ChevronLeft, ChevronRight, X, RefreshCw, ExternalLink } from 'luc
 import { useZoomMeetings } from '@/hooks/useZoomMeetings';
 import { format } from 'date-fns';
 import CreateMeetingPopover from '@/components/CreateMeetingPopover';
+import MeetingDetailsPopover from '@/components/MeetingDetailsPopover';
 
 const Calendar = () => {
   const [date, setDate] = useState<Date | undefined>(new Date());
   const { meetings, isLoading, isSyncing, syncMeetings } = useZoomMeetings(date);
 
-  const handleJoinMeeting = (joinUrl: string) => {
+  const handleJoinMeeting = (joinUrl: string, event: React.MouseEvent) => {
+    event.stopPropagation(); // Prevent popover from opening
     if (joinUrl) {
       window.open(joinUrl, '_blank');
     }
+  };
+
+  const handleCloseMeeting = (event: React.MouseEvent) => {
+    event.stopPropagation(); // Prevent popover from opening
+    // Add close functionality here if needed
   };
 
   const formatMeetingTime = (startTime: string, duration: number) => {
@@ -113,48 +120,52 @@ const Calendar = () => {
               const variant = variants[index % variants.length];
 
               return (
-                <Alert
-                  key={meeting.id}
-                  layout="row"
-                  isNotification
-                  className="w-[90%] bg-background"
-                  variant={variant}
-                  action={
-                    <div className="flex items-center gap-3">
-                      <Button 
-                        size="sm"
-                        onClick={() => handleJoinMeeting(meeting.join_url)}
-                        disabled={!meeting.join_url}
-                      >
-                        <ExternalLink className="h-3 w-3 mr-1" />
-                        Join Meeting
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        className="group -my-1.5 -me-2 size-8 shrink-0 p-0 hover:bg-transparent"
-                        aria-label="Close banner"
-                      >
-                        <X
-                          size={16}
-                          strokeWidth={2}
-                          className="opacity-60 transition-opacity group-hover:opacity-100"
-                          aria-hidden="true"
-                        />
-                      </Button>
-                    </div>
-                  }
-                >
-                  <div className="flex grow items-center gap-4">
-                    <div className="flex flex-col gap-1">
-                      <p className="h-6 text-xs w-16 px-2 py-1">{startTime}</p>
-                      <p className="h-6 text-xs w-16 px-2 py-1">{endTime}</p>
-                    </div>
-                    <div className="flex flex-col">
-                      <p className="text-sm font-medium">{meeting.title}</p>
-                      <p className="text-xs text-gray-500">{meeting.duration} minutes</p>
-                    </div>
+                <MeetingDetailsPopover key={meeting.id} meeting={meeting}>
+                  <div className="cursor-pointer">
+                    <Alert
+                      layout="row"
+                      isNotification
+                      className="w-[90%] bg-background hover:border-opacity-50 transition-all duration-200"
+                      variant={variant}
+                      action={
+                        <div className="flex items-center gap-3">
+                          <Button 
+                            size="sm"
+                            onClick={(e) => handleJoinMeeting(meeting.join_url, e)}
+                            disabled={!meeting.join_url}
+                          >
+                            <ExternalLink className="h-3 w-3 mr-1" />
+                            Join Meeting
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            className="group -my-1.5 -me-2 size-8 shrink-0 p-0 hover:bg-transparent"
+                            aria-label="Close banner"
+                            onClick={handleCloseMeeting}
+                          >
+                            <X
+                              size={16}
+                              strokeWidth={2}
+                              className="opacity-60 transition-opacity group-hover:opacity-100"
+                              aria-hidden="true"
+                            />
+                          </Button>
+                        </div>
+                      }
+                    >
+                      <div className="flex grow items-center gap-4">
+                        <div className="flex flex-col gap-1">
+                          <p className="h-6 text-xs w-16 px-2 py-1">{startTime}</p>
+                          <p className="h-6 text-xs w-16 px-2 py-1">{endTime}</p>
+                        </div>
+                        <div className="flex flex-col">
+                          <p className="text-sm font-medium">{meeting.title}</p>
+                          <p className="text-xs text-gray-500">{meeting.duration} minutes</p>
+                        </div>
+                      </div>
+                    </Alert>
                   </div>
-                </Alert>
+                </MeetingDetailsPopover>
               );
             })}
           </div>
