@@ -1,3 +1,4 @@
+
 import React, { useEffect, useRef, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { supabase } from '@/lib/supabase';
@@ -102,4 +103,4 @@ const Meeting = () => {
   );
 };
 
-export default Meeting; 
+export default Meeting;

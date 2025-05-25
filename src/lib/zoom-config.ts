@@ -1,5 +1,5 @@
+
 import { ZoomMeetingConfig, ZoomJoinParams, ZoomJoinConfig, ZoomTokenData, MeetingStatus } from '@/types/zoom';
-import { createHash } from 'crypto';
 
 // Use the updated client ID as the SDK Key
 const ZOOM_SDK_KEY = "dkQMavedS2OWM2c73F6pLg"; // Updated SDK Key (Client ID)
@@ -239,9 +239,6 @@ export const checkMeetingStatus = async (meetingNumber: string): Promise<Meeting
     throw error;
   }
 };
-
-// Legacy function name for backward compatibility
-export const getSignature = getZoomAccessToken;
 
 export const createAndInitializeZoomClient = async (
   zoomAppRoot: HTMLElement,
