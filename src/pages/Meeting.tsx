@@ -1,3 +1,4 @@
+
 import React, { useEffect, useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import ZoomMtgEmbedded from '@zoom/meetingsdk/embedded';
@@ -24,17 +25,19 @@ const Meeting = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const [isLoading, setIsLoading] = useState(true);
+  const [isInitializing, setIsInitializing] = useState(false);
+  const [isJoining, setIsJoining] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [meetingData, setMeetingData] = useState<ZoomMeeting | null>(null);
   const { toast } = useToast();
   const clientRef = useRef<any>(null);
   const meetingContainerRef = useRef<HTMLDivElement>(null);
+  const joinAttemptRef = useRef<boolean>(false);
 
   const getMeetingPassword = async (meetingId: string, isHost: boolean) => {
     console.log('🔄 Attempting to get meeting details from server...', { meetingId, isHost });
     
     try {
-      // Call our edge function to get meeting details (no CORS issues)
       console.log('🔄 Calling get-meeting-details edge function...');
       const { data: meetingDetails, error } = await supabase.functions.invoke('get-meeting-details', {
         body: { meetingId }
@@ -109,9 +112,132 @@ const Meeting = () => {
     });
   };
 
+  // Initialize Zoom client with guards
+  const initializeClient = async () => {
+    if (isInitializing || clientRef.current) {
+      console.log('🔄 Client already initializing or initialized');
+      return clientRef.current;
+    }
+
+    try {
+      setIsInitializing(true);
+      console.log('🎯 Starting client initialization');
+      
+      const client = ZoomMtgEmbedded.createClient();
+      clientRef.current = client;
+
+      await client.init({
+        zoomAppRoot: meetingContainerRef.current,
+        language: 'en-US',
+        customize: {
+          meetingInfo: ['topic', 'host', 'mn', 'pwd', 'invite', 'participant', 'dc'],
+          toolbar: {
+            buttons: [
+              {
+                text: 'Leave Meeting',
+                className: 'CustomLeaveButton',
+                onClick: () => {
+                  console.log('🔘 Leave meeting clicked');
+                  handleLeaveMeeting();
+                }
+              }
+            ]
+          }
+        }
+      });
+      
+      console.log('✅ Client initialized successfully');
+      return client;
+    } catch (error) {
+      console.error('❌ Client initialization failed:', error);
+      throw error;
+    } finally {
+      setIsInitializing(false);
+    }
+  };
+
+  // Join meeting with guards
+  const joinMeeting = async (meetingConfig: any) => {
+    if (isJoining || joinAttemptRef.current) {
+      console.log('⚠️ Join operation already in progress');
+      return;
+    }
+
+    try {
+      setIsJoining(true);
+      joinAttemptRef.current = true;
+      console.log('🔄 Starting join operation with config:', {
+        meetingNumber: meetingConfig.meetingNumber,
+        hasPassword: !!meetingConfig.password,
+        hasZak: !!meetingConfig.zak,
+        role: meetingConfig.role || 'participant'
+      });
+
+      if (!clientRef.current) {
+        throw new Error('Client not initialized');
+      }
+
+      await clientRef.current.join({
+        ...meetingConfig,
+        success: (success: any) => {
+          console.log('✅ Join successful:', success);
+          setIsLoading(false);
+          setIsJoining(false);
+          toast({
+            title: "Success",
+            description: "Successfully joined the meeting",
+          });
+        },
+        error: (error: any) => {
+          console.error('❌ Join failed:', error);
+          setIsJoining(false);
+          handleJoinError(error, meetingConfig.meetingNumber, meetingConfig.role === 1);
+          setIsLoading(false);
+        }
+      });
+    } catch (error: any) {
+      console.error('❌ Join operation failed:', error);
+      setError(error.message);
+      setIsLoading(false);
+      setIsJoining(false);
+    } finally {
+      joinAttemptRef.current = false;
+    }
+  };
+
+  // Proper cleanup
+  const handleLeaveMeeting = async () => {
+    try {
+      console.log('🧹 Starting meeting cleanup');
+      
+      if (clientRef.current?.leave) {
+        await clientRef.current.leave();
+        console.log('✅ Meeting left successfully');
+      }
+      
+      // Reset all states
+      clientRef.current = null;
+      setIsJoining(false);
+      joinAttemptRef.current = false;
+      setIsInitializing(false);
+      
+    } catch (error) {
+      console.error('❌ Cleanup error:', error);
+    } finally {
+      navigate('/calendar');
+    }
+  };
+
   useEffect(() => {
     const initializeMeeting = async () => {
       console.log('🎯 Initializing Zoom meeting component...');
+      
+      // Prevent multiple initializations
+      if (isInitializing || isJoining || joinAttemptRef.current) {
+        console.log('🔄 Already initializing, skipping...');
+        return;
+      }
+
       try {
         setIsLoading(true);
         setError(null);
@@ -152,10 +278,13 @@ const Meeting = () => {
         const isHost = meeting.user_id === user.id;
         console.log(`ℹ️ User role: ${isHost ? 'Host' : 'Participant'}`);
 
-        // Get meeting password from our edge function (no CORS issues)
+        // Get meeting password from our edge function
         console.log('🔄 Getting meeting password via edge function...');
         const meetingPassword = await getMeetingPassword(meeting.meeting_id, isHost);
         console.log('✅ Meeting password retrieved:', { hasPassword: !!meetingPassword });
+
+        // Initialize client
+        await initializeClient();
 
         // Get Zoom token and signature
         console.log('🔄 Requesting Zoom token and signature...');
@@ -163,7 +292,7 @@ const Meeting = () => {
           body: { 
             meetingNumber: meeting.meeting_id,
             role: isHost ? 1 : 0,
-            expirationSeconds: 7200 // 2 hours
+            expirationSeconds: 7200
           }
         });
 
@@ -186,58 +315,15 @@ const Meeting = () => {
           }
         }
 
-        // Initialize Zoom client
-        console.log('🔄 Initializing Zoom client...');
-        const client = ZoomMtgEmbedded.createClient();
-        clientRef.current = client;
-
-        // Initialize the client
-        console.log('🔄 Setting up Zoom client configuration...');
-        await client.init({
-          zoomAppRoot: meetingContainerRef.current,
-          language: 'en-US',
-          customize: {
-            meetingInfo: ['topic', 'host', 'mn', 'pwd', 'invite', 'participant', 'dc'],
-            toolbar: {
-              buttons: [
-                {
-                  text: 'Leave Meeting',
-                  className: 'CustomLeaveButton',
-                  onClick: () => {
-                    console.log('🔘 Leave meeting button clicked');
-                    if (clientRef.current) {
-                      clientRef.current.leave();
-                    }
-                    navigate('/calendar');
-                  }
-                }
-              ]
-            }
-          }
-        });
-        console.log('✅ Zoom client initialized');
-
         // Prepare join configuration with real password
         const joinConfig: any = {
           sdkKey: tokenData.sdkKey,
           signature: tokenData.signature,
           meetingNumber: meeting.meeting_id,
-          password: meetingPassword, // Now using real password from Zoom API
+          password: meetingPassword,
           userName: user.email || 'Anonymous',
           userEmail: user.email,
-          success: (success: any) => {
-            console.log('✅ Successfully joined meeting:', success);
-            setIsLoading(false);
-            toast({
-              title: "Success",
-              description: "Successfully joined the meeting",
-            });
-          },
-          error: (error: any) => {
-            console.error('❌ Error joining meeting:', error);
-            handleJoinError(error, meeting.meeting_id, isHost);
-            setIsLoading(false);
-          }
+          role: isHost ? 1 : 0
         };
 
         // Add ZAK token for hosts
@@ -247,14 +333,8 @@ const Meeting = () => {
         }
 
         // Join the meeting
-        console.log('🔄 Joining Zoom meeting with configuration:', {
-          meetingNumber: joinConfig.meetingNumber,
-          hasPassword: !!joinConfig.password,
-          hasZak: !!joinConfig.zak,
-          role: isHost ? 'Host' : 'Participant'
-        });
-
-        await client.join(joinConfig);
+        console.log('🔄 Joining Zoom meeting...');
+        await joinMeeting(joinConfig);
 
       } catch (err: any) {
         console.error('❌ Meeting initialization error:', err);
@@ -268,7 +348,7 @@ const Meeting = () => {
       }
     };
 
-    if (id && user) {
+    if (id && user && !isInitializing && !isJoining && !joinAttemptRef.current) {
       initializeMeeting();
     }
 
@@ -319,7 +399,7 @@ const Meeting = () => {
             <p className="text-sm text-gray-600">Meeting ID: {meetingData.meeting_id}</p>
           </div>
         )}
-        <div></div> {/* Spacer for flex layout */}
+        <div></div>
       </div>
 
       {/* Meeting Content */}
@@ -328,7 +408,11 @@ const Meeting = () => {
           <div className="absolute inset-0 flex items-center justify-center bg-background/80 z-50">
             <div className="text-center">
               <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4" />
-              <p>Initializing meeting...</p>
+              <p>
+                {isInitializing ? 'Initializing Zoom client...' : 
+                 isJoining ? 'Joining meeting...' : 
+                 'Loading meeting...'}
+              </p>
             </div>
           </div>
         )}
