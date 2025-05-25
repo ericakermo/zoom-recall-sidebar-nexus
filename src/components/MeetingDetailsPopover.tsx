@@ -19,10 +19,12 @@ interface MeetingDetailsPopoverProps {
 }
 
 const ZoomIcon = () => (
-  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-    <rect x="2" y="6" width="20" height="12" rx="4" fill="#2D8CFF"/>
-    <path d="M8 10v4l4-2-4-2z" fill="white"/>
-  </svg>
+  <img 
+    src="https://cdn.worldvectorlogo.com/logos/zoom-app.svg" 
+    alt="Zoom" 
+    width="20" 
+    height="20" 
+  />
 );
 
 export const MeetingDetailsPopover: React.FC<MeetingDetailsPopoverProps> = ({ children, meeting }) => {
