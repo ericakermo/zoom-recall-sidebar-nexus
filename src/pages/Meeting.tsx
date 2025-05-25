@@ -1,4 +1,3 @@
-
 import React, { useEffect, useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import ZoomMtgEmbedded from '@zoom/meetingsdk/embedded';
@@ -32,43 +31,31 @@ const Meeting = () => {
   const meetingContainerRef = useRef<HTMLDivElement>(null);
 
   const getMeetingPassword = async (meetingId: string, isHost: boolean) => {
-    console.log('🔄 Attempting to get meeting password...', { meetingId, isHost });
+    console.log('🔄 Attempting to get meeting details from server...', { meetingId, isHost });
     
     try {
-      // First, try to get password from Zoom API if user is host
-      if (isHost) {
-        console.log('🔄 Host detected, fetching meeting details from Zoom API...');
-        const { data: tokenData } = await supabase.functions.invoke('get-zoom-token', {
-          body: { 
-            meetingNumber: meetingId,
-            role: 1 // Host role
-          }
-        });
+      // Call our edge function to get meeting details (no CORS issues)
+      console.log('🔄 Calling get-meeting-details edge function...');
+      const { data: meetingDetails, error } = await supabase.functions.invoke('get-meeting-details', {
+        body: { meetingId }
+      });
 
-        // Get meeting details from Zoom API
-        const meetingResponse = await fetch(`https://api.zoom.us/v2/meetings/${meetingId}`, {
-          headers: {
-            'Authorization': `Bearer ${tokenData.accessToken}`,
-            'Content-Type': 'application/json'
-          }
-        });
-
-        if (meetingResponse.ok) {
-          const meetingDetails = await meetingResponse.json();
-          console.log('✅ Meeting details from Zoom API:', {
-            hasPassword: !!meetingDetails.password,
-            waitingRoom: meetingDetails.settings?.waiting_room,
-            joinBeforeHost: meetingDetails.settings?.join_before_host
-          });
-          return meetingDetails.password || '';
-        }
+      if (error) {
+        console.error('❌ Error getting meeting details:', error);
+        return '';
       }
 
-      // Fallback: return empty password
-      console.log('ℹ️ No password found, using empty string');
-      return '';
+      console.log('✅ Meeting details retrieved:', {
+        hasPassword: !!meetingDetails.password,
+        waitingRoom: meetingDetails.settings?.waiting_room,
+        joinBeforeHost: meetingDetails.settings?.join_before_host,
+        status: meetingDetails.status
+      });
+
+      return meetingDetails.password || '';
+
     } catch (error) {
-      console.error('⚠️ Error getting meeting password:', error);
+      console.error('⚠️ Error getting meeting details:', error);
       return '';
     }
   };
@@ -165,8 +152,8 @@ const Meeting = () => {
         const isHost = meeting.user_id === user.id;
         console.log(`ℹ️ User role: ${isHost ? 'Host' : 'Participant'}`);
 
-        // Get meeting password
-        console.log('🔄 Getting meeting password...');
+        // Get meeting password from our edge function (no CORS issues)
+        console.log('🔄 Getting meeting password via edge function...');
         const meetingPassword = await getMeetingPassword(meeting.meeting_id, isHost);
         console.log('✅ Meeting password retrieved:', { hasPassword: !!meetingPassword });
 
@@ -230,12 +217,12 @@ const Meeting = () => {
         });
         console.log('✅ Zoom client initialized');
 
-        // Prepare join configuration
+        // Prepare join configuration with real password
         const joinConfig: any = {
           sdkKey: tokenData.sdkKey,
           signature: tokenData.signature,
           meetingNumber: meeting.meeting_id,
-          password: meetingPassword, // Use the retrieved password
+          password: meetingPassword, // Now using real password from Zoom API
           userName: user.email || 'Anonymous',
           userEmail: user.email,
           success: (success: any) => {

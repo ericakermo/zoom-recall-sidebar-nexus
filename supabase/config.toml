@@ -9,3 +9,15 @@ verify_jwt = false
 
 [functions.create-zoom-meeting]
 verify_jwt = true
+
+[functions.get-zoom-token]
+verify_jwt = true
+
+[functions.get-zoom-zak]
+verify_jwt = true
+
+[functions.sync-zoom-meetings]
+verify_jwt = true
+
+[functions.get-meeting-details]
+verify_jwt = true
