@@ -50,6 +50,9 @@ const Calendar = () => {
           {/* Horizontal line below all buttons */}
           <div className="w-full h-px bg-black opacity-10"></div>
 
+          {/* Today header */}
+          <p className="text-sm font-medium text-left">Today</p>
+
           {/* Alert components section */}
           <div className="flex flex-col gap-4 w-full">
             <Alert
