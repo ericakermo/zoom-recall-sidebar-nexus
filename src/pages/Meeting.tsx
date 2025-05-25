@@ -8,13 +8,25 @@ import { Button } from '@/components/ui/button';
 import { Loader2, ArrowLeft } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 
+interface ZoomMeeting {
+  id: string;
+  meeting_id: string;
+  title: string;
+  start_time: string;
+  duration: number;
+  user_id: string;
+  join_url: string;
+  created_at: string;
+  updated_at: string;
+}
+
 const Meeting = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const { user } = useAuth();
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [meetingData, setMeetingData] = useState<any>(null);
+  const [meetingData, setMeetingData] = useState<ZoomMeeting | null>(null);
   const { toast } = useToast();
   const clientRef = useRef<any>(null);
   const meetingContainerRef = useRef<HTMLDivElement>(null);
@@ -96,7 +108,7 @@ const Meeting = () => {
           sdkKey: tokenData.sdkKey,
           signature: tokenData.signature,
           meetingNumber: meeting.meeting_id,
-          password: meeting.password || '',
+          password: '', // Leave empty as we don't store passwords in our database
           userName: user.email || 'Anonymous',
           userEmail: user.email,
           zak: zakToken,
