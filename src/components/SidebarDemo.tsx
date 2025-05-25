@@ -1,4 +1,3 @@
-
 import React, { useState, ReactNode } from "react";
 import { Sidebar, SidebarBody, SidebarLink } from "@/components/ui/sidebar";
 import { LayoutDashboard, UserCog, Settings, LogOut, Video, Calendar } from "lucide-react";
@@ -90,13 +89,7 @@ export function SidebarDemo({ children }: SidebarDemoProps) {
           </div>
         </SidebarBody>
       </Sidebar>
-      <div className="flex flex-1 relative">
-        {/* Vertical line spanning full height */}
-        <div className="absolute left-0 top-0 w-px h-full bg-black opacity-20"></div>
-        
-        {/* Horizontal line spanning full width */}
-        <div className="absolute top-20 left-0 w-full h-px bg-black opacity-20"></div>
-        
+      <div className="flex flex-1">
         <div className="p-2 md:p-10 rounded-tl-2xl border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 flex flex-col gap-2 flex-1 w-full h-full overflow-auto">
           {children}
         </div>
