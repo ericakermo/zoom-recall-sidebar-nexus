@@ -1,4 +1,3 @@
-
 export interface ZoomMeetingConfig {
   signature: string;
   meetingNumber: string;
@@ -65,4 +64,4 @@ export interface MeetingStatus {
   startTime: string;
   duration: number;
   joinBeforeHost: boolean;
-}
+} 

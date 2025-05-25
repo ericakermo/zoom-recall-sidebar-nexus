@@ -1,70 +1,37 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Calendar as CalendarComponent } from '@/components/ui/calendar';
 import { Button } from '@/components/ui/button';
 import { Alert } from '@/components/ui/alert';
-import { Plus, ChevronLeft, ChevronRight, CircleCheck, X } from 'lucide-react';
-import { supabase } from '@/lib/supabase';
-import { useToast } from '@/components/ui/use-toast';
-import { useNavigate } from 'react-router-dom';
-
-interface ZoomMeeting {
-  id: string;
-  meeting_id: string;
-  title: string;
-  start_time: string;
-  duration: number;
-  user_id: string;
-}
+import { Plus, ChevronLeft, ChevronRight, X, RefreshCw, ExternalLink } from 'lucide-react';
+import { useZoomMeetings } from '@/hooks/useZoomMeetings';
+import { format } from 'date-fns';
+import CreateMeetingPopover from '@/components/CreateMeetingPopover';
+import MeetingDetailsPopover from '@/components/MeetingDetailsPopover';
 
 const Calendar = () => {
   const [date, setDate] = useState<Date | undefined>(new Date());
-  const [meetings, setMeetings] = useState<ZoomMeeting[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const { toast } = useToast();
-  const navigate = useNavigate();
+  const { meetings, isLoading, isSyncing, syncMeetings } = useZoomMeetings(date);
 
-  useEffect(() => {
-    const fetchMeetings = async () => {
-      try {
-        setIsLoading(true);
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) throw new Error('User not authenticated');
+  const handleJoinMeeting = (joinUrl: string, event: React.MouseEvent) => {
+    event.stopPropagation(); // Prevent popover from opening
+    if (joinUrl) {
+      window.open(joinUrl, '_blank');
+    }
+  };
 
-        const { data, error } = await supabase
-          .from('zoom_meetings')
-          .select('*')
-          .gte('start_time', new Date().toISOString())
-          .order('start_time', { ascending: true });
-
-        if (error) throw error;
-        setMeetings(data || []);
-      } catch (err: any) {
-        console.error('Error fetching meetings:', err);
-        toast({
-          title: "Error",
-          description: err.message,
-          variant: "destructive",
-        });
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    fetchMeetings();
-  }, [toast]);
-
-  const getMeetingsForDate = (date: Date) => {
-    return meetings.filter(meeting => {
-      const meetingDate = new Date(meeting.start_time);
-      return meetingDate.toDateString() === date.toDateString();
-    });
+  const handleCloseMeeting = (event: React.MouseEvent) => {
+    event.stopPropagation(); // Prevent popover from opening
+    // Add close functionality here if needed
   };
 
   const formatMeetingTime = (startTime: string, duration: number) => {
     const start = new Date(startTime);
     const end = new Date(start.getTime() + duration * 60000);
-    return `${start.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} - ${end.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+    return {
+      startTime: format(start, 'HH:mm'),
+      endTime: format(end, 'HH:mm')
+    };
   };
 
   return (
@@ -89,10 +56,26 @@ const Calendar = () => {
         <div className="flex flex-col gap-4 flex-1">
           {/* Buttons section */}
           <div className="flex items-center gap-2 self-start">
-            {/* Circle button with plus */}
-            <Button size="icon" className="rounded-full bg-black hover:bg-black/80 text-white w-10 h-10">
-              <Plus className="h-4 w-4" />
+            {/* Refresh button */}
+            <Button 
+              size="icon" 
+              variant="ghost"
+              onClick={syncMeetings}
+              disabled={isSyncing}
+              className="w-10 h-10 p-0 hover:bg-black hover:bg-opacity-10"
+            >
+              <RefreshCw className={`h-4 w-4 text-black opacity-10 ${isSyncing ? 'animate-spin' : ''}`} />
             </Button>
+
+            {/* Plus button with popover */}
+            <CreateMeetingPopover>
+              <Button 
+                size="icon" 
+                className="rounded-full bg-black hover:bg-black/80 text-white w-10 h-10"
+              >
+                <Plus className="h-4 w-4" />
+              </Button>
+            </CreateMeetingPopover>
 
             {/* Chevron buttons */}
             <div className="flex gap-1">
@@ -109,55 +92,82 @@ const Calendar = () => {
           {/* Horizontal line below all buttons */}
           <div className="w-full h-px bg-black opacity-10"></div>
 
-          {/* Alert components section */}
+          {/* Today header */}
+          <p className="text-sm font-medium text-left">
+            {date ? format(date, 'EEEE, MMMM d') : 'Today'}
+          </p>
+
+          {/* Loading state */}
+          {isLoading && (
+            <div className="flex items-center justify-center py-8">
+              <RefreshCw className="h-6 w-6 animate-spin" />
+              <span className="ml-2 text-sm text-gray-600">Loading meetings...</span>
+            </div>
+          )}
+
+          {/* Meetings section */}
           <div className="flex flex-col gap-4 w-full">
-            {date && getMeetingsForDate(date).map((meeting) => (
-              <Alert
-                key={meeting.id}
-                layout="row"
-                isNotification
-                className="w-[90%] bg-background"
-                icon={
-                  <CircleCheck
-                    className="text-emerald-500"
-                    size={16}
-                    strokeWidth={2}
-                    aria-hidden="true"
-                  />
-                }
-                action={
-                  <div className="flex items-center gap-3">
-                    <Button 
-                      size="sm"
-                      onClick={() => navigate(`/meeting/${meeting.id}`)}
+            {!isLoading && meetings.length === 0 && (
+              <div className="text-center py-8 text-gray-500">
+                <p className="text-sm">No meetings scheduled for this day</p>
+                <p className="text-xs mt-1">Click the sync button to fetch your Zoom meetings</p>
+              </div>
+            )}
+
+            {meetings.map((meeting, index) => {
+              const { startTime, endTime } = formatMeetingTime(meeting.start_time, meeting.duration);
+              const variants = ['default', 'warning', 'info'] as const;
+              const variant = variants[index % variants.length];
+
+              return (
+                <MeetingDetailsPopover key={meeting.id} meeting={meeting}>
+                  <div className="cursor-pointer">
+                    <Alert
+                      layout="row"
+                      isNotification
+                      className="w-[90%] bg-background hover:border-opacity-50 transition-all duration-200"
+                      variant={variant}
+                      action={
+                        <div className="flex items-center gap-3">
+                          <Button 
+                            size="sm"
+                            onClick={(e) => handleJoinMeeting(meeting.join_url, e)}
+                            disabled={!meeting.join_url}
+                          >
+                            <ExternalLink className="h-3 w-3 mr-1" />
+                            Join Meeting
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            className="group -my-1.5 -me-2 size-8 shrink-0 p-0 hover:bg-transparent"
+                            aria-label="Close banner"
+                            onClick={handleCloseMeeting}
+                          >
+                            <X
+                              size={16}
+                              strokeWidth={2}
+                              className="opacity-60 transition-opacity group-hover:opacity-100"
+                              aria-hidden="true"
+                            />
+                          </Button>
+                        </div>
+                      }
                     >
-                      Join Meeting
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      className="group -my-1.5 -me-2 size-8 shrink-0 p-0 hover:bg-transparent"
-                      aria-label="Close banner"
-                    >
-                      <X
-                        size={16}
-                        strokeWidth={2}
-                        className="opacity-60 transition-opacity group-hover:opacity-100"
-                        aria-hidden="true"
-                      />
-                    </Button>
+                      <div className="flex grow items-center gap-4">
+                        <div className="flex flex-col gap-1">
+                          <p className="h-6 text-xs w-16 px-2 py-1">{startTime}</p>
+                          <p className="h-6 text-xs w-16 px-2 py-1">{endTime}</p>
+                        </div>
+                        <div className="flex flex-col">
+                          <p className="text-sm font-medium">{meeting.title}</p>
+                          <p className="text-xs text-gray-500">{meeting.duration} minutes</p>
+                        </div>
+                      </div>
+                    </Alert>
                   </div>
-                }
-              >
-                <div className="flex grow items-center justify-between gap-12">
-                  <div>
-                    <p className="text-sm font-medium">{meeting.title}</p>
-                    <p className="text-sm text-muted-foreground">
-                      {formatMeetingTime(meeting.start_time, meeting.duration)}
-                    </p>
-                  </div>
-                </div>
-              </Alert>
-            ))}
+                </MeetingDetailsPopover>
+              );
+            })}
           </div>
         </div>
       </div>

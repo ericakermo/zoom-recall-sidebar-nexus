@@ -1,10 +1,11 @@
+
 import { useEffect, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { getZoomAccessToken } from '@/lib/zoom-config';
+import { getSignature } from '@/lib/zoom-config';
 
 // Ensure the ZoomMtg is loaded
 function loadZoomMtgScript() {
@@ -113,8 +114,8 @@ export function ZoomMeetingSample({
       setJoining(true);
       setError(null);
       
-      // Get signature from your backend using the correct function name
-      const tokenData = await getZoomAccessToken(meetingNumber, role);
+      // Get signature from your backend
+      const signature = await getSignature(meetingNumber, role);
       
       // Initialize the meeting container
       if (zoomContainer.current) {
@@ -125,10 +126,10 @@ export function ZoomMeetingSample({
             
             // Join the meeting
             window.ZoomMtg.join({
-              signature: tokenData.signature,
+              signature: signature,
               meetingNumber: meetingNumber,
               userName: userName,
-              sdkKey: tokenData.sdkKey,
+              sdkKey: apiKey,
               userEmail: userEmail,
               passWord: passWord,
               tk: '',
