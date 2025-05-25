@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Calendar as CalendarComponent } from '@/components/ui/calendar';
 import { Button } from '@/components/ui/button';
@@ -21,11 +20,6 @@ const Calendar = () => {
           />
         </div>
         
-        {/* Vertical line */}
-        <div className="flex items-center h-full">
-          <div className="w-0.5 h-[95%] bg-black opacity-20"></div>
-        </div>
-        
         {/* Right side content */}
         <div className="flex flex-col gap-4 flex-1">
           {/* Buttons section */}
@@ -46,9 +40,6 @@ const Calendar = () => {
               </Button>
             </div>
           </div>
-
-          {/* Horizontal line below all buttons */}
-          <div className="w-full h-px bg-black opacity-10"></div>
 
           {/* Today header */}
           <p className="text-sm font-medium text-left">Today</p>
