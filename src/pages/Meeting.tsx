@@ -5,7 +5,7 @@ import { supabase } from '@/lib/supabase';
 import { useToast } from '@/components/ui/use-toast';
 import { Button } from '@/components/ui/button';
 import { Loader2 } from 'lucide-react';
-import { createAndInitializeZoomClient, joinMeeting, leaveZoomMeeting } from '@/lib/zoom-config';
+import { createAndInitializeZoomClient, joinMeeting, leaveZoomMeeting, getZoomAccessToken } from '@/lib/zoom-config';
 
 const Meeting = () => {
   const { id } = useParams();
@@ -43,13 +43,18 @@ const Meeting = () => {
         const client = await createAndInitializeZoomClient(meetingContainerRef.current);
         clientRef.current = client;
 
-        // Join the meeting
+        // Get token data first
+        const tokenData = await getZoomAccessToken(meeting.meeting_id, meeting.user_id === user.id ? 1 : 0);
+
+        // Join the meeting with the correct parameters
         await joinMeeting(client, {
           meetingNumber: meeting.meeting_id,
           userName: user.email || 'Anonymous',
           userEmail: user.email,
           password: meeting.password || '',
-          role: meeting.user_id === user.id ? 1 : 0, // 1 for host, 0 for participant
+          role: meeting.user_id === user.id ? 1 : 0,
+          signature: tokenData.signature,
+          sdkKey: tokenData.sdkKey
         });
 
         setIsLoading(false);
