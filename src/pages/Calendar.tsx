@@ -16,78 +16,59 @@ const Calendar = () => {
   const navigate = useNavigate();
   const { meetings, isLoading, isSyncing, syncMeetings } = useZoomMeetings(date);
 
-  const handleJoinMeeting = async (meetingId: string, event: React.MouseEvent) => {
-    event.stopPropagation(); // Prevent popover from opening
-    console.log('🎯 Starting meeting join process for meeting ID:', meetingId);
-      
+  const handleJoinMeeting = async (meetingId: string) => {
     try {
-      // Get user session
-      console.log('🔄 Getting user session...');
+      console.log('🎯 Starting meeting join process for meeting ID:', meetingId);
+      
+      // 1. Get user session
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
-        console.error('❌ User not authenticated');
-        throw new Error('User not authenticated');
-      }
+      if (!user) throw new Error('User not authenticated');
       console.log('✅ User authenticated:', user.email);
 
-      // Get meeting details
-      console.log('🔄 Fetching meeting details...');
+      // 2. Get meeting details with proper validation
       const { data: meeting, error: meetingError } = await supabase
         .from('zoom_meetings')
         .select('*')
         .eq('id', meetingId)
         .single();
 
-      if (meetingError) {
-        console.error('❌ Error fetching meeting details:', meetingError);
-        throw meetingError;
-      }
-      console.log('✅ Meeting details retrieved:', {
-        meetingId: meeting.id,
-        title: meeting.title,
-        startTime: meeting.start_time,
-        duration: meeting.duration
-      });
+      if (meetingError) throw meetingError;
+      console.log('✅ Meeting details retrieved:', meeting);
 
-      // Get Zoom token and signature
-      console.log('🔄 Requesting Zoom token and signature...');
+      // 3. Validate meeting status
+      const meetingStatus = await validateMeetingStatus(meeting.zoom_meeting_id);
+      console.log('ℹ️ Meeting status:', meetingStatus);
+
+      if (!meetingStatus.canJoin) {
+        throw new Error(meetingStatus.reason || 'Meeting is not ready to join');
+      }
+
+      // 4. Get tokens with proper error handling
       const { data: tokenData, error: tokenError } = await supabase.functions.invoke('get-zoom-token', {
         body: { 
-          meetingNumber: meeting.meeting_id,
-          role: meeting.user_id === user.id ? 1 : 0 // 1 for host, 0 for participant
+          meetingNumber: meeting.zoom_meeting_id,
+          role: meeting.user_id === user.id ? 1 : 0
         }
       });
 
-      if (tokenError) {
-        console.error('❌ Error getting Zoom token:', tokenError);
-        throw tokenError;
-      }
-      console.log('✅ Zoom token and signature received');
+      if (tokenError) throw tokenError;
+      console.log('✅ Tokens retrieved successfully');
 
-      // Get ZAK token if user is the host
-      let zakToken = null;
-      if (meeting.user_id === user.id) {
-        console.log('🔄 User is host, requesting ZAK token...');
-        const { data: zakData, error: zakError } = await supabase.functions.invoke('get-zoom-zak');
-        if (zakError) {
-          console.error('❌ Error getting ZAK token:', zakError);
-          throw zakError;
+      // 5. Navigate to meeting page with state
+      navigate(`/meeting/${meetingId}`, {
+        state: {
+          meeting,
+          tokens: tokenData,
+          isHost: meeting.user_id === user.id
         }
-        zakToken = zakData.zak;
-        console.log('✅ ZAK token received');
-      }
+      });
 
-      // Navigate to meeting page
-      console.log('🔄 Navigating to meeting page...');
-      navigate(`/meeting/${meetingId}`);
-      console.log('✅ Navigation complete');
-
-    } catch (err: any) {
-      console.error('❌ Meeting join error:', err);
+    } catch (error) {
+      console.error('❌ Join process failed:', error);
       toast({
-        title: "Error",
-        description: err.message,
-        variant: "destructive",
+        title: "Error joining meeting",
+        description: error.message,
+        variant: "destructive"
       });
     }
   };
@@ -104,6 +85,15 @@ const Calendar = () => {
       startTime: format(start, 'HH:mm'),
       endTime: format(end, 'HH:mm')
     };
+  };
+
+  const validateMeetingStatus = async (meetingId: string) => {
+    const { data, error } = await supabase.functions.invoke('validate-meeting-status', {
+      body: { meetingId }
+    });
+
+    if (error) throw error;
+    return data;
   };
 
   return (
@@ -203,7 +193,7 @@ const Calendar = () => {
                         <div className="flex items-center gap-3">
                           <Button 
                             size="sm"
-                            onClick={(e) => handleJoinMeeting(meeting.id, e)}
+                            onClick={() => handleJoinMeeting(meeting.id)}
                           >
                             <ExternalLink className="h-3 w-3 mr-1" />
                             Join Meeting
