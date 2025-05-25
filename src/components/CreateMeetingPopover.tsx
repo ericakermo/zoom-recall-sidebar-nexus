@@ -4,7 +4,9 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { X, Plus } from 'lucide-react';
+import { Calendar } from '@/components/ui/calendar';
+import { X, Plus, Calendar as CalendarIcon } from 'lucide-react';
+import { format } from 'date-fns';
 
 interface CreateMeetingPopoverProps {
   children: React.ReactNode;
@@ -12,9 +14,9 @@ interface CreateMeetingPopoverProps {
 
 const CreateMeetingPopover = ({ children }: CreateMeetingPopoverProps) => {
   const [title, setTitle] = useState('');
-  const [startDate, setStartDate] = useState('');
+  const [startDate, setStartDate] = useState<Date | undefined>();
   const [startTime, setStartTime] = useState('');
-  const [endDate, setEndDate] = useState('');
+  const [endDate, setEndDate] = useState<Date | undefined>();
   const [endTime, setEndTime] = useState('');
   const [attendees, setAttendees] = useState<string[]>(['']);
   const [meetingType, setMeetingType] = useState<string>('');
@@ -51,13 +53,18 @@ const CreateMeetingPopover = ({ children }: CreateMeetingPopoverProps) => {
     setOpen(false);
   };
 
+  const formatDisplayDate = (date: Date | undefined) => {
+    if (!date) return '';
+    return format(date, 'MMM do, yy');
+  };
+
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         {children}
       </PopoverTrigger>
       <PopoverContent 
-        className="w-96 p-6 bg-white border border-black border-opacity-20" 
+        className="w-96 p-6 bg-white border-[0.5px] border-black border-opacity-10" 
         align="start"
         side="right"
         sideOffset={8}
@@ -83,7 +90,7 @@ const CreateMeetingPopover = ({ children }: CreateMeetingPopoverProps) => {
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               placeholder="Enter meeting title"
-              className="border-black border-opacity-20 focus:border-black focus:border-opacity-40"
+              className="border-[0.5px] border-black border-opacity-10 focus:border-black focus:border-opacity-20"
             />
           </div>
 
@@ -91,12 +98,25 @@ const CreateMeetingPopover = ({ children }: CreateMeetingPopoverProps) => {
           <div className="grid grid-cols-2 gap-2">
             <div className="space-y-2">
               <label className="text-sm font-medium text-black">Start Date</label>
-              <Input
-                type="date"
-                value={startDate}
-                onChange={(e) => setStartDate(e.target.value)}
-                className="border-black border-opacity-20 focus:border-black focus:border-opacity-40"
-              />
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className="w-full justify-start text-left font-normal border-[0.5px] border-black border-opacity-10 hover:bg-black hover:bg-opacity-5"
+                  >
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {startDate ? formatDisplayDate(startDate) : "Pick date"}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0 border-[0.5px] border-black border-opacity-10" align="start">
+                  <Calendar
+                    mode="single"
+                    selected={startDate}
+                    onSelect={setStartDate}
+                    className="pointer-events-auto"
+                  />
+                </PopoverContent>
+              </Popover>
             </div>
             <div className="space-y-2">
               <label className="text-sm font-medium text-black">Start Time</label>
@@ -104,7 +124,7 @@ const CreateMeetingPopover = ({ children }: CreateMeetingPopoverProps) => {
                 type="time"
                 value={startTime}
                 onChange={(e) => setStartTime(e.target.value)}
-                className="border-black border-opacity-20 focus:border-black focus:border-opacity-40"
+                className="border-[0.5px] border-black border-opacity-10 focus:border-black focus:border-opacity-20"
               />
             </div>
           </div>
@@ -113,12 +133,25 @@ const CreateMeetingPopover = ({ children }: CreateMeetingPopoverProps) => {
           <div className="grid grid-cols-2 gap-2">
             <div className="space-y-2">
               <label className="text-sm font-medium text-black">End Date</label>
-              <Input
-                type="date"
-                value={endDate}
-                onChange={(e) => setEndDate(e.target.value)}
-                className="border-black border-opacity-20 focus:border-black focus:border-opacity-40"
-              />
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className="w-full justify-start text-left font-normal border-[0.5px] border-black border-opacity-10 hover:bg-black hover:bg-opacity-5"
+                  >
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {endDate ? formatDisplayDate(endDate) : "Pick date"}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0 border-[0.5px] border-black border-opacity-10" align="start">
+                  <Calendar
+                    mode="single"
+                    selected={endDate}
+                    onSelect={setEndDate}
+                    className="pointer-events-auto"
+                  />
+                </PopoverContent>
+              </Popover>
             </div>
             <div className="space-y-2">
               <label className="text-sm font-medium text-black">End Time</label>
@@ -126,7 +159,7 @@ const CreateMeetingPopover = ({ children }: CreateMeetingPopoverProps) => {
                 type="time"
                 value={endTime}
                 onChange={(e) => setEndTime(e.target.value)}
-                className="border-black border-opacity-20 focus:border-black focus:border-opacity-40"
+                className="border-[0.5px] border-black border-opacity-10 focus:border-black focus:border-opacity-20"
               />
             </div>
           </div>
@@ -140,7 +173,7 @@ const CreateMeetingPopover = ({ children }: CreateMeetingPopoverProps) => {
                   value={attendee}
                   onChange={(e) => updateAttendee(index, e.target.value)}
                   placeholder="Enter email address"
-                  className="flex-1 border-black border-opacity-20 focus:border-black focus:border-opacity-40"
+                  className="flex-1 border-[0.5px] border-black border-opacity-10 focus:border-black focus:border-opacity-20"
                 />
                 {attendees.length > 1 && (
                   <Button
@@ -168,10 +201,10 @@ const CreateMeetingPopover = ({ children }: CreateMeetingPopoverProps) => {
           <div className="space-y-2">
             <label className="text-sm font-medium text-black">Meeting Type</label>
             <Select value={meetingType} onValueChange={setMeetingType}>
-              <SelectTrigger className="border-black border-opacity-20 focus:border-black focus:border-opacity-40">
+              <SelectTrigger className="border-[0.5px] border-black border-opacity-10 focus:border-black focus:border-opacity-20">
                 <SelectValue placeholder="Select meeting type" />
               </SelectTrigger>
-              <SelectContent className="bg-white border border-black border-opacity-20">
+              <SelectContent className="bg-white border-[0.5px] border-black border-opacity-10">
                 <SelectItem value="intro">Intro</SelectItem>
                 <SelectItem value="discovery">Discovery</SelectItem>
                 <SelectItem value="closing">Closing</SelectItem>
