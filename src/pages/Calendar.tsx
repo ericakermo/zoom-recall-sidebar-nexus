@@ -86,7 +86,7 @@ const Calendar = () => {
                     className="h-6 text-xs w-16 px-2 py-1" 
                   />
                 </div>
-                <p className="text-sm font-medium">Eric <> Corp LLC - intro</p>
+                <p className="text-sm font-medium">Eric &lt;&gt; Corp LLC - intro</p>
               </div>
             </Alert>
 
@@ -124,7 +124,7 @@ const Calendar = () => {
                     className="h-6 text-xs w-16 px-2 py-1" 
                   />
                 </div>
-                <p className="text-sm font-medium">Eric <> Corp LLC - intro</p>
+                <p className="text-sm font-medium">Eric &lt;&gt; Corp LLC - intro</p>
               </div>
             </Alert>
 
@@ -162,7 +162,7 @@ const Calendar = () => {
                     className="h-6 text-xs w-16 px-2 py-1" 
                   />
                 </div>
-                <p className="text-sm font-medium">Eric <> Corp LLC - intro</p>
+                <p className="text-sm font-medium">Eric &lt;&gt; Corp LLC - intro</p>
               </div>
             </Alert>
           </div>
