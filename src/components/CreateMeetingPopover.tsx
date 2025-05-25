@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -7,6 +6,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Calendar } from '@/components/ui/calendar';
 import { X, Plus, Calendar as CalendarIcon } from 'lucide-react';
 import { format } from 'date-fns';
+import { useToast } from '@/hooks/use-toast';
+import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/context/AuthContext';
 
 interface CreateMeetingPopoverProps {
   children: React.ReactNode;
@@ -21,6 +23,9 @@ const CreateMeetingPopover = ({ children }: CreateMeetingPopoverProps) => {
   const [attendees, setAttendees] = useState<string[]>(['']);
   const [meetingType, setMeetingType] = useState<string>('');
   const [open, setOpen] = useState(false);
+  const [isCreating, setIsCreating] = useState(false);
+  const { toast } = useToast();
+  const { user } = useAuth();
 
   // Generate time options with 15-minute intervals
   const generateTimeOptions = () => {
@@ -53,18 +58,100 @@ const CreateMeetingPopover = ({ children }: CreateMeetingPopoverProps) => {
     }
   };
 
-  const handleSubmit = () => {
-    // Handle meeting creation logic here
-    console.log({
-      title,
-      startDate,
-      startTime,
-      endDate,
-      endTime,
-      attendees: attendees.filter(email => email.trim() !== ''),
-      meetingType
-    });
-    setOpen(false);
+  const handleSubmit = async () => {
+    if (!user) {
+      toast({
+        title: "Authentication Error",
+        description: "You must be logged in to create meetings.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!title || !startDate || !endDate) {
+      toast({
+        title: "Validation Error",
+        description: "Please fill in all required fields.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsCreating(true);
+
+    try {
+      // Calculate duration in minutes
+      const startDateTime = new Date(startDate);
+      const [startHours, startMinutes] = startTime.split(':').map(Number);
+      startDateTime.setHours(startHours, startMinutes, 0, 0);
+
+      const endDateTime = new Date(endDate);
+      const [endHours, endMinutes] = endTime.split(':').map(Number);
+      endDateTime.setHours(endHours, endMinutes, 0, 0);
+
+      const duration = Math.round((endDateTime.getTime() - startDateTime.getTime()) / (1000 * 60));
+
+      if (duration <= 0) {
+        toast({
+          title: "Invalid Duration",
+          description: "End time must be after start time.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      const meetingSettings = {
+        topic: title,
+        type: 2, // Scheduled meeting
+        start_time: startDateTime.toISOString(),
+        duration: duration,
+        timezone: 'UTC',
+        settings: {
+          host_video: true,
+          participant_video: true,
+          join_before_host: false,
+          mute_upon_entry: true,
+          waiting_room: true,
+        }
+      };
+
+      const { data, error } = await supabase.functions.invoke('create-zoom-meeting', {
+        body: meetingSettings
+      });
+
+      if (error) {
+        throw new Error(error.message || 'Failed to create meeting');
+      }
+
+      if (!data || data.error) {
+        throw new Error(data?.error || 'Failed to create meeting');
+      }
+
+      toast({
+        title: "Meeting Created",
+        description: `Meeting "${title}" has been created successfully.`,
+      });
+
+      // Reset form
+      setTitle('');
+      setStartDate(undefined);
+      setEndDate(undefined);
+      setStartTime('15:00');
+      setEndTime('15:30');
+      setAttendees(['']);
+      setMeetingType('');
+      setOpen(false);
+
+    } catch (error: any) {
+      console.error('Error creating meeting:', error);
+      toast({
+        title: "Error Creating Meeting",
+        description: error.message || "Failed to create Zoom meeting. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsCreating(false);
+    }
   };
 
   const formatDisplayDate = (date: Date | undefined) => {
@@ -245,9 +332,10 @@ const CreateMeetingPopover = ({ children }: CreateMeetingPopoverProps) => {
           {/* Submit Button */}
           <Button
             onClick={handleSubmit}
+            disabled={isCreating}
             className="w-full bg-black hover:bg-black hover:bg-opacity-80 text-white"
           >
-            Create Meeting
+            {isCreating ? 'Creating Meeting...' : 'Create Meeting'}
           </Button>
         </div>
       </PopoverContent>
