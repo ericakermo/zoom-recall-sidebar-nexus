@@ -1,5 +1,5 @@
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
@@ -31,136 +31,204 @@ export function ZoomComponentView({
   const [isMuted, setIsMuted] = useState(true);
   const [isVideoOff, setIsVideoOff] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [initializationAttempted, setInitializationAttempted] = useState(false);
   
   const containerRef = useRef<HTMLDivElement>(null);
   const clientRef = useRef<any>(null);
+  const isJoiningRef = useRef(false);
+  
   const { user } = useAuth();
   const { toast } = useToast();
 
-  useEffect(() => {
-    const initializeAndJoin = async () => {
-      if (!containerRef.current || !meetingNumber) return;
+  const handleError = useCallback((errorMessage: string) => {
+    console.error('❌ Zoom error:', errorMessage);
+    setError(errorMessage);
+    setIsLoading(false);
+    onMeetingError?.(errorMessage);
+  }, [onMeetingError]);
 
-      try {
-        setIsLoading(true);
-        setError(null);
+  const handleJoinSuccess = useCallback(() => {
+    console.log('✅ Meeting joined successfully');
+    setIsJoined(true);
+    setIsLoading(false);
+    isJoiningRef.current = false;
+    onMeetingJoined?.();
+    toast({
+      title: "Meeting Joined",
+      description: "Successfully joined the Zoom meeting"
+    });
+  }, [onMeetingJoined, toast]);
 
-        // Get tokens
-        const { data: tokenData, error: tokenError } = await supabase.functions.invoke('get-zoom-token', {
-          body: {
-            meetingNumber,
-            role: role || 0,
-            expirationSeconds: 7200
-          }
-        });
+  const initializeAndJoin = useCallback(async () => {
+    if (!containerRef.current || !meetingNumber || initializationAttempted || isJoiningRef.current) {
+      return;
+    }
 
-        if (tokenError) throw tokenError;
+    setInitializationAttempted(true);
+    isJoiningRef.current = true;
+    setIsLoading(true);
+    setError(null);
 
-        // Get ZAK token if host
-        let zakToken = null;
-        if (role === 1) {
-          const { data: zakData, error: zakError } = await supabase.functions.invoke('get-zoom-zak');
-          if (!zakError && zakData) {
-            zakToken = zakData.zak;
-          }
-        }
-
-        // Create client
-        const client = await createZoomComponentClient(containerRef.current);
-        clientRef.current = client;
-
-        // Join configuration
-        const joinConfig: ZoomComponentConfig = {
-          sdkKey: tokenData.sdkKey,
-          signature: tokenData.signature,
-          meetingNumber,
-          userName: providedUserName || user?.email || 'Guest',
-          userEmail: user?.email || '',
-          password: meetingPassword || '',
-          role: role || 0
-        };
-
-        if (role === 1 && zakToken) {
-          joinConfig.zak = zakToken;
-        }
-
-        // Join meeting
-        await client.join({
-          ...joinConfig,
-          success: (result: any) => {
-            console.log('✅ Successfully joined meeting:', result);
-            setIsJoined(true);
-            setIsLoading(false);
-            onMeetingJoined?.();
-            toast({
-              title: "Meeting Joined",
-              description: "Successfully joined the Zoom meeting"
-            });
-          },
-          error: (error: any) => {
-            console.error('❌ Failed to join meeting:', error);
-            const errorMessage = error.message || error.reason || 'Failed to join meeting';
-            setError(errorMessage);
-            setIsLoading(false);
-            onMeetingError?.(errorMessage);
-          }
-        });
-
-      } catch (err: any) {
-        console.error('❌ Initialization error:', err);
-        const errorMessage = err.message || 'Failed to initialize meeting';
-        setError(errorMessage);
-        setIsLoading(false);
-        onMeetingError?.(errorMessage);
-      }
-    };
-
-    initializeAndJoin();
-
-    return () => {
-      if (clientRef.current) {
-        try {
-          clientRef.current.leave();
-        } catch (error) {
-          console.error('Cleanup error:', error);
-        }
-      }
-    };
-  }, [meetingNumber, role, providedUserName, user, meetingPassword, onMeetingJoined, onMeetingError, toast]);
-
-  const handleLeaveMeeting = async () => {
     try {
-      if (clientRef.current) {
+      console.log('🔄 Starting Zoom initialization...');
+
+      // Get tokens and meeting details
+      const { data: tokenData, error: tokenError } = await supabase.functions.invoke('get-zoom-token', {
+        body: {
+          meetingNumber,
+          role: role || 0,
+          expirationSeconds: 7200
+        }
+      });
+
+      if (tokenError) {
+        throw new Error(`Token error: ${tokenError.message}`);
+      }
+
+      // Get ZAK token if host
+      let zakToken = null;
+      if (role === 1) {
+        const { data: zakData, error: zakError } = await supabase.functions.invoke('get-zoom-zak');
+        if (!zakError && zakData) {
+          zakToken = zakData.zak;
+        }
+      }
+
+      console.log('✅ Tokens retrieved successfully');
+
+      // Ensure container is ready
+      if (!containerRef.current) {
+        throw new Error('Container element not available');
+      }
+
+      // Create and initialize client
+      console.log('🔄 Creating Zoom client...');
+      const client = await createZoomComponentClient(containerRef.current);
+      clientRef.current = client;
+
+      console.log('✅ Client initialized successfully');
+
+      // Join configuration
+      const joinConfig: any = {
+        sdkKey: tokenData.sdkKey,
+        signature: tokenData.signature,
+        meetingNumber,
+        userName: providedUserName || user?.email || 'Guest',
+        userEmail: user?.email || '',
+        passWord: meetingPassword || '',
+        role: role || 0,
+        success: (result: any) => {
+          console.log('✅ Join success callback:', result);
+          handleJoinSuccess();
+        },
+        error: (error: any) => {
+          console.error('❌ Join error callback:', error);
+          const errorMessage = error.message || error.reason || 'Failed to join meeting';
+          handleError(errorMessage);
+        }
+      };
+
+      if (role === 1 && zakToken) {
+        joinConfig.zak = zakToken;
+      }
+
+      console.log('🔄 Joining meeting with config:', {
+        meetingNumber: joinConfig.meetingNumber,
+        userName: joinConfig.userName,
+        hasSignature: !!joinConfig.signature,
+        role: joinConfig.role,
+        hasZak: !!joinConfig.zak
+      });
+
+      // Join meeting
+      await client.join(joinConfig);
+
+    } catch (err: any) {
+      console.error('❌ Initialization error:', err);
+      const errorMessage = err.message || 'Failed to initialize meeting';
+      handleError(errorMessage);
+      isJoiningRef.current = false;
+    }
+  }, [
+    meetingNumber, 
+    role, 
+    providedUserName, 
+    user, 
+    meetingPassword, 
+    initializationAttempted,
+    handleError,
+    handleJoinSuccess
+  ]);
+
+  const handleLeaveMeeting = useCallback(async () => {
+    try {
+      if (clientRef.current && typeof clientRef.current.leave === 'function') {
+        console.log('🔄 Leaving meeting...');
         await clientRef.current.leave();
       }
       setIsJoined(false);
       onMeetingLeft?.();
     } catch (error) {
-      console.error('Error leaving meeting:', error);
+      console.error('❌ Error leaving meeting:', error);
     }
-  };
+  }, [onMeetingLeft]);
 
-  const toggleMute = () => {
-    if (clientRef.current) {
-      if (isMuted) {
-        clientRef.current.unmuteAudio();
-      } else {
-        clientRef.current.muteAudio();
+  const toggleMute = useCallback(() => {
+    if (clientRef.current && isJoined) {
+      try {
+        if (isMuted) {
+          clientRef.current.unmuteAudio();
+        } else {
+          clientRef.current.muteAudio();
+        }
+        setIsMuted(!isMuted);
+      } catch (error) {
+        console.error('Error toggling mute:', error);
       }
-      setIsMuted(!isMuted);
     }
-  };
+  }, [isMuted, isJoined]);
 
-  const toggleVideo = () => {
-    if (clientRef.current) {
-      if (isVideoOff) {
-        clientRef.current.startVideo();
-      } else {
-        clientRef.current.stopVideo();
+  const toggleVideo = useCallback(() => {
+    if (clientRef.current && isJoined) {
+      try {
+        if (isVideoOff) {
+          clientRef.current.startVideo();
+        } else {
+          clientRef.current.stopVideo();
+        }
+        setIsVideoOff(!isVideoOff);
+      } catch (error) {
+        console.error('Error toggling video:', error);
       }
-      setIsVideoOff(!isVideoOff);
     }
-  };
+  }, [isVideoOff, isJoined]);
+
+  // Initialize when component mounts and dependencies are ready
+  useEffect(() => {
+    if (containerRef.current && meetingNumber && !initializationAttempted) {
+      // Small delay to ensure DOM is fully ready
+      const timer = setTimeout(() => {
+        initializeAndJoin();
+      }, 100);
+
+      return () => clearTimeout(timer);
+    }
+  }, [initializeAndJoin, meetingNumber, initializationAttempted]);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (clientRef.current) {
+        try {
+          if (typeof clientRef.current.leave === 'function') {
+            clientRef.current.leave();
+          }
+        } catch (error) {
+          console.error('Cleanup error:', error);
+        }
+      }
+    };
+  }, []);
 
   if (error) {
     return (
@@ -169,7 +237,15 @@ export function ZoomComponentView({
           <p className="text-red-600 font-medium">Meeting Error</p>
           <p className="text-red-500 text-sm mt-1">{error}</p>
         </div>
-        <Button onClick={() => window.location.reload()}>
+        <Button 
+          onClick={() => {
+            setError(null);
+            setInitializationAttempted(false);
+            setIsLoading(true);
+            isJoiningRef.current = false;
+            initializeAndJoin();
+          }}
+        >
           Try Again
         </Button>
       </div>
