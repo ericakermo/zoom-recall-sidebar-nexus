@@ -1,4 +1,5 @@
 
+
 import React, { useState } from 'react';
 import { Calendar as CalendarComponent } from '@/components/ui/calendar';
 import { Button } from '@/components/ui/button';
@@ -37,7 +38,7 @@ const Calendar = () => {
       console.log('✅ Meeting details retrieved:', meeting);
 
       // 3. Validate meeting status
-      const meetingStatus = await validateMeetingStatus(meeting.zoom_meeting_id);
+      const meetingStatus = await validateMeetingStatus(meeting.meeting_id);
       console.log('ℹ️ Meeting status:', meetingStatus);
 
       if (!meetingStatus.canJoin) {
@@ -47,7 +48,7 @@ const Calendar = () => {
       // 4. Get tokens with proper error handling
       const { data: tokenData, error: tokenError } = await supabase.functions.invoke('get-zoom-token', {
         body: { 
-          meetingNumber: meeting.zoom_meeting_id,
+          meetingNumber: meeting.meeting_id,
           role: meeting.user_id === user.id ? 1 : 0
         }
       });
