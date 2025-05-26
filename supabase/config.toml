@@ -21,3 +21,6 @@ verify_jwt = true
 
 [functions.get-meeting-details]
 verify_jwt = true
+
+[functions.validate-meeting-status]
+verify_jwt = true
