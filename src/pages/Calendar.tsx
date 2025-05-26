@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Calendar as CalendarComponent } from '@/components/ui/calendar';
 import { Button } from '@/components/ui/button';
@@ -9,7 +10,7 @@ import { useNavigate } from 'react-router-dom';
 import CreateMeetingPopover from '@/components/CreateMeetingPopover';
 import MeetingDetailsPopover from '@/components/MeetingDetailsPopover';
 import { toast } from '@/components/ui/use-toast';
-import { supabase } from '@/lib/supabase';
+import { supabase } from '@/integrations/supabase/client';
 
 const Calendar = () => {
   const [date, setDate] = useState<Date | undefined>(new Date());
