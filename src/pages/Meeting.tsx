@@ -29,12 +29,10 @@ const Meeting = () => {
   const [isJoining, setIsJoining] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [meetingData, setMeetingData] = useState<ZoomMeeting | null>(null);
-  const [isMeetingActive, setIsMeetingActive] = useState(false);
   const { toast } = useToast();
   const clientRef = useRef<any>(null);
   const meetingContainerRef = useRef<HTMLDivElement>(null);
   const joinAttemptRef = useRef<boolean>(false);
-  const initAttemptRef = useRef<boolean>(false);
 
   const getMeetingPassword = async (meetingId: string, isHost: boolean) => {
     console.log('🔄 Attempting to get meeting details from server...', { meetingId, isHost });
@@ -107,7 +105,6 @@ const Meeting = () => {
     }
 
     setError(`${errorMessage}. ${suggestion}`);
-    setIsLoading(false);
     toast({
       title: "Meeting Join Failed",
       description: `${errorMessage}. ${suggestion}`,
@@ -115,16 +112,15 @@ const Meeting = () => {
     });
   };
 
-  // Initialize Zoom client with comprehensive guards
+  // Initialize Zoom client with guards
   const initializeClient = async () => {
-    if (isInitializing || clientRef.current || initAttemptRef.current) {
+    if (isInitializing || clientRef.current) {
       console.log('🔄 Client already initializing or initialized');
       return clientRef.current;
     }
 
     try {
       setIsInitializing(true);
-      initAttemptRef.current = true;
       console.log('🎯 Starting client initialization');
       
       const client = ZoomMtgEmbedded.createClient();
@@ -154,16 +150,13 @@ const Meeting = () => {
       return client;
     } catch (error) {
       console.error('❌ Client initialization failed:', error);
-      setError('Failed to initialize Zoom client');
-      setIsLoading(false);
       throw error;
     } finally {
       setIsInitializing(false);
-      initAttemptRef.current = false;
     }
   };
 
-  // Join meeting with comprehensive guards and proper state management
+  // Join meeting with guards
   const joinMeeting = async (meetingConfig: any) => {
     if (isJoining || joinAttemptRef.current) {
       console.log('⚠️ Join operation already in progress');
@@ -188,8 +181,7 @@ const Meeting = () => {
         ...meetingConfig,
         success: (success: any) => {
           console.log('✅ Join successful:', success);
-          setIsLoading(false); // Critical: Update loading state
-          setIsMeetingActive(true); // Set meeting as active
+          setIsLoading(false);
           setIsJoining(false);
           toast({
             title: "Success",
@@ -200,6 +192,7 @@ const Meeting = () => {
           console.error('❌ Join failed:', error);
           setIsJoining(false);
           handleJoinError(error, meetingConfig.meetingNumber, meetingConfig.role === 1);
+          setIsLoading(false);
         }
       });
     } catch (error: any) {
@@ -212,12 +205,12 @@ const Meeting = () => {
     }
   };
 
-  // Robust cleanup with null-safe checks
+  // Proper cleanup
   const handleLeaveMeeting = async () => {
     try {
       console.log('🧹 Starting meeting cleanup');
       
-      if (clientRef.current && typeof clientRef.current.leave === 'function') {
+      if (clientRef.current?.leave) {
         await clientRef.current.leave();
         console.log('✅ Meeting left successfully');
       }
@@ -225,10 +218,8 @@ const Meeting = () => {
       // Reset all states
       clientRef.current = null;
       setIsJoining(false);
-      setIsMeetingActive(false);
       joinAttemptRef.current = false;
       setIsInitializing(false);
-      initAttemptRef.current = false;
       
     } catch (error) {
       console.error('❌ Cleanup error:', error);
@@ -241,8 +232,8 @@ const Meeting = () => {
     const initializeMeeting = async () => {
       console.log('🎯 Initializing Zoom meeting component...');
       
-      // Comprehensive guards to prevent duplicate initialization
-      if (isInitializing || isJoining || joinAttemptRef.current || initAttemptRef.current) {
+      // Prevent multiple initializations
+      if (isInitializing || isJoining || joinAttemptRef.current) {
         console.log('🔄 Already initializing, skipping...');
         return;
       }
@@ -357,16 +348,15 @@ const Meeting = () => {
       }
     };
 
-    // Only initialize if we have required data and no operations in progress
-    if (id && user && !isInitializing && !isJoining && !joinAttemptRef.current && !initAttemptRef.current) {
+    if (id && user && !isInitializing && !isJoining && !joinAttemptRef.current) {
       initializeMeeting();
     }
 
-    // Cleanup function with null-safe checks
+    // Cleanup function
     return () => {
-      if (clientRef.current && typeof clientRef.current.leave === 'function') {
+      if (clientRef.current) {
         try {
-          console.log('🧹 Cleaning up meeting resources on unmount...');
+          console.log('🧹 Cleaning up meeting resources...');
           clientRef.current.leave();
           console.log('✅ Meeting cleanup complete');
         } catch (error) {
@@ -448,13 +438,7 @@ const Meeting = () => {
             ref={meetingContainerRef} 
             id="meetingSDKElement"
             className="w-full max-w-4xl h-full min-h-[500px] border rounded-lg"
-            style={{ display: isMeetingActive ? 'block' : 'none' }}
           />
-          {!isMeetingActive && !isLoading && !error && (
-            <div className="text-center">
-              <p className="text-gray-500">Preparing meeting interface...</p>
-            </div>
-          )}
         </div>
       </div>
     </div>
