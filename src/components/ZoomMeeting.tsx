@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
-import { ZoomComponentMeeting } from './ZoomComponentMeeting';
+import { ZoomComponentView } from './ZoomComponentView';
 
 interface ZoomMeetingProps {
   meetingNumber: string;
@@ -11,7 +11,7 @@ interface ZoomMeetingProps {
   userName?: string;
   role?: number;
   onMeetingEnd?: () => void;
-  zak?: string; // Add ZAK token property
+  zak?: string;
 }
 
 export function ZoomMeeting({
@@ -29,16 +29,20 @@ export function ZoomMeeting({
 
   const handleMeetingJoined = () => {
     setIsConnected(true);
-    console.log('Meeting joined successfully');
+    console.log('✅ Meeting joined successfully');
+    toast({
+      title: "Connected",
+      description: "You have joined the meeting"
+    });
   };
 
   const handleMeetingError = (errorMessage: string) => {
     setError(errorMessage);
     setIsConnected(false);
-    console.error('Meeting error:', errorMessage);
+    console.error('❌ Meeting error:', errorMessage);
   };
 
-  const handleLeaveMeeting = () => {
+  const handleMeetingLeft = () => {
     setIsConnected(false);
     onMeetingEnd?.();
     toast({
@@ -50,63 +54,72 @@ export function ZoomMeeting({
   if (error) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[400px] p-4">
-        <p className="text-red-500 mb-4 text-center">{error}</p>
-        <div className="text-sm text-gray-500 mb-6 max-w-md text-center">
-          <p>Troubleshooting tips:</p>
-          <ul className="list-disc list-inside mt-2 text-left">
-            <li>Check your internet connection</li>
-            <li>Verify the meeting ID is correct</li>
-            <li>Allow camera and microphone access</li>
-            <li>Try using Chrome browser</li>
-          </ul>
-        </div>
-        <div className="flex gap-4">
-          <Button
-            onClick={() => {
-              setError(null);
-              window.location.reload();
-            }}
-            className="px-4 py-2"
-          >
-            Retry Connection
-          </Button>
-          <Button
-            onClick={() => navigate('/meetings')}
-            variant="outline"
-            className="px-4 py-2"
-          >
-            Back to Meetings
-          </Button>
+        <div className="text-center max-w-md">
+          <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg">
+            <p className="text-red-600 font-medium">Unable to Join Meeting</p>
+            <p className="text-red-500 text-sm mt-1">{error}</p>
+          </div>
+          
+          <div className="text-sm text-gray-600 mb-6">
+            <p className="font-medium mb-2">Troubleshooting tips:</p>
+            <ul className="list-disc list-inside text-left space-y-1">
+              <li>Check your internet connection</li>
+              <li>Verify the meeting ID is correct</li>
+              <li>Allow camera and microphone access</li>
+              <li>Try using Chrome browser</li>
+              <li>Ensure meeting hasn't ended</li>
+            </ul>
+          </div>
+          
+          <div className="flex gap-3 justify-center">
+            <Button
+              onClick={() => {
+                setError(null);
+                window.location.reload();
+              }}
+            >
+              Retry Connection
+            </Button>
+            <Button
+              onClick={() => navigate('/calendar')}
+              variant="outline"
+            >
+              Back to Calendar
+            </Button>
+          </div>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="flex flex-col h-full">
-      <div className="flex-1 relative">
-        <ZoomComponentMeeting
+    <div className="flex flex-col h-full bg-gray-50 rounded-lg overflow-hidden">
+      {/* Meeting header */}
+      <div className="flex items-center justify-between p-4 bg-white border-b">
+        <div>
+          <h2 className="text-lg font-semibold">Zoom Meeting</h2>
+          <p className="text-sm text-gray-600">Meeting ID: {meetingNumber}</p>
+        </div>
+        {isConnected && (
+          <div className="flex items-center gap-2">
+            <div className="h-2 w-2 bg-green-500 rounded-full animate-pulse"></div>
+            <span className="text-sm text-green-600 font-medium">Connected</span>
+          </div>
+        )}
+      </div>
+      
+      {/* Meeting content */}
+      <div className="flex-1 p-4">
+        <ZoomComponentView
           meetingNumber={meetingNumber}
           meetingPassword={meetingPassword}
           userName={userName}
           role={role}
           onMeetingJoined={handleMeetingJoined}
           onMeetingError={handleMeetingError}
-          zak={zak} // Pass ZAK token to ZoomComponentMeeting
+          onMeetingLeft={handleMeetingLeft}
         />
       </div>
-      
-      {isConnected && (
-        <div className="flex items-center justify-center p-4 bg-background border-t">
-          <Button
-            onClick={handleLeaveMeeting}
-            variant="destructive"
-            className="px-6 py-2"
-          >
-            Leave Meeting
-          </Button>
-        </div>
-      )}
     </div>
   );
 }
