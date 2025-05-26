@@ -27,18 +27,18 @@ const Meeting = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [isInitializing, setIsInitializing] = useState(false);
   const [isJoining, setIsJoining] = useState(false);
+  const [isMeetingJoined, setIsMeetingJoined] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [meetingData, setMeetingData] = useState<ZoomMeeting | null>(null);
   const { toast } = useToast();
   const clientRef = useRef<any>(null);
   const meetingContainerRef = useRef<HTMLDivElement>(null);
-  const joinAttemptRef = useRef<boolean>(false);
+  const initializationAttempted = useRef<boolean>(false);
 
   const getMeetingPassword = async (meetingId: string, isHost: boolean) => {
-    console.log('🔄 Attempting to get meeting details from server...', { meetingId, isHost });
+    console.log('🔄 Getting meeting details...', { meetingId, isHost });
     
     try {
-      console.log('🔄 Calling get-meeting-details edge function...');
       const { data: meetingDetails, error } = await supabase.functions.invoke('get-meeting-details', {
         body: { meetingId }
       });
@@ -50,13 +50,10 @@ const Meeting = () => {
 
       console.log('✅ Meeting details retrieved:', {
         hasPassword: !!meetingDetails.password,
-        waitingRoom: meetingDetails.settings?.waiting_room,
-        joinBeforeHost: meetingDetails.settings?.join_before_host,
         status: meetingDetails.status
       });
 
       return meetingDetails.password || '';
-
     } catch (error) {
       console.error('⚠️ Error getting meeting details:', error);
       return '';
@@ -64,14 +61,7 @@ const Meeting = () => {
   };
 
   const handleJoinError = (error: any, meetingId: string, isHost: boolean) => {
-    console.error('❌ Meeting join error details:', {
-      error,
-      errorCode: error.errorCode,
-      reason: error.reason,
-      type: error.type,
-      meetingId,
-      isHost
-    });
+    console.error('❌ Meeting join error:', error);
 
     let errorMessage = 'Failed to join meeting';
     let suggestion = '';
@@ -105,6 +95,8 @@ const Meeting = () => {
     }
 
     setError(`${errorMessage}. ${suggestion}`);
+    setIsLoading(false);
+    setIsJoining(false);
     toast({
       title: "Meeting Join Failed",
       description: `${errorMessage}. ${suggestion}`,
@@ -112,15 +104,15 @@ const Meeting = () => {
     });
   };
 
-  // Initialize Zoom client with guards
   const initializeClient = async () => {
-    if (isInitializing || clientRef.current) {
+    if (isInitializing || clientRef.current || initializationAttempted.current) {
       console.log('🔄 Client already initializing or initialized');
       return clientRef.current;
     }
 
     try {
       setIsInitializing(true);
+      initializationAttempted.current = true;
       console.log('🎯 Starting client initialization');
       
       const client = ZoomMtgEmbedded.createClient();
@@ -150,22 +142,21 @@ const Meeting = () => {
       return client;
     } catch (error) {
       console.error('❌ Client initialization failed:', error);
+      initializationAttempted.current = false;
       throw error;
     } finally {
       setIsInitializing(false);
     }
   };
 
-  // Join meeting with guards
   const joinMeeting = async (meetingConfig: any) => {
-    if (isJoining || joinAttemptRef.current) {
-      console.log('⚠️ Join operation already in progress');
+    if (isJoining || isMeetingJoined) {
+      console.log('⚠️ Join operation already in progress or meeting already joined');
       return;
     }
 
     try {
       setIsJoining(true);
-      joinAttemptRef.current = true;
       console.log('🔄 Starting join operation with config:', {
         meetingNumber: meetingConfig.meetingNumber,
         hasPassword: !!meetingConfig.password,
@@ -181,6 +172,7 @@ const Meeting = () => {
         ...meetingConfig,
         success: (success: any) => {
           console.log('✅ Join successful:', success);
+          setIsMeetingJoined(true);
           setIsLoading(false);
           setIsJoining(false);
           toast({
@@ -192,7 +184,6 @@ const Meeting = () => {
           console.error('❌ Join failed:', error);
           setIsJoining(false);
           handleJoinError(error, meetingConfig.meetingNumber, meetingConfig.role === 1);
-          setIsLoading(false);
         }
       });
     } catch (error: any) {
@@ -200,17 +191,14 @@ const Meeting = () => {
       setError(error.message);
       setIsLoading(false);
       setIsJoining(false);
-    } finally {
-      joinAttemptRef.current = false;
     }
   };
 
-  // Proper cleanup
   const handleLeaveMeeting = async () => {
     try {
       console.log('🧹 Starting meeting cleanup');
       
-      if (clientRef.current?.leave) {
+      if (clientRef.current && typeof clientRef.current.leave === 'function') {
         await clientRef.current.leave();
         console.log('✅ Meeting left successfully');
       }
@@ -218,8 +206,9 @@ const Meeting = () => {
       // Reset all states
       clientRef.current = null;
       setIsJoining(false);
-      joinAttemptRef.current = false;
+      setIsMeetingJoined(false);
       setIsInitializing(false);
+      initializationAttempted.current = false;
       
     } catch (error) {
       console.error('❌ Cleanup error:', error);
@@ -232,9 +221,8 @@ const Meeting = () => {
     const initializeMeeting = async () => {
       console.log('🎯 Initializing Zoom meeting component...');
       
-      // Prevent multiple initializations
-      if (isInitializing || isJoining || joinAttemptRef.current) {
-        console.log('🔄 Already initializing, skipping...');
+      if (initializationAttempted.current || !user || !id) {
+        console.log('🔄 Already attempted or missing requirements, skipping...');
         return;
       }
 
@@ -242,10 +230,6 @@ const Meeting = () => {
         setIsLoading(true);
         setError(null);
 
-        if (!user) {
-          console.error('❌ User not authenticated');
-          throw new Error('User not authenticated');
-        }
         console.log('✅ User authenticated:', user.email);
 
         // Get meeting details from Supabase
@@ -264,12 +248,11 @@ const Meeting = () => {
           console.error('❌ Meeting not found');
           throw new Error('Meeting not found');
         }
+
         console.log('✅ Meeting details retrieved:', {
           meetingId: meeting.id,
           zoomMeetingId: meeting.meeting_id,
-          title: meeting.title,
-          startTime: meeting.start_time,
-          duration: meeting.duration
+          title: meeting.title
         });
 
         setMeetingData(meeting);
@@ -278,10 +261,8 @@ const Meeting = () => {
         const isHost = meeting.user_id === user.id;
         console.log(`ℹ️ User role: ${isHost ? 'Host' : 'Participant'}`);
 
-        // Get meeting password from our edge function
-        console.log('🔄 Getting meeting password via edge function...');
+        // Get meeting password
         const meetingPassword = await getMeetingPassword(meeting.meeting_id, isHost);
-        console.log('✅ Meeting password retrieved:', { hasPassword: !!meetingPassword });
 
         // Initialize client
         await initializeClient();
@@ -315,7 +296,7 @@ const Meeting = () => {
           }
         }
 
-        // Prepare join configuration with real password
+        // Prepare join configuration
         const joinConfig: any = {
           sdkKey: tokenData.sdkKey,
           signature: tokenData.signature,
@@ -348,19 +329,16 @@ const Meeting = () => {
       }
     };
 
-    if (id && user && !isInitializing && !isJoining && !joinAttemptRef.current) {
-      initializeMeeting();
-    }
+    initializeMeeting();
 
     // Cleanup function
     return () => {
-      if (clientRef.current) {
+      if (clientRef.current && typeof clientRef.current.leave === 'function') {
         try {
-          console.log('🧹 Cleaning up meeting resources...');
+          console.log('🧹 Component unmount cleanup...');
           clientRef.current.leave();
-          console.log('✅ Meeting cleanup complete');
         } catch (error) {
-          console.error('❌ Error during meeting cleanup:', error);
+          console.error('❌ Error during component cleanup:', error);
         }
       }
     };
@@ -404,7 +382,7 @@ const Meeting = () => {
 
       {/* Meeting Content */}
       <div className="flex-1 relative p-4">
-        {isLoading && (
+        {(isLoading && !isMeetingJoined) && (
           <div className="absolute inset-0 flex items-center justify-center bg-background/80 z-50">
             <div className="text-center">
               <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4" />
@@ -438,6 +416,7 @@ const Meeting = () => {
             ref={meetingContainerRef} 
             id="meetingSDKElement"
             className="w-full max-w-4xl h-full min-h-[500px] border rounded-lg"
+            style={{ display: isMeetingJoined ? 'block' : 'none' }}
           />
         </div>
       </div>
