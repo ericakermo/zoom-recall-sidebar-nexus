@@ -17,14 +17,18 @@ const Calendar = () => {
   const navigate = useNavigate();
   const { meetings, isLoading, isSyncing, syncMeetings } = useZoomMeetings(date);
 
-  const handleJoinMeeting = async (meetingId: string) => {
+  const handleJoinMeeting = async (meetingId: string, event: React.MouseEvent) => {
+    // Prevent any default behavior that might cause redirects
+    event.preventDefault();
+    event.stopPropagation();
+    
     try {
-      console.log('🎯 Starting meeting join process for meeting ID:', meetingId);
+      console.log('🎯 [Calendar] Starting meeting join process for meeting ID:', meetingId);
       
       // 1. Get user session
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('User not authenticated');
-      console.log('✅ User authenticated:', user.email);
+      console.log('✅ [Calendar] User authenticated:', user.email);
 
       // 2. Get meeting details with proper validation
       const { data: meeting, error: meetingError } = await supabase
@@ -34,38 +38,40 @@ const Calendar = () => {
         .single();
 
       if (meetingError) throw meetingError;
-      console.log('✅ Meeting details retrieved:', meeting);
+      console.log('✅ [Calendar] Meeting details retrieved:', meeting);
 
-      // 3. Validate meeting status
-      const meetingStatus = await validateMeetingStatus(meeting.meeting_id);
-      console.log('ℹ️ Meeting status:', meetingStatus);
-
-      if (!meetingStatus.canJoin) {
-        throw new Error(meetingStatus.reason || 'Meeting is not ready to join');
-      }
-
-      // 4. Get tokens with proper error handling
-      const { data: tokenData, error: tokenError } = await supabase.functions.invoke('get-zoom-token', {
-        body: { 
-          meetingNumber: meeting.meeting_id,
-          role: meeting.user_id === user.id ? 1 : 0
-        }
+      // 3. Validate meeting status before attempting to join
+      console.log('🔄 [Calendar] Validating meeting status...');
+      const { data: statusData, error: statusError } = await supabase.functions.invoke('validate-meeting-status', {
+        body: { meetingId: meeting.meeting_id }
       });
 
-      if (tokenError) throw tokenError;
-      console.log('✅ Tokens retrieved successfully');
+      if (statusError) {
+        console.error('❌ [Calendar] Meeting validation error:', statusError);
+        throw statusError;
+      }
 
-      // 5. Navigate to meeting page with state
+      console.log('✅ [Calendar] Meeting status validated:', statusData);
+
+      if (!statusData.canJoin) {
+        throw new Error(statusData.reason || 'Meeting is not ready to join');
+      }
+
+      // 4. Navigate to meeting page with component view (NO EXTERNAL REDIRECT)
+      console.log('🔄 [Calendar] Navigating to component view...');
       navigate(`/meeting/${meetingId}`, {
         state: {
           meeting,
-          tokens: tokenData,
-          isHost: meeting.user_id === user.id
+          meetingNumber: meeting.meeting_id,
+          isHost: meeting.user_id === user.id,
+          useComponentView: true // Force component view
         }
       });
 
+      console.log('✅ [Calendar] Navigation completed');
+
     } catch (error) {
-      console.error('❌ Join process failed:', error);
+      console.error('❌ [Calendar] Join process failed:', error);
       toast({
         title: "Error joining meeting",
         description: error.message,
@@ -86,15 +92,6 @@ const Calendar = () => {
       startTime: format(start, 'HH:mm'),
       endTime: format(end, 'HH:mm')
     };
-  };
-
-  const validateMeetingStatus = async (meetingId: string) => {
-    const { data, error } = await supabase.functions.invoke('validate-meeting-status', {
-      body: { meetingId }
-    });
-
-    if (error) throw error;
-    return data;
   };
 
   return (
@@ -194,7 +191,7 @@ const Calendar = () => {
                         <div className="flex items-center gap-3">
                           <Button 
                             size="sm"
-                            onClick={() => handleJoinMeeting(meeting.id)}
+                            onClick={(e) => handleJoinMeeting(meeting.id, e)}
                           >
                             <ExternalLink className="h-3 w-3 mr-1" />
                             Join Meeting

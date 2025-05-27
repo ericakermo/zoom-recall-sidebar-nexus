@@ -111,8 +111,9 @@ serve(async (req) => {
     const requestBody = await req.json();
     console.log("Received meeting settings:", requestBody);
 
-    // Create start time for instant meeting (now + 1 minute to ensure it's in future)
-    const startTime = new Date(now.getTime() + 60000); // 1 minute from now
+    // Create start time - use current time for instant meetings
+    const startTime = new Date();
+    console.log("Meeting start time set to:", startTime.toISOString());
     
     const meetingPayload = {
       topic: requestBody.topic || 'Instant Meeting',
@@ -123,16 +124,24 @@ serve(async (req) => {
       settings: {
         host_video: requestBody.settings?.host_video ?? true,
         participant_video: requestBody.settings?.participant_video ?? true,
-        join_before_host: true, // Allow joining before host
+        join_before_host: true,
         mute_upon_entry: requestBody.settings?.mute_upon_entry ?? true,
-        waiting_room: false, // Disable waiting room for instant meetings
+        waiting_room: false, // Critical: Disable waiting room for component view
         approval_type: 0, // Automatically approve
-        auto_recording: 'none'
+        auto_recording: 'none',
+        // Additional settings to prevent external redirects
+        enforce_login: false,
+        enforce_login_domains: '',
+        alternative_hosts: '',
+        close_registration: false,
+        show_share_button: false,
+        allow_multiple_devices: true,
+        registrants_confirmation_email: false,
+        registrants_email_notification: false
       }
     };
 
     console.log("Final meeting payload:", JSON.stringify(meetingPayload, null, 2));
-    console.log("Creating new Zoom meeting with settings:", meetingPayload);
 
     const response = await fetch('https://api.zoom.us/v2/users/me/meetings', {
       method: 'POST',
@@ -153,23 +162,29 @@ serve(async (req) => {
     }
 
     const meetingData = await response.json();
-    console.log("Meeting created successfully:", meetingData.id);
+    console.log("Meeting created successfully:", {
+      id: meetingData.id,
+      topic: meetingData.topic,
+      startTime: meetingData.start_time,
+      joinUrl: meetingData.join_url
+    });
 
-    // Store meeting in database with proper start_time
+    // Store meeting in database
     const { error: insertError } = await supabaseClient
       .from('zoom_meetings')
       .insert({
         user_id: user.id,
         meeting_id: meetingData.id.toString(),
         title: meetingData.topic,
-        start_time: startTime.toISOString(), // Use the same start time
+        start_time: startTime.toISOString(),
         duration: meetingData.duration,
         join_url: meetingData.join_url
       });
 
     if (insertError) {
       console.error("Failed to store meeting in database:", insertError);
-      // Don't fail the request, just log the error
+    } else {
+      console.log("Meeting stored in database successfully");
     }
 
     return new Response(
@@ -181,8 +196,8 @@ serve(async (req) => {
         joinUrl: meetingData.join_url,
         password: meetingData.password || '',
         duration: meetingData.duration,
-        accessToken,
-        tokenType: 'Bearer'
+        status: 'created',
+        useComponentView: true // Flag to force component view
       }),
       { 
         status: 200, 
