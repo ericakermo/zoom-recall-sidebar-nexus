@@ -196,7 +196,48 @@ export function ZoomComponentView({
     }
   }, [meetingNumber, role, logStep]);
 
-  // Initialize and join meeting - FIXED VERSION
+  const validateContainer = useCallback((container: HTMLElement): string | null => {
+    logStep('🔍 Validating container...');
+    
+    if (!container) {
+      return 'Container element is null';
+    }
+
+    if (!document.contains(container)) {
+      return 'Container is not mounted in DOM';
+    }
+
+    const rect = container.getBoundingClientRect();
+    logStep(`📏 Container dimensions: ${rect.width}x${rect.height}`);
+    
+    if (rect.width === 0 || rect.height === 0) {
+      return `Container has zero dimensions: ${rect.width}x${rect.height}`;
+    }
+
+    const computedStyle = window.getComputedStyle(container);
+    if (computedStyle.display === 'none') {
+      return 'Container is hidden (display: none)';
+    }
+
+    if (computedStyle.visibility === 'hidden') {
+      return 'Container is hidden (visibility: hidden)';
+    }
+
+    // Check if any parent is hidden
+    let parent = container.parentElement;
+    while (parent) {
+      const parentStyle = window.getComputedStyle(parent);
+      if (parentStyle.display === 'none' || parentStyle.visibility === 'hidden') {
+        return `Parent element is hidden: ${parent.tagName}`;
+      }
+      parent = parent.parentElement;
+    }
+
+    logStep('✅ Container validation passed');
+    return null;
+  }, [logStep]);
+
+  // Initialize and join meeting - ENHANCED VERSION
   const initializeAndJoin = useCallback(async () => {
     if (initializationRef.current || !containerRef.current || !sdkReady || !mountedRef.current) {
       return;
@@ -215,14 +256,20 @@ export function ZoomComponentView({
       // Get tokens
       const tokens = await getTokens();
 
-      // CRITICAL FIX: Validate container before proceeding
+      // CRITICAL: Validate container before proceeding
       if (!containerRef.current || !mountedRef.current) {
         throw new Error('Container element not available');
       }
 
       const container = containerRef.current;
       
-      // CRITICAL FIX: Ensure container is properly set up BEFORE init
+      // Enhanced container validation
+      const containerError = validateContainer(container);
+      if (containerError) {
+        throw new Error(`Container validation failed: ${containerError}`);
+      }
+
+      // Force container to be properly sized
       container.style.width = '100%';
       container.style.height = '100%';
       container.style.minHeight = '500px';
@@ -230,16 +277,14 @@ export function ZoomComponentView({
       container.style.visibility = 'visible';
       container.style.position = 'relative';
       
-      // Wait for container to be rendered
+      // Wait for DOM to settle
       await new Promise(resolve => setTimeout(resolve, 100));
       
-      // Validate container dimensions
-      const rect = container.getBoundingClientRect();
-      if (rect.width === 0 || rect.height === 0) {
-        throw new Error(`Container has invalid dimensions: ${rect.width}x${rect.height}`);
+      // Revalidate after styling
+      const finalValidation = validateContainer(container);
+      if (finalValidation) {
+        throw new Error(`Final container validation failed: ${finalValidation}`);
       }
-      
-      logStep('Container prepared and validated', { width: rect.width, height: rect.height });
 
       // Create and initialize client
       logStep('Creating Zoom client...');
@@ -251,38 +296,78 @@ export function ZoomComponentView({
       const client = window.ZoomMtgEmbedded.createClient();
       clientRef.current = client;
 
-      // CRITICAL FIX: Add timeout to prevent hanging
-      logStep('Initializing client...');
+      // Enhanced initialization with detailed logging and timeout
+      logStep('Initializing client with enhanced validation...');
+      
+      const initConfig = {
+        zoomAppRoot: container,
+        language: 'en-US',
+        patchJsMedia: true,
+        isSupportAV: true,
+        isSupportChat: true,
+        screenShare: true,
+        debug: true,
+        success: () => {
+          logStep('✅ Client init success callback fired');
+        },
+        error: (error: any) => {
+          logStep('❌ Client init error callback fired');
+          console.error('Init error details:', error);
+        }
+      };
+
+      logStep('Init config prepared:', initConfig);
+
       await Promise.race([
         new Promise<void>((resolve, reject) => {
           if (!mountedRef.current || !clientRef.current) {
-            reject(new Error('Component unmounted or client null'));
+            reject(new Error('Component unmounted or client null during init'));
             return;
           }
 
-          clientRef.current.init({
-            zoomAppRoot: container,
-            language: 'en-US',
-            patchJsMedia: true,
-            isSupportAV: true,
-            isSupportChat: true,
-            screenShare: true,
-            debug: true, // CRITICAL FIX: Enable debug mode
-            success: () => {
-              logStep('✅ Client initialized successfully');
+          let resolved = false;
+
+          const originalSuccess = initConfig.success;
+          const originalError = initConfig.error;
+
+          initConfig.success = () => {
+            if (!resolved) {
+              resolved = true;
+              originalSuccess();
+              logStep('✅ Client initialized successfully - resolving promise');
               resolve();
-            },
-            error: (error: any) => {
-              console.error('❌ Client initialization error:', error);
-              reject(new Error(`Initialization failed: ${error.message || error.reason}`));
             }
-          });
+          };
+
+          initConfig.error = (error: any) => {
+            if (!resolved) {
+              resolved = true;
+              originalError(error);
+              const errorMessage = error.message || error.reason || 'Unknown init error';
+              logStep(`❌ Client init failed: ${errorMessage}`);
+              reject(new Error(`Initialization failed: ${errorMessage}`));
+            }
+          };
+
+          logStep('🚀 Calling client.init() now...');
+          
+          try {
+            clientRef.current.init(initConfig);
+            logStep('📞 client.init() called, waiting for callbacks...');
+          } catch (syncError) {
+            if (!resolved) {
+              resolved = true;
+              logStep(`💥 Synchronous error in client.init(): ${syncError.message}`);
+              reject(new Error(`Sync init error: ${syncError.message}`));
+            }
+          }
         }),
-        // CRITICAL FIX: Add 30-second timeout for init
+        // 15-second timeout for initialization
         new Promise<void>((_, reject) => {
           setTimeout(() => {
-            reject(new Error('Client initialization timed out after 30 seconds'));
-          }, 30000);
+            logStep('⏰ Client initialization timed out after 15 seconds');
+            reject(new Error('Client initialization timed out after 15 seconds - container may not be ready'));
+          }, 15000);
         })
       ]);
 
@@ -381,7 +466,8 @@ export function ZoomComponentView({
     onMeetingJoined,
     handleError,
     getTokens,
-    logStep
+    logStep,
+    validateContainer
   ]);
 
   const handleRetry = useCallback(() => {
