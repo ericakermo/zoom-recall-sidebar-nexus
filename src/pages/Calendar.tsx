@@ -1,5 +1,4 @@
-
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Calendar as CalendarComponent } from '@/components/ui/calendar';
 import { Button } from '@/components/ui/button';
 import { Alert } from '@/components/ui/alert';
@@ -11,6 +10,7 @@ import CreateMeetingPopover from '@/components/CreateMeetingPopover';
 import MeetingDetailsPopover from '@/components/MeetingDetailsPopover';
 import { toast } from '@/components/ui/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+import ZoomMtgEmbedded from "@zoom/meetingsdk/embedded";
 
 const Calendar = () => {
   const [date, setDate] = useState<Date | undefined>(new Date());
