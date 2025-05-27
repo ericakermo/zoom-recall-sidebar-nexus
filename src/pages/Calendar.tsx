@@ -1,5 +1,4 @@
-
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Calendar as CalendarComponent } from '@/components/ui/calendar';
 import { Button } from '@/components/ui/button';
 import { Alert } from '@/components/ui/alert';
@@ -11,11 +10,15 @@ import CreateMeetingPopover from '@/components/CreateMeetingPopover';
 import MeetingDetailsPopover from '@/components/MeetingDetailsPopover';
 import { toast } from '@/components/ui/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+import ZoomMtgEmbedded from "@zoom/meetingsdk/embedded"
 
 const Calendar = () => {
   const [date, setDate] = useState<Date | undefined>(new Date());
   const navigate = useNavigate();
   const { meetings, isLoading, isSyncing, syncMeetings, fetchMeetingsForDate } = useZoomMeetings(date);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [client, setClient] = useState<any>(null);
+  const [isInitialized, setIsInitialized] = useState(false);
 
   // Listen for meeting creation events to refresh the list
   useEffect(() => {
@@ -29,6 +32,76 @@ const Calendar = () => {
     window.addEventListener('meetingCreated', handleMeetingCreated);
     return () => window.removeEventListener('meetingCreated', handleMeetingCreated);
   }, [date, fetchMeetingsForDate]);
+
+  useEffect(() => {
+    const initializeMeeting = async () => {
+      try {
+        // 1. Create client once
+        if (!client) {
+          const zoomClient = ZoomMtgEmbedded.createClient();
+          setClient(zoomClient);
+        }
+
+        // 2. Initialize with container
+        if (client && containerRef.current && !isInitialized) {
+          await client.init({
+            zoomAppRoot: containerRef.current,
+            language: 'en-US',
+            customize: {
+              meetingInfo: ['topic', 'host', 'mn', 'pwd', 'invite', 'participant', 'dc'],
+              toolbar: {
+                buttons: [
+                  {
+                    text: 'Leave Meeting',
+                    className: 'CustomLeaveButton',
+                    onClick: () => handleLeaveMeeting()
+                  }
+                ]
+              }
+            }
+          });
+          setIsInitialized(true);
+        }
+
+        // 3. Join meeting
+        if (isInitialized) {
+          const { data: { user } } = await supabase.auth.getUser();
+          const { data: meeting } = await supabase
+            .from('zoom_meetings')
+            .select('*')
+            .eq('id', id)
+            .single();
+
+          const { data: tokenData } = await supabase.functions.invoke('get-zoom-token', {
+            body: { 
+              meetingNumber: meeting.meeting_id,
+              role: meeting.user_id === user.id ? 1 : 0
+            }
+          });
+
+          await client.join({
+            sdkKey: tokenData.sdkKey,
+            signature: tokenData.signature,
+            meetingNumber: meeting.meeting_id,
+            password: meeting.password || '',
+            userName: user.email || 'Anonymous',
+            userEmail: user.email,
+            zak: tokenData.zak
+          });
+        }
+      } catch (error) {
+        console.error('Meeting initialization failed:', error);
+      }
+    };
+
+    initializeMeeting();
+
+    return () => {
+      if (client?.leave) {
+        client.leave();
+      }
+    };
+  }, [client, isInitialized]);
 
   const handleJoinMeeting = async (meetingId: string, event: React.MouseEvent) => {
     // Prevent any default behavior that might cause redirects
@@ -106,6 +179,19 @@ const Calendar = () => {
       endTime: format(end, 'HH:mm')
     };
   };
+
+  const handleLeaveMeeting = () => {
+    // Implement leave meeting logic here
+    console.log('Meeting left');
+  };
+
+  client.on('error', (error) => {
+    console.error('Zoom SDK Error:', error)
+  })
+
+  client.on('meeting-status-change', (data) => {
+    console.log('Meeting Status:', data)
+  })
 
   return (
     <div className="p-6 h-full">
@@ -243,6 +329,11 @@ const Calendar = () => {
           </div>
         </div>
       </div>
+      <div 
+        ref={containerRef} 
+        className="w-full h-full"
+        id="zoomComponentContainer"
+      />
     </div>
   );
 };
