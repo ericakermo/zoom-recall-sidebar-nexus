@@ -24,8 +24,16 @@ export function useZoomClient({ onInitialized, onError }: UseZoomClientProps = {
     try {
       console.log('Starting Zoom client initialization...');
       
-      // Wait a bit more for container to be fully ready
-      await new Promise(resolve => setTimeout(resolve, 200));
+      // Ensure container is properly sized and visible
+      const container = containerRef.current;
+      if (container.offsetWidth === 0 || container.offsetHeight === 0) {
+        container.style.width = '100%';
+        container.style.height = '100%';
+        container.style.minHeight = '400px';
+        
+        // Wait for the DOM to update
+        await new Promise(resolve => requestAnimationFrame(() => setTimeout(resolve, 100)));
+      }
       
       if (!mountedRef.current) return;
 

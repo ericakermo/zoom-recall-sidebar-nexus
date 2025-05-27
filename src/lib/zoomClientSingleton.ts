@@ -25,48 +25,75 @@ export const initializeZoomClient = async (container: HTMLElement): Promise<any>
 
   const client = getZoomClient();
   
-  initializationPromise = new Promise<any>(async (resolve, reject) => {
-    try {
-      // Wait for DOM to be ready
-      await new Promise((res) => requestAnimationFrame(() => setTimeout(res, 100)));
-
-      // Validate container
-      if (!container) {
-        throw new Error('Zoom container not available');
-      }
-
-      const rect = container.getBoundingClientRect();
-      if (rect.width === 0 || rect.height === 0) {
-        throw new Error(`Zoom container has no dimensions: ${rect.width}x${rect.height}`);
-      }
-
-      console.log('Initializing Zoom client with container:', {
-        width: rect.width,
-        height: rect.height,
-        id: container.id
-      });
-
-      // Initialize with simplified config
-      client.init({
-        zoomAppRoot: container,
-        language: 'en-US',
-        patchJsMedia: true,
-        isSupportAV: true,
-        isSupportChat: true,
-        screenShare: true,
-        success: () => {
-          console.log('✅ Zoom client initialized successfully');
-          resolve(client);
-        },
-        error: (err: any) => {
-          console.error('❌ Zoom init error:', err);
-          reject(new Error(`Zoom init failed: ${err.message || err.reason || 'Unknown error'}`));
-        }
-      });
-    } catch (error) {
-      console.error('❌ Error during initialization:', error);
-      reject(error);
+  initializationPromise = new Promise<any>((resolve, reject) => {
+    // Validate container first
+    if (!container) {
+      reject(new Error('Zoom container not available'));
+      return;
     }
+
+    const rect = container.getBoundingClientRect();
+    if (rect.width === 0 || rect.height === 0) {
+      reject(new Error(`Zoom container has no dimensions: ${rect.width}x${rect.height}`));
+      return;
+    }
+
+    console.log('Initializing Zoom client with container:', {
+      width: rect.width,
+      height: rect.height,
+      id: container.id
+    });
+
+    // Use the exact configuration from the working GitHub sample
+    client.init({
+      zoomAppRoot: container,
+      language: 'en-US',
+      patchJsMedia: true,
+      leaveOnPageUnload: true,
+      isSupportAV: true,
+      isSupportChat: true,
+      isSupportQA: true,
+      isSupportPolling: true,
+      isSupportBreakout: true,
+      screenShare: true,
+      rwcBackup: '',
+      videoDrag: true,
+      sharingMode: 'both',
+      videoHeader: true,
+      isLockBottom: true,
+      isSupportNonverbal: true,
+      isShowJoiningErrorDialog: true,
+      disablePreview: false,
+      disableSetting: false,
+      disableInvite: false,
+      disableCallOut: false,
+      disableRecord: false,
+      disableJoinAudio: false,
+      audioPanelAlwaysOpen: true,
+      showMeetingHeader: true,
+      disableVoIP: false,
+      disableReport: false,
+      meetingInfo: [
+        'topic',
+        'host',
+        'mn',
+        'pwd',
+        'telPwd',
+        'invite',
+        'participant',
+        'dc',
+        'enctype',
+        'report'
+      ],
+      success: () => {
+        console.log('✅ Zoom client initialized successfully');
+        resolve(client);
+      },
+      error: (err: any) => {
+        console.error('❌ Zoom init error:', err);
+        reject(new Error(`Zoom init failed: ${err.message || err.reason || 'Unknown error'}`));
+      }
+    });
   });
 
   // Clear promise when done (success or failure)
