@@ -77,55 +77,21 @@ export function ZoomComponentView({
     mountedRef
   });
 
-  // Enhanced container validation
+  // Simplified container validation
   const validateContainer = useCallback((container: HTMLElement): string | null => {
-    logStep('🔍 Enhanced container validation...');
-    
-    if (!container) {
-      return 'Container element is null';
+    if (!container || !document.contains(container)) {
+      return 'Container not in DOM';
     }
 
-    if (!document.contains(container)) {
-      return 'Container is not mounted in DOM';
-    }
-
-    // Wait for layout to complete
     const rect = container.getBoundingClientRect();
-    logStep(`📏 Container dimensions: ${rect.width}x${rect.height}`);
-    
-    if (rect.width === 0 || rect.height === 0) {
-      return `Container has zero dimensions: ${rect.width}x${rect.height}`;
-    }
-
-    // Check minimum size requirements for Zoom SDK
     if (rect.width < 400 || rect.height < 300) {
-      return `Container too small for Zoom SDK: ${rect.width}x${rect.height} (minimum 400x300)`;
+      return `Container too small: ${rect.width}x${rect.height}`;
     }
 
-    const computedStyle = window.getComputedStyle(container);
-    if (computedStyle.display === 'none') {
-      return 'Container is hidden (display: none)';
-    }
-
-    if (computedStyle.visibility === 'hidden') {
-      return 'Container is hidden (visibility: hidden)';
-    }
-
-    // Check if any parent is hidden
-    let parent = container.parentElement;
-    while (parent && parent !== document.body) {
-      const parentStyle = window.getComputedStyle(parent);
-      if (parentStyle.display === 'none' || parentStyle.visibility === 'hidden') {
-        return `Parent element is hidden: ${parent.tagName}`;
-      }
-      parent = parent.parentElement;
-    }
-
-    logStep('✅ Container validation passed');
     return null;
-  }, [logStep]);
+  }, []);
 
-  // Initialize and join meeting
+  // Fixed initialization with proper configuration
   const initializeAndJoin = useCallback(async () => {
     if (initializationRef.current || !containerRef.current || !sdkReady || !mountedRef.current) {
       return;
@@ -138,50 +104,43 @@ export function ZoomComponentView({
     }
 
     try {
-      logStep('Starting Zoom Component initialization...');
+      logStep('Starting Zoom initialization...');
 
       // Get tokens first
       const tokens = await getTokens(meetingNumber, role || 0);
 
-      // Wait for DOM to be completely stable
+      // Wait for DOM stability
       await new Promise(resolve => {
         requestAnimationFrame(() => {
-          setTimeout(resolve, 200);
+          setTimeout(resolve, 100);
         });
       });
 
       // Validate container
-      if (!containerRef.current || !mountedRef.current) {
-        throw new Error('Container element not available');
+      const container = containerRef.current;
+      if (!container || !mountedRef.current) {
+        throw new Error('Container not available');
       }
 
-      const container = containerRef.current;
       const containerError = validateContainer(container);
       if (containerError) {
         throw new Error(`Container validation failed: ${containerError}`);
       }
 
-      // Force container properties that Zoom SDK requires
+      // Setup container with required properties
       container.style.width = '100%';
       container.style.height = '100%';
-      container.style.minHeight = '500px';
-      container.style.display = 'block';
-      container.style.visibility = 'visible';
+      container.style.minHeight = '400px';
       container.style.position = 'relative';
       container.style.overflow = 'hidden';
-      
-      if (!container.id) {
-        container.id = 'zoomComponentContainer';
-      }
+      container.id = 'zoomComponentContainer';
 
-      await new Promise(resolve => setTimeout(resolve, 100));
-
-      // Create client
       logStep('Creating Zoom client...');
       if (!window.ZoomMtgEmbedded) {
         throw new Error('ZoomMtgEmbedded not available');
       }
       
+      // Clean up any existing client
       if (clientRef.current) {
         try {
           if (typeof clientRef.current.leave === 'function') {
@@ -195,58 +154,31 @@ export function ZoomComponentView({
       const client = window.ZoomMtgEmbedded.createClient();
       clientRef.current = client;
 
-      // Complete init configuration
-      logStep('Initializing client with complete configuration...');
+      // Simplified, working init configuration
+      logStep('Initializing client...');
       
       const initConfig = {
         zoomAppRoot: container,
         language: 'en-US',
         patchJsMedia: true,
         leaveUrl: window.location.origin + '/calendar',
-        success: () => {
-          logStep('✅ Client init success callback fired');
-        },
-        error: (error: any) => {
-          logStep('❌ Client init error callback fired');
-          console.error('Init error details:', error);
-        },
         isSupportAV: true,
         isSupportChat: true,
-        isSupportQA: true,
-        isSupportCC: true,
-        isSupportPolling: true,
-        isSupportBreakout: true,
         screenShare: true,
-        videoDrag: true,
-        sharingMode: 'both',
-        videoHeader: true,
-        isLockBottom: true,
-        isShowJoinAudioFunction: true,
-        isSupportNonverbal: true,
-        isShowMeetingHeader: false,
-        disableInvite: false,
-        disableCallOut: false,
-        disableRecord: false,
-        disableJoinAudio: false,
-        audioPanelAlwaysOpen: false,
-        showMeetingHeader: false,
-        showPureSharingContent: false,
-        enableLoggerUI: false,
-        showLearningExperienceUrl: false,
-        showSurveyUrl: false,
-        showUpgradeWarning: false,
-        showOriginUrlInInvite: false,
-        enableInviteUrlOnJoinScreen: false,
-        disablePhonePasscode: false
+        success: () => {
+          logStep('✅ Client initialized successfully');
+        },
+        error: (error: any) => {
+          logStep('❌ Client init error');
+          console.error('Init error details:', error);
+        }
       };
 
-      logStep('Init config prepared with all required properties');
-
-      // Initialize with timeout
+      // Initialize with reduced timeout
       await Promise.race([
         new Promise<void>((resolve, reject) => {
           if (!mountedRef.current || !clientRef.current) {
-            reject(new Error('Component unmounted or client null during init'));
+            reject(new Error('Component unmounted during init'));
             return;
           }
 
@@ -259,7 +191,6 @@ export function ZoomComponentView({
             if (!resolved) {
               resolved = true;
               originalSuccess();
-              logStep('✅ Client initialized successfully - resolving promise');
               resolve();
             }
           };
@@ -268,30 +199,25 @@ export function ZoomComponentView({
             if (!resolved) {
               resolved = true;
               originalError(error);
-              const errorMessage = error.message || error.reason || 'Unknown init error';
-              logStep(`❌ Client init failed: ${errorMessage}`);
-              reject(new Error(`Initialization failed: ${errorMessage}`));
+              reject(new Error(`Init failed: ${error.message || error.reason || 'Unknown error'}`));
             }
           };
 
-          logStep('🚀 Calling client.init() with complete configuration...');
+          logStep('Calling client.init()...');
           
           try {
             clientRef.current.init(initConfig);
-            logStep('📞 client.init() called, waiting for callbacks...');
           } catch (syncError) {
             if (!resolved) {
               resolved = true;
-              logStep(`💥 Synchronous error in client.init(): ${syncError.message}`);
               reject(new Error(`Sync init error: ${syncError.message}`));
             }
           }
         }),
         new Promise<void>((_, reject) => {
           setTimeout(() => {
-            logStep('⏰ Client initialization timed out after 10 seconds');
-            reject(new Error('Client initialization timed out - SDK configuration issue detected'));
-          }, 10000);
+            reject(new Error('Client initialization timed out after 5 seconds'));
+          }, 5000);
         })
       ]);
 
@@ -300,7 +226,7 @@ export function ZoomComponentView({
       }
 
       // JOIN THE MEETING
-      logStep('Proceeding to join meeting...');
+      logStep('Joining meeting...');
 
       const joinConfig: ZoomJoinConfig = {
         sdkKey: tokens.sdkKey,
@@ -330,11 +256,11 @@ export function ZoomComponentView({
       // Add ZAK token if available
       if (role === 1 && tokens.zak) {
         joinConfig.zak = tokens.zak;
-        logStep('Added ZAK token to join config');
+        logStep('Added ZAK token for host');
       }
 
       if (!mountedRef.current || !clientRef.current) {
-        throw new Error('Component unmounted or client null before join');
+        throw new Error('Component unmounted before join');
       }
 
       // Join with timeout
@@ -357,13 +283,13 @@ export function ZoomComponentView({
             reject(new Error(error.message || error.reason || 'Join failed'));
           };
 
-          logStep('Calling client.join() with config');
+          logStep('Calling client.join()...');
           clientRef.current.join(joinConfig);
         }),
         new Promise<void>((_, reject) => {
           setTimeout(() => {
-            reject(new Error('Join operation timed out after 20 seconds'));
-          }, 20000);
+            reject(new Error('Join operation timed out after 15 seconds'));
+          }, 15000);
         })
       ]);
 
@@ -431,12 +357,12 @@ export function ZoomComponentView({
   // Initialize when ready
   useEffect(() => {
     if (sdkReady && containerRef.current && meetingNumber && !initializationRef.current && mountedRef.current) {
-      logStep('SDK ready, starting initialization in 1000ms...');
+      logStep('SDK ready, initializing...');
       const timer = setTimeout(() => {
         if (mountedRef.current) {
           initializeAndJoin();
         }
-      }, 1000);
+      }, 500);
 
       return () => clearTimeout(timer);
     }
@@ -445,7 +371,7 @@ export function ZoomComponentView({
   // Cleanup on unmount
   useEffect(() => {
     return () => {
-      logStep('Component unmounting, cleaning up...');
+      logStep('Component unmounting...');
       mountedRef.current = false;
       if (clientRef.current && typeof clientRef.current.leave === 'function') {
         try {
@@ -484,7 +410,7 @@ export function ZoomComponentView({
         id="zoomComponentContainer"
         className="w-full h-full"
         style={{ 
-          minHeight: '500px',
+          minHeight: '400px',
           minWidth: '400px',
           position: 'relative',
           overflow: 'hidden'
