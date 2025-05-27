@@ -215,17 +215,31 @@ export function ZoomComponentView({
       // Get tokens
       const tokens = await getTokens();
 
-      // Ensure container is ready
+      // CRITICAL FIX: Validate container before proceeding
       if (!containerRef.current || !mountedRef.current) {
         throw new Error('Container element not available');
       }
 
       const container = containerRef.current;
+      
+      // CRITICAL FIX: Ensure container is properly set up BEFORE init
       container.style.width = '100%';
       container.style.height = '100%';
       container.style.minHeight = '500px';
+      container.style.display = 'block';
+      container.style.visibility = 'visible';
+      container.style.position = 'relative';
       
-      logStep('Container prepared');
+      // Wait for container to be rendered
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
+      // Validate container dimensions
+      const rect = container.getBoundingClientRect();
+      if (rect.width === 0 || rect.height === 0) {
+        throw new Error(`Container has invalid dimensions: ${rect.width}x${rect.height}`);
+      }
+      
+      logStep('Container prepared and validated', { width: rect.width, height: rect.height });
 
       // Create and initialize client
       logStep('Creating Zoom client...');
@@ -237,37 +251,46 @@ export function ZoomComponentView({
       const client = window.ZoomMtgEmbedded.createClient();
       clientRef.current = client;
 
-      // Initialize client first
+      // CRITICAL FIX: Add timeout to prevent hanging
       logStep('Initializing client...');
-      await new Promise<void>((resolve, reject) => {
-        if (!mountedRef.current || !clientRef.current) {
-          reject(new Error('Component unmounted or client null'));
-          return;
-        }
-
-        clientRef.current.init({
-          zoomAppRoot: container,
-          language: 'en-US',
-          patchJsMedia: true,
-          isSupportAV: true,
-          isSupportChat: true,
-          screenShare: true,
-          success: () => {
-            logStep('✅ Client initialized successfully');
-            resolve();
-          },
-          error: (error: any) => {
-            console.error('❌ Client initialization error:', error);
-            reject(new Error(`Initialization failed: ${error.message || error.reason}`));
+      await Promise.race([
+        new Promise<void>((resolve, reject) => {
+          if (!mountedRef.current || !clientRef.current) {
+            reject(new Error('Component unmounted or client null'));
+            return;
           }
-        });
-      });
+
+          clientRef.current.init({
+            zoomAppRoot: container,
+            language: 'en-US',
+            patchJsMedia: true,
+            isSupportAV: true,
+            isSupportChat: true,
+            screenShare: true,
+            debug: true, // CRITICAL FIX: Enable debug mode
+            success: () => {
+              logStep('✅ Client initialized successfully');
+              resolve();
+            },
+            error: (error: any) => {
+              console.error('❌ Client initialization error:', error);
+              reject(new Error(`Initialization failed: ${error.message || error.reason}`));
+            }
+          });
+        }),
+        // CRITICAL FIX: Add 30-second timeout for init
+        new Promise<void>((_, reject) => {
+          setTimeout(() => {
+            reject(new Error('Client initialization timed out after 30 seconds'));
+          }, 30000);
+        })
+      ]);
 
       if (!mountedRef.current) {
         throw new Error('Component unmounted during initialization');
       }
 
-      // NOW JOIN THE MEETING - This was the missing piece!
+      // NOW JOIN THE MEETING
       logStep('Joining meeting...');
 
       const joinConfig: ZoomJoinConfig = {
@@ -305,50 +328,38 @@ export function ZoomComponentView({
         throw new Error('Component unmounted or client null before join');
       }
 
-      // THIS IS THE CRITICAL FIX - Actually call join and wait for result
-      await new Promise<void>((resolve, reject) => {
-        if (!clientRef.current) {
-          reject(new Error('Client is null'));
-          return;
-        }
+      // CRITICAL FIX: Add timeout to join operation
+      await Promise.race([
+        new Promise<void>((resolve, reject) => {
+          if (!clientRef.current) {
+            reject(new Error('Client is null'));
+            return;
+          }
 
-        // Override success to resolve promise
-        const originalSuccess = joinConfig.success;
-        joinConfig.success = (result: any) => {
-          originalSuccess(result);
-          resolve();
-        };
+          // Override success to resolve promise
+          const originalSuccess = joinConfig.success;
+          joinConfig.success = (result: any) => {
+            originalSuccess(result);
+            resolve();
+          };
 
-        // Override error to reject promise  
-        const originalError = joinConfig.error;
-        joinConfig.error = (error: any) => {
-          originalError(error);
-          reject(new Error(error.message || error.reason || 'Join failed'));
-        };
+          // Override error to reject promise  
+          const originalError = joinConfig.error;
+          joinConfig.error = (error: any) => {
+            originalError(error);
+            reject(new Error(error.message || error.reason || 'Join failed'));
+          };
 
-        // Set timeout for join operation
-        const timeout = setTimeout(() => {
-          reject(new Error('Join operation timed out after 30 seconds'));
-        }, 30000);
-
-        // Clear timeout on success/error
-        const clearTimeoutSuccess = joinConfig.success;
-        const clearTimeoutError = joinConfig.error;
-        
-        joinConfig.success = (result: any) => {
-          clearTimeout(timeout);
-          clearTimeoutSuccess(result);
-        };
-        
-        joinConfig.error = (error: any) => {
-          clearTimeout(timeout);
-          clearTimeoutError(error);
-        };
-
-        // Actually call join - this was missing!
-        logStep('Calling client.join() with config');
-        clientRef.current.join(joinConfig);
-      });
+          logStep('Calling client.join() with config');
+          clientRef.current.join(joinConfig);
+        }),
+        // Add 30-second timeout for join
+        new Promise<void>((_, reject) => {
+          setTimeout(() => {
+            reject(new Error('Join operation timed out after 30 seconds'));
+          }, 30000);
+        })
+      ]);
 
       logStep('✅ Meeting joined successfully!');
 
