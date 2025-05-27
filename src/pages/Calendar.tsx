@@ -17,8 +17,9 @@ const Calendar = () => {
   const navigate = useNavigate();
   const { meetings, isLoading, isSyncing, syncMeetings, fetchMeetingsForDate } = useZoomMeetings(date);
   const containerRef = useRef<HTMLDivElement>(null);
-  const [client, setClient] = useState<any>(null);
+  const clientRef = useRef<any>(null);
   const [isInitialized, setIsInitialized] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   // Listen for meeting creation events to refresh the list
   useEffect(() => {
@@ -33,75 +34,146 @@ const Calendar = () => {
     return () => window.removeEventListener('meetingCreated', handleMeetingCreated);
   }, [date, fetchMeetingsForDate]);
 
+  // Initialize Zoom client
+  const initializeClient = async () => {
+    try {
+      console.log('🎯 Starting client initialization')
+      
+      // Create client if it doesn't exist
+      if (!clientRef.current) {
+        clientRef.current = ZoomMtgEmbedded.createClient()
+      }
+
+      // Initialize only if we have a container and haven't initialized yet
+      if (containerRef.current && !isInitialized) {
+        await clientRef.current.init({
+          zoomAppRoot: containerRef.current,
+          language: 'en-US',
+          customize: {
+            meetingInfo: ['topic', 'host', 'mn', 'pwd', 'invite', 'participant', 'dc'],
+            toolbar: {
+              buttons: [
+                {
+                  text: 'Leave Meeting',
+                  className: 'CustomLeaveButton',
+                  onClick: () => handleLeaveMeeting()
+                }
+              ]
+            }
+          }
+        })
+
+        // Add event listeners after successful initialization
+        clientRef.current.on('error', (error: any) => {
+          console.error('❌ Zoom SDK Error:', error)
+          setError(error.message)
+        })
+
+        clientRef.current.on('meeting-status-change', (data: any) => {
+          console.log('ℹ️ Meeting Status:', data)
+        })
+
+        setIsInitialized(true)
+        console.log('✅ Client initialized successfully')
+      }
+    } catch (error) {
+      console.error('❌ Client initialization failed:', error)
+      setError(error.message)
+    }
+  }
+
+  // Join meeting
+  const joinMeeting = async () => {
+    try {
+      if (!clientRef.current || !isInitialized) {
+        throw new Error('Client not initialized')
+      }
+
+      console.log('🔄 Getting user session...')
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) throw new Error('User not authenticated')
+      console.log('✅ User authenticated:', user.email)
+
+      console.log('🔄 Fetching meeting details...')
+      const { data: meeting, error: meetingError } = await supabase
+        .from('zoom_meetings')
+        .select('*')
+        .eq('id', id)
+        .single()
+
+      if (meetingError) throw meetingError
+      console.log('✅ Meeting details retrieved:', meeting)
+
+      console.log('🔄 Getting tokens...')
+      const { data: tokenData, error: tokenError } = await supabase.functions.invoke('get-zoom-token', {
+        body: { 
+          meetingNumber: meeting.meeting_id,
+          role: meeting.user_id === user.id ? 1 : 0
+        }
+      })
+
+      if (tokenError) throw tokenError
+      console.log('✅ Tokens retrieved successfully')
+
+      console.log('🔄 Joining meeting...')
+      await clientRef.current.join({
+        sdkKey: tokenData.sdkKey,
+        signature: tokenData.signature,
+        meetingNumber: meeting.meeting_id,
+        password: meeting.password || '',
+        userName: user.email || 'Anonymous',
+        userEmail: user.email,
+        zak: tokenData.zak
+      })
+      console.log('✅ Successfully joined meeting')
+
+    } catch (error) {
+      console.error('❌ Join meeting failed:', error)
+      setError(error.message)
+    }
+  }
+
+  // Cleanup function
+  const handleLeaveMeeting = async () => {
+    try {
+      if (clientRef.current?.leave) {
+        await clientRef.current.leave()
+        console.log('✅ Successfully left meeting')
+      }
+    } catch (error) {
+      console.error('❌ Error leaving meeting:', error)
+    } finally {
+      clientRef.current = null
+      setIsInitialized(false)
+      navigate('/calendar')
+    }
+  }
+
+  // Main effect
   useEffect(() => {
-    const initializeMeeting = async () => {
+    let isMounted = true
+
+    const setupMeeting = async () => {
+      if (!isMounted) return
+
       try {
-        // 1. Create client once
-        if (!client) {
-          const zoomClient = ZoomMtgEmbedded.createClient();
-          setClient(zoomClient);
-        }
-
-        // 2. Initialize with container
-        if (client && containerRef.current && !isInitialized) {
-          await client.init({
-            zoomAppRoot: containerRef.current,
-            language: 'en-US',
-            customize: {
-              meetingInfo: ['topic', 'host', 'mn', 'pwd', 'invite', 'participant', 'dc'],
-              toolbar: {
-                buttons: [
-                  {
-                    text: 'Leave Meeting',
-                    className: 'CustomLeaveButton',
-                    onClick: () => handleLeaveMeeting()
-                  }
-                ]
-              }
-            }
-          });
-          setIsInitialized(true);
-        }
-
-        // 3. Join meeting
+        await initializeClient()
         if (isInitialized) {
-          const { data: { user } } = await supabase.auth.getUser();
-          const { data: meeting } = await supabase
-            .from('zoom_meetings')
-            .select('*')
-            .eq('id', id)
-            .single();
-
-          const { data: tokenData } = await supabase.functions.invoke('get-zoom-token', {
-            body: { 
-              meetingNumber: meeting.meeting_id,
-              role: meeting.user_id === user.id ? 1 : 0
-            }
-          });
-
-          await client.join({
-            sdkKey: tokenData.sdkKey,
-            signature: tokenData.signature,
-            meetingNumber: meeting.meeting_id,
-            password: meeting.password || '',
-            userName: user.email || 'Anonymous',
-            userEmail: user.email,
-            zak: tokenData.zak
-          });
+          await joinMeeting()
         }
       } catch (error) {
-        console.error('Meeting initialization failed:', error);
+        console.error('❌ Meeting setup failed:', error)
+        setError(error.message)
       }
-    };
+    }
 
-    initializeMeeting();
+    setupMeeting()
 
     return () => {
-      if (client?.leave) {
-        client.leave();
-      }
-    };
-  }, [client, isInitialized]);
+      isMounted = false
+      handleLeaveMeeting()
+    }
+  }, [isInitialized])
 
   const handleJoinMeeting = async (meetingId: string, event: React.MouseEvent) => {
     // Prevent any default behavior that might cause redirects
@@ -180,18 +252,22 @@ const Calendar = () => {
     };
   };
 
-  const handleLeaveMeeting = () => {
-    // Implement leave meeting logic here
-    console.log('Meeting left');
-  };
-
-  client.on('error', (error) => {
-    console.error('Zoom SDK Error:', error)
-  })
-
-  client.on('meeting-status-change', (data) => {
-    console.log('Meeting Status:', data)
-  })
+  if (error) {
+    return (
+      <div className="flex items-center justify-center h-full">
+        <div className="text-center">
+          <h2 className="text-xl font-semibold text-red-600">Error</h2>
+          <p className="mt-2">{error}</p>
+          <button 
+            onClick={() => navigate('/calendar')}
+            className="mt-4 px-4 py-2 bg-primary text-white rounded"
+          >
+            Return to Calendar
+          </button>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="p-6 h-full">
