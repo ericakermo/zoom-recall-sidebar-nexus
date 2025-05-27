@@ -74,7 +74,7 @@ export function ZoomComponentView({
     }
   }, [onMeetingError]);
 
-  // Load Zoom SDK
+  // Load Zoom SDK with improved error handling
   const loadZoomSDK = useCallback(async () => {
     if (window.ZoomMtgEmbedded || sdkReady) {
       logStep('SDK already loaded');
@@ -83,9 +83,9 @@ export function ZoomComponentView({
     }
 
     try {
-      logStep('Starting Zoom Component SDK loading...');
+      logStep('Loading Zoom Component SDK...');
       
-      // Make React available globally
+      // Make React available globally (CRITICAL for SDK)
       if (!window.React) {
         logStep('Loading React globally...');
         window.React = (await import('react')).default;
@@ -95,7 +95,7 @@ export function ZoomComponentView({
         window.ReactDOM = (await import('react-dom')).default;
       }
 
-      // Load CSS files
+      // Load CSS files first
       logStep('Loading Zoom CSS files...');
       const cssFiles = [
         'https://source.zoom.us/3.13.2/css/bootstrap.css',
@@ -133,13 +133,13 @@ export function ZoomComponentView({
         document.head.appendChild(script);
       });
 
-      // Wait for SDK to be available
-      logStep('Waiting for ZoomMtgEmbedded to be available...');
+      // Wait for SDK to be available with better polling
+      logStep('Waiting for ZoomMtgEmbedded...');
       let attempts = 0;
-      const maxAttempts = 50;
+      const maxAttempts = 100; // Increased attempts
       
       while (!window.ZoomMtgEmbedded && attempts < maxAttempts && mountedRef.current) {
-        await new Promise(resolve => setTimeout(resolve, 100));
+        await new Promise(resolve => setTimeout(resolve, 50)); // Shorter intervals
         attempts++;
       }
 
@@ -196,8 +196,9 @@ export function ZoomComponentView({
     }
   }, [meetingNumber, role, logStep]);
 
+  // Enhanced container validation
   const validateContainer = useCallback((container: HTMLElement): string | null => {
-    logStep('🔍 Validating container...');
+    logStep('🔍 Enhanced container validation...');
     
     if (!container) {
       return 'Container element is null';
@@ -207,11 +208,17 @@ export function ZoomComponentView({
       return 'Container is not mounted in DOM';
     }
 
+    // Wait for layout to complete
     const rect = container.getBoundingClientRect();
     logStep(`📏 Container dimensions: ${rect.width}x${rect.height}`);
     
     if (rect.width === 0 || rect.height === 0) {
       return `Container has zero dimensions: ${rect.width}x${rect.height}`;
+    }
+
+    // Check minimum size requirements for Zoom SDK
+    if (rect.width < 400 || rect.height < 300) {
+      return `Container too small for Zoom SDK: ${rect.width}x${rect.height} (minimum 400x300)`;
     }
 
     const computedStyle = window.getComputedStyle(container);
@@ -225,7 +232,7 @@ export function ZoomComponentView({
 
     // Check if any parent is hidden
     let parent = container.parentElement;
-    while (parent) {
+    while (parent && parent !== document.body) {
       const parentStyle = window.getComputedStyle(parent);
       if (parentStyle.display === 'none' || parentStyle.visibility === 'hidden') {
         return `Parent element is hidden: ${parent.tagName}`;
@@ -237,7 +244,7 @@ export function ZoomComponentView({
     return null;
   }, [logStep]);
 
-  // Initialize and join meeting - ENHANCED VERSION
+  // FIXED: Initialize and join meeting with proper SDK configuration
   const initializeAndJoin = useCallback(async () => {
     if (initializationRef.current || !containerRef.current || !sdkReady || !mountedRef.current) {
       return;
@@ -253,71 +260,113 @@ export function ZoomComponentView({
     try {
       logStep('Starting Zoom Component initialization...');
 
-      // Get tokens
+      // Get tokens first
       const tokens = await getTokens();
 
-      // CRITICAL: Validate container before proceeding
+      // CRITICAL: Wait for DOM to be completely stable
+      await new Promise(resolve => {
+        requestAnimationFrame(() => {
+          setTimeout(resolve, 200); // Give extra time for DOM stability
+        });
+      });
+
+      // Validate container
       if (!containerRef.current || !mountedRef.current) {
         throw new Error('Container element not available');
       }
 
       const container = containerRef.current;
-      
-      // Enhanced container validation
       const containerError = validateContainer(container);
       if (containerError) {
         throw new Error(`Container validation failed: ${containerError}`);
       }
 
-      // Force container to be properly sized
+      // CRITICAL: Force container properties that Zoom SDK requires
       container.style.width = '100%';
       container.style.height = '100%';
       container.style.minHeight = '500px';
       container.style.display = 'block';
       container.style.visibility = 'visible';
       container.style.position = 'relative';
+      container.style.overflow = 'hidden'; // Zoom SDK requirement
       
-      // Wait for DOM to settle
-      await new Promise(resolve => setTimeout(resolve, 100));
-      
-      // Revalidate after styling
-      const finalValidation = validateContainer(container);
-      if (finalValidation) {
-        throw new Error(`Final container validation failed: ${finalValidation}`);
+      // Ensure container has a proper ID (SDK requirement)
+      if (!container.id) {
+        container.id = 'zoomComponentContainer';
       }
 
-      // Create and initialize client
+      // Wait for styling to take effect
+      await new Promise(resolve => setTimeout(resolve, 100));
+
+      // Create client ONCE
       logStep('Creating Zoom client...');
-      
       if (!window.ZoomMtgEmbedded) {
         throw new Error('ZoomMtgEmbedded not available');
+      }
+      
+      // Clear any existing client
+      if (clientRef.current) {
+        try {
+          if (typeof clientRef.current.leave === 'function') {
+            clientRef.current.leave();
+          }
+        } catch (e) {
+          // Ignore cleanup errors
+        }
       }
       
       const client = window.ZoomMtgEmbedded.createClient();
       clientRef.current = client;
 
-      // Enhanced initialization with detailed logging and timeout
-      logStep('Initializing client with enhanced validation...');
+      // FIXED: Complete init configuration (missing properties cause hangs)
+      logStep('Initializing client with complete configuration...');
       
       const initConfig = {
         zoomAppRoot: container,
         language: 'en-US',
         patchJsMedia: true,
-        isSupportAV: true,
-        isSupportChat: true,
-        screenShare: true,
-        debug: true,
+        leaveUrl: window.location.origin + '/calendar',
         success: () => {
           logStep('✅ Client init success callback fired');
         },
         error: (error: any) => {
           logStep('❌ Client init error callback fired');
           console.error('Init error details:', error);
-        }
+        },
+        // CRITICAL: Missing properties that cause hangs
+        isSupportAV: true,
+        isSupportChat: true,
+        isSupportQA: true,
+        isSupportCC: true,
+        isSupportPolling: true,
+        isSupportBreakout: true,
+        screenShare: true,
+        videoDrag: true,
+        sharingMode: 'both',
+        videoHeader: true,
+        isLockBottom: true,
+        isShowJoinAudioFunction: true,
+        isSupportNonverbal: true,
+        isShowMeetingHeader: false,
+        disableInvite: false,
+        disableCallOut: false,
+        disableRecord: false,
+        disableJoinAudio: false,
+        audioPanelAlwaysOpen: false,
+        showMeetingHeader: false,
+        showPureSharingContent: false,
+        enableLoggerUI: false,
+        showLearningExperienceUrl: false,
+        showSurveyUrl: false,
+        showUpgradeWarning: false,
+        showOriginUrlInInvite: false,
+        enableInviteUrlOnJoinScreen: false,
+        disablePhonePasscode: false
       };
 
-      logStep('Init config prepared:', initConfig);
+      logStep('Init config prepared with all required properties');
 
+      // Initialize with proper timeout and error handling
       await Promise.race([
         new Promise<void>((resolve, reject) => {
           if (!mountedRef.current || !clientRef.current) {
@@ -349,7 +398,7 @@ export function ZoomComponentView({
             }
           };
 
-          logStep('🚀 Calling client.init() now...');
+          logStep('🚀 Calling client.init() with complete configuration...');
           
           try {
             clientRef.current.init(initConfig);
@@ -362,12 +411,12 @@ export function ZoomComponentView({
             }
           }
         }),
-        // 15-second timeout for initialization
+        // Reduced timeout to 10 seconds (if it takes longer, something is wrong)
         new Promise<void>((_, reject) => {
           setTimeout(() => {
-            logStep('⏰ Client initialization timed out after 15 seconds');
-            reject(new Error('Client initialization timed out after 15 seconds - container may not be ready'));
-          }, 15000);
+            logStep('⏰ Client initialization timed out after 10 seconds');
+            reject(new Error('Client initialization timed out - SDK configuration issue detected'));
+          }, 10000);
         })
       ]);
 
@@ -375,8 +424,8 @@ export function ZoomComponentView({
         throw new Error('Component unmounted during initialization');
       }
 
-      // NOW JOIN THE MEETING
-      logStep('Joining meeting...');
+      // JOIN THE MEETING
+      logStep('Proceeding to join meeting...');
 
       const joinConfig: ZoomJoinConfig = {
         sdkKey: tokens.sdkKey,
@@ -413,7 +462,7 @@ export function ZoomComponentView({
         throw new Error('Component unmounted or client null before join');
       }
 
-      // CRITICAL FIX: Add timeout to join operation
+      // Join with timeout
       await Promise.race([
         new Promise<void>((resolve, reject) => {
           if (!clientRef.current) {
@@ -421,14 +470,12 @@ export function ZoomComponentView({
             return;
           }
 
-          // Override success to resolve promise
           const originalSuccess = joinConfig.success;
           joinConfig.success = (result: any) => {
             originalSuccess(result);
             resolve();
           };
 
-          // Override error to reject promise  
           const originalError = joinConfig.error;
           joinConfig.error = (error: any) => {
             originalError(error);
@@ -438,11 +485,10 @@ export function ZoomComponentView({
           logStep('Calling client.join() with config');
           clientRef.current.join(joinConfig);
         }),
-        // Add 30-second timeout for join
         new Promise<void>((_, reject) => {
           setTimeout(() => {
-            reject(new Error('Join operation timed out after 30 seconds'));
-          }, 30000);
+            reject(new Error('Join operation timed out after 20 seconds'));
+          }, 20000);
         })
       ]);
 
@@ -482,7 +528,6 @@ export function ZoomComponentView({
       setError(null);
     }
     initializationRef.current = false;
-    joinAttemptRef.current = false;
     
     setTimeout(() => {
       if (mountedRef.current) {
@@ -557,15 +602,16 @@ export function ZoomComponentView({
     };
   }, [loadZoomSDK, handleError, logStep]);
 
-  // Initialize when ready
+  // Initialize when ready with better timing
   useEffect(() => {
     if (sdkReady && containerRef.current && meetingNumber && !initializationRef.current && mountedRef.current) {
-      logStep('SDK ready, starting initialization in 500ms...');
+      logStep('SDK ready, starting initialization in 1000ms...');
+      // Increased delay to ensure DOM is completely stable
       const timer = setTimeout(() => {
         if (mountedRef.current) {
           initializeAndJoin();
         }
-      }, 500);
+      }, 1000);
 
       return () => clearTimeout(timer);
     }
@@ -624,12 +670,17 @@ export function ZoomComponentView({
         </div>
       )}
 
-      {/* Zoom meeting container */}
+      {/* Zoom meeting container with required properties */}
       <div 
         ref={containerRef}
         id="zoomComponentContainer"
         className="w-full h-full"
-        style={{ minHeight: '500px' }}
+        style={{ 
+          minHeight: '500px',
+          minWidth: '400px',
+          position: 'relative',
+          overflow: 'hidden'
+        }}
       />
 
       {/* Custom meeting controls */}
