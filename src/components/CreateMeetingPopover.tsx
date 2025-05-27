@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -16,16 +16,31 @@ interface CreateMeetingPopoverProps {
 
 const CreateMeetingPopover = ({ children }: CreateMeetingPopoverProps) => {
   const [title, setTitle] = useState('');
-  const [startDate, setStartDate] = useState<Date | undefined>();
-  const [startTime, setStartTime] = useState('15:00');
-  const [endDate, setEndDate] = useState<Date | undefined>();
-  const [endTime, setEndTime] = useState('15:30');
+  const [startDate, setStartDate] = useState<Date | undefined>(new Date()); // Set to today by default
+  const [startTime, setStartTime] = useState('22:00'); // Default to 22:00 as requested
+  const [endDate, setEndDate] = useState<Date | undefined>(new Date()); // Set to today by default
+  const [endTime, setEndTime] = useState('22:30'); // Default to 30 minutes later
   const [attendees, setAttendees] = useState<string[]>(['']);
   const [meetingType, setMeetingType] = useState<string>('');
   const [open, setOpen] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
   const { toast } = useToast();
   const { user } = useAuth();
+
+  // Set default times when component mounts
+  useEffect(() => {
+    const now = new Date();
+    const currentHour = now.getHours();
+    const currentMinute = now.getMinutes();
+    
+    // If it's past 22:00, set for tomorrow
+    if (currentHour >= 22) {
+      const tomorrow = new Date(now);
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      setStartDate(tomorrow);
+      setEndDate(tomorrow);
+    }
+  }, []);
 
   // Generate time options with 15-minute intervals
   const generateTimeOptions = () => {
@@ -97,8 +112,16 @@ const CreateMeetingPopover = ({ children }: CreateMeetingPopoverProps) => {
           description: "End time must be after start time.",
           variant: "destructive",
         });
+        setIsCreating(false);
         return;
       }
+
+      console.log("Creating meeting with:", {
+        topic: title,
+        start_time: startDateTime.toISOString(),
+        duration: duration,
+        type: 2 // Scheduled meeting
+      });
 
       const meetingSettings = {
         topic: title,
@@ -120,27 +143,32 @@ const CreateMeetingPopover = ({ children }: CreateMeetingPopoverProps) => {
       });
 
       if (error) {
+        console.error("Supabase function error:", error);
         throw new Error(error.message || 'Failed to create meeting');
       }
 
       if (!data || data.error) {
+        console.error("Meeting creation failed:", data);
         throw new Error(data?.error || 'Failed to create meeting');
       }
 
+      console.log("Meeting created successfully:", data);
+
       toast({
         title: "Meeting Created",
-        description: `Meeting "${title}" has been created successfully.`,
+        description: `Meeting "${title}" has been created successfully for ${format(startDateTime, 'MMM do, yyyy')} at ${startTime}.`,
       });
 
-      // Reset form
+      // Reset form but keep today's date
       setTitle('');
-      setStartDate(undefined);
-      setEndDate(undefined);
-      setStartTime('15:00');
-      setEndTime('15:30');
+      setStartTime('22:00');
+      setEndTime('22:30');
       setAttendees(['']);
       setMeetingType('');
       setOpen(false);
+
+      // Trigger a refresh of meetings by dispatching a custom event
+      window.dispatchEvent(new CustomEvent('meetingCreated'));
 
     } catch (error: any) {
       console.error('Error creating meeting:', error);

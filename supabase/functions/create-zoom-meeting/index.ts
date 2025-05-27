@@ -111,25 +111,27 @@ serve(async (req) => {
     const requestBody = await req.json();
     console.log("Received meeting settings:", requestBody);
 
-    // Create start time - use current time for instant meetings
-    const startTime = new Date();
+    // Use the exact start time from the request for scheduled meetings
+    const startTime = new Date(requestBody.start_time);
+    const duration = requestBody.duration || 30; // Ensure duration is always set
+    
     console.log("Meeting start time set to:", startTime.toISOString());
+    console.log("Meeting duration set to:", duration, "minutes");
     
     const meetingPayload = {
-      topic: requestBody.topic || 'Instant Meeting',
-      type: 1, // Instant meeting
+      topic: requestBody.topic || 'Meeting',
+      type: requestBody.type || 2, // Use the type from request (2 for scheduled)
       start_time: startTime.toISOString(),
-      duration: requestBody.duration || 30,
-      timezone: 'UTC',
+      duration: duration,
+      timezone: requestBody.timezone || 'UTC',
       settings: {
         host_video: requestBody.settings?.host_video ?? true,
         participant_video: requestBody.settings?.participant_video ?? true,
-        join_before_host: true,
+        join_before_host: requestBody.settings?.join_before_host ?? false,
         mute_upon_entry: requestBody.settings?.mute_upon_entry ?? true,
-        waiting_room: false, // Critical: Disable waiting room for component view
-        approval_type: 0, // Automatically approve
+        waiting_room: requestBody.settings?.waiting_room ?? true,
+        approval_type: 0,
         auto_recording: 'none',
-        // Additional settings to prevent external redirects
         enforce_login: false,
         enforce_login_domains: '',
         alternative_hosts: '',
@@ -166,10 +168,11 @@ serve(async (req) => {
       id: meetingData.id,
       topic: meetingData.topic,
       startTime: meetingData.start_time,
+      duration: meetingData.duration,
       joinUrl: meetingData.join_url
     });
 
-    // Store meeting in database
+    // Store meeting in database with proper duration
     const { error: insertError } = await supabaseClient
       .from('zoom_meetings')
       .insert({
@@ -177,7 +180,7 @@ serve(async (req) => {
         meeting_id: meetingData.id.toString(),
         title: meetingData.topic,
         start_time: startTime.toISOString(),
-        duration: meetingData.duration,
+        duration: meetingData.duration || duration, // Ensure duration is saved
         join_url: meetingData.join_url
       });
 
@@ -195,9 +198,9 @@ serve(async (req) => {
         startTime: startTime.toISOString(),
         joinUrl: meetingData.join_url,
         password: meetingData.password || '',
-        duration: meetingData.duration,
+        duration: meetingData.duration || duration,
         status: 'created',
-        useComponentView: true // Flag to force component view
+        useComponentView: true
       }),
       { 
         status: 200, 

@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Calendar as CalendarComponent } from '@/components/ui/calendar';
 import { Button } from '@/components/ui/button';
 import { Alert } from '@/components/ui/alert';
@@ -15,7 +15,20 @@ import { supabase } from '@/integrations/supabase/client';
 const Calendar = () => {
   const [date, setDate] = useState<Date | undefined>(new Date());
   const navigate = useNavigate();
-  const { meetings, isLoading, isSyncing, syncMeetings } = useZoomMeetings(date);
+  const { meetings, isLoading, isSyncing, syncMeetings, fetchMeetingsForDate } = useZoomMeetings(date);
+
+  // Listen for meeting creation events to refresh the list
+  useEffect(() => {
+    const handleMeetingCreated = () => {
+      console.log("Meeting created event received, refreshing meetings...");
+      if (date) {
+        fetchMeetingsForDate(date);
+      }
+    };
+
+    window.addEventListener('meetingCreated', handleMeetingCreated);
+    return () => window.removeEventListener('meetingCreated', handleMeetingCreated);
+  }, [date, fetchMeetingsForDate]);
 
   const handleJoinMeeting = async (meetingId: string, event: React.MouseEvent) => {
     // Prevent any default behavior that might cause redirects
@@ -170,7 +183,7 @@ const Calendar = () => {
             {!isLoading && meetings.length === 0 && (
               <div className="text-center py-8 text-gray-500">
                 <p className="text-sm">No meetings scheduled for this day</p>
-                <p className="text-xs mt-1">Click the sync button to fetch your Zoom meetings</p>
+                <p className="text-xs mt-1">Click the + button to create a new meeting or sync to fetch existing ones</p>
               </div>
             )}
 
