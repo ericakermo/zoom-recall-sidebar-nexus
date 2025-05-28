@@ -1,7 +1,6 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { useAuth } from '@/context/AuthContext';
-import { useZoomSDK } from '@/hooks/useZoomSDK';
 import { useSimpleZoom } from '@/hooks/useSimpleZoom';
 import { ZoomMeetingControls } from '@/components/zoom/ZoomMeetingControls';
 import { ZoomLoadingOverlay } from '@/components/zoom/ZoomLoadingOverlay';
@@ -32,39 +31,33 @@ export function ZoomComponentView({
   const [error, setError] = useState<string | null>(null);
   const [retryCount, setRetryCount] = useState(0);
   const [hasStartedJoin, setHasStartedJoin] = useState(false);
+  const [currentStep, setCurrentStep] = useState('Loading...');
   
   const { user } = useAuth();
   const MAX_RETRIES = 3;
 
   const {
-    sdkReady,
-    error: sdkError,
-    currentStep,
-    logStep,
-    handleError,
-    loadZoomSDK
-  } = useZoomSDK(onMeetingError);
-
-  const {
     containerRef,
     isReady,
     isInitializing,
-    initializeZoom,
+    sdkLoaded,
     joinMeeting,
     cleanup
   } = useSimpleZoom({
     onInitialized: () => {
-      logStep('✅ Zoom client ready');
+      console.log('✅ Zoom client ready for meeting');
+      setCurrentStep('Client ready');
     },
     onError: (error) => {
-      handleError(`Client error: ${error}`);
+      console.error('❌ Zoom error:', error);
       setError(error);
+      onMeetingError?.(error);
     }
   });
 
   const getTokens = useCallback(async (meetingNumber: string, role: number) => {
     try {
-      logStep('🔄 Fetching tokens...');
+      setCurrentStep('Getting authentication tokens...');
 
       const { data: tokenData, error: tokenError } = await supabase.functions.invoke('get-zoom-token', {
         body: {
@@ -79,7 +72,7 @@ export function ZoomComponentView({
       // Get ZAK token if host
       let zakToken = null;
       if (role === 1) {
-        logStep('🔄 Getting ZAK token...');
+        setCurrentStep('Getting host permissions...');
         const { data: zakData, error: zakError } = await supabase.functions.invoke('get-zoom-zak');
         if (!zakError && zakData) {
           zakToken = zakData.zak;
@@ -91,7 +84,7 @@ export function ZoomComponentView({
       console.error('❌ Token fetch failed:', error);
       throw error;
     }
-  }, [logStep]);
+  }, []);
 
   const handleJoinMeeting = useCallback(async () => {
     if (!isReady || hasStartedJoin) return;
@@ -99,7 +92,7 @@ export function ZoomComponentView({
     setHasStartedJoin(true);
     
     try {
-      logStep('🔄 Starting join process...');
+      setCurrentStep('Preparing to join meeting...');
       const tokens = await getTokens(meetingNumber, role || 0);
 
       const joinConfig = {
@@ -113,18 +106,20 @@ export function ZoomComponentView({
         ...(role === 1 && tokens.zak && { zak: tokens.zak })
       };
 
+      setCurrentStep('Joining meeting...');
       await joinMeeting(joinConfig);
       
       setIsJoined(true);
       setIsLoading(false);
+      setCurrentStep('Meeting joined successfully');
       onMeetingJoined?.();
-      logStep('✅ Successfully joined meeting');
     } catch (error: any) {
       console.error('❌ Join failed:', error);
       setError(error.message);
       setHasStartedJoin(false);
+      setCurrentStep('Join failed');
     }
-  }, [isReady, hasStartedJoin, meetingNumber, role, providedUserName, user, meetingPassword, getTokens, joinMeeting, onMeetingJoined, logStep]);
+  }, [isReady, hasStartedJoin, meetingNumber, role, providedUserName, user, meetingPassword, getTokens, joinMeeting, onMeetingJoined]);
 
   const handleRetry = useCallback(() => {
     if (retryCount >= MAX_RETRIES) return;
@@ -133,44 +128,32 @@ export function ZoomComponentView({
     setError(null);
     setHasStartedJoin(false);
     setIsLoading(true);
-    
-    setTimeout(() => {
-      if (isReady) {
-        handleJoinMeeting();
-      } else {
-        initializeZoom();
-      }
-    }, 1000);
-  }, [retryCount, isReady, handleJoinMeeting, initializeZoom]);
+    setCurrentStep('Retrying...');
+  }, [retryCount]);
 
-  // Load SDK
+  // Update loading state based on SDK status
   useEffect(() => {
-    logStep('🔄 Loading SDK...');
-    loadZoomSDK().catch(err => {
-      console.error('SDK load failed:', err);
-      setError('Failed to load Zoom SDK');
-    });
-  }, [loadZoomSDK, logStep]);
-
-  // Initialize when SDK ready
-  useEffect(() => {
-    if (sdkReady && !isInitializing && !isReady) {
-      logStep('🔄 SDK ready, initializing...');
-      setTimeout(initializeZoom, 100);
+    if (sdkLoaded && !isInitializing) {
+      setCurrentStep('SDK loaded, initializing...');
+    } else if (isInitializing) {
+      setCurrentStep('Initializing Zoom client...');
+    } else if (!sdkLoaded) {
+      setCurrentStep('Loading Zoom SDK...');
     }
-  }, [sdkReady, isInitializing, isReady, initializeZoom, logStep]);
+  }, [sdkLoaded, isInitializing]);
 
   // Join when ready
   useEffect(() => {
-    if (isReady && !hasStartedJoin) {
-      setTimeout(handleJoinMeeting, 200);
+    if (isReady && !hasStartedJoin && !isJoined) {
+      const timer = setTimeout(handleJoinMeeting, 500);
+      return () => clearTimeout(timer);
     }
-  }, [isReady, hasStartedJoin, handleJoinMeeting]);
+  }, [isReady, hasStartedJoin, isJoined, handleJoinMeeting]);
 
-  if (sdkError || error) {
+  if (error) {
     return (
       <ZoomErrorDisplay
-        error={sdkError || error || 'Unknown error'}
+        error={error}
         meetingNumber={meetingNumber}
         retryCount={retryCount}
         maxRetries={MAX_RETRIES}
@@ -191,11 +174,12 @@ export function ZoomComponentView({
 
       <div 
         ref={containerRef}
-        id="meetingSDKElement"
+        id="zoomComponentContainer"
         className="w-full h-full"
         style={{ 
-          minHeight: '400px',
-          minWidth: '400px'
+          minHeight: '500px',
+          minWidth: '800px',
+          position: 'relative'
         }}
       />
 
