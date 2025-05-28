@@ -23,7 +23,7 @@ export function useZoomSDK({ onReady, onError }: UseZoomSDKProps = {}) {
       
       clientRef.current = ZoomMtgEmbedded.createClient();
       
-      console.log('🔄 Initializing Zoom embedded client with custom video sizing...');
+      console.log('🔄 Initializing Zoom embedded client with responsive video sizing...');
       
       await clientRef.current.init({
         zoomAppRoot: containerRef.current,
@@ -35,19 +35,15 @@ export function useZoomSDK({ onReady, onError }: UseZoomSDKProps = {}) {
             isResizable: true,
             viewSizes: {
               default: {
-                width: 1000,
-                height: 600
-              },
-              ribbon: {
-                width: 300,
-                height: 700
+                width: '100%',
+                height: '100%'
               }
             }
           }
         }
       });
 
-      console.log('✅ Zoom embedded client initialized successfully with 1000x600 video size');
+      console.log('✅ Zoom embedded client initialized successfully with responsive sizing');
       setIsSDKLoaded(true);
       setIsReady(true);
       onReady?.();

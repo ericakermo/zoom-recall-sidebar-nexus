@@ -135,32 +135,52 @@
   overflow: hidden;
 }
 
-/* Ensure embedded meeting takes full container and optimizes for 1000x600 */
+/* Make video participants fill the available space like Zoom web app */
+#meetingSDKElement .zoom-MuiListItem-root,
+#meetingSDKElement li[aria-label*="Avatar"] {
+  width: 100% !important;
+  height: 100% !important;
+  max-width: none !important;
+  max-height: none !important;
+}
+
+/* Ensure video content takes full container space */
+#meetingSDKElement .zoom-MuiCardMedia-root,
+#meetingSDKElement .zoom-MuiCardMedia-img,
+#meetingSDKElement img[alt*="avatar"] {
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: cover !important;
+}
+
+/* Force video grid to use full space */
+#meetingSDKElement .zoom-MuiList-root,
+#meetingSDKElement ul {
+  width: 100% !important;
+  height: 100% !important;
+}
+
+/* Ensure embedded meeting takes full container */
 #meetingSDKElement > div {
   width: 100% !important;
   height: 100% !important;
 }
 
-/* Zoom SDK video sizing - optimized for 1000x600 dimensions */
+/* Zoom SDK video container optimization */
 #meetingSDKElement .zm-video-container,
 #meetingSDKElement .video-container,
 #meetingSDKElement [class*="video"],
 #meetingSDKElement [class*="participant"] {
+  width: 100% !important;
   height: 100% !important;
   max-height: 100% !important;
 }
 
-/* Minimize Zoom's built-in control bar to maximize video space */
+/* Minimize Zoom's built-in control bar */
 #meetingSDKElement .zm-toolbar,
 #meetingSDKElement [class*="toolbar"],
 #meetingSDKElement [class*="control-bar"] {
   height: auto !important;
   min-height: 40px !important;
   max-height: 60px !important;
-}
-
-/* Ensure the video canvas uses the configured 1000x600 size */
-#meetingSDKElement canvas {
-  max-width: 1000px !important;
-  max-height: 600px !important;
 }
