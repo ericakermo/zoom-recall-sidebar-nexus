@@ -13,6 +13,7 @@ export function useSimpleZoom({ onInitialized, onError }: UseSimpleZoomProps = {
   const containerRef = useRef<HTMLDivElement>(null);
   const clientRef = useRef<any>(null);
   const mountedRef = useRef(true);
+  const initPromiseRef = useRef<Promise<void> | null>(null);
 
   // Load CSS files synchronously
   const loadCSS = useCallback(async () => {
@@ -92,77 +93,103 @@ export function useSimpleZoom({ onInitialized, onError }: UseSimpleZoomProps = {
     }
   }, [loadCSS, onError]);
 
-  // Initialize Zoom client
+  // Initialize Zoom client with proper guards
   const initializeZoom = useCallback(async () => {
+    // Prevent multiple simultaneous initializations
+    if (initPromiseRef.current) {
+      console.log('⏸️ Initialization already in progress, waiting...');
+      return initPromiseRef.current;
+    }
+
     if (!sdkLoaded || !containerRef.current || isInitializing || isReady) {
-      console.log('⏸️ Skipping initialization:', { sdkLoaded, hasContainer: !!containerRef.current, isInitializing, isReady });
+      console.log('⏸️ Skipping initialization:', { 
+        sdkLoaded, 
+        hasContainer: !!containerRef.current, 
+        isInitializing, 
+        isReady 
+      });
       return;
     }
 
+    console.log('🔄 Starting Zoom client initialization...');
     setIsInitializing(true);
 
-    try {
-      const container = containerRef.current;
-      
-      // Validate container
-      if (!container.offsetHeight || !container.offsetWidth) {
-        console.log('📐 Setting container dimensions...');
-        container.style.minHeight = '500px';
-        container.style.minWidth = '800px';
-        container.style.width = '100%';
-        container.style.height = '100%';
-      }
+    // Create initialization promise
+    initPromiseRef.current = new Promise<void>(async (resolve, reject) => {
+      try {
+        const container = containerRef.current;
+        if (!container) {
+          throw new Error('Container not available');
+        }
+        
+        // Validate container
+        if (!container.offsetHeight || !container.offsetWidth) {
+          console.log('📐 Setting container dimensions...');
+          container.style.minHeight = '500px';
+          container.style.minWidth = '800px';
+          container.style.width = '100%';
+          container.style.height = '100%';
+        }
 
-      console.log('🔄 Creating Zoom client...');
-      const client = window.ZoomMtgEmbedded.createClient();
-      clientRef.current = client;
+        console.log('🔄 Creating Zoom client...');
+        const client = window.ZoomMtgEmbedded.createClient();
+        
+        // Store client reference before initialization
+        clientRef.current = client;
 
-      console.log('🔄 Initializing client with container:', container.id);
+        console.log('🔄 Initializing client with container:', container.id);
 
-      // Initialize with proper error handling
-      await new Promise<void>((resolve, reject) => {
-        const initConfig = {
-          zoomAppRoot: container,
-          language: 'en-US',
-          patchJsMedia: true,
-          leaveOnPageUnload: true,
-          isSupportAV: true,
-          isSupportChat: true,
-          isSupportQA: true,
-          isSupportCC: true,
-          screenShare: true,
-          success: () => {
-            console.log('✅ Zoom client initialized successfully');
-            if (mountedRef.current) {
-              setIsReady(true);
-              onInitialized?.();
+        // Initialize with proper error handling
+        await new Promise<void>((initResolve, initReject) => {
+          const initConfig = {
+            zoomAppRoot: container,
+            language: 'en-US',
+            patchJsMedia: true,
+            leaveOnPageUnload: true,
+            isSupportAV: true,
+            isSupportChat: true,
+            isSupportQA: true,
+            isSupportCC: true,
+            screenShare: true,
+            success: () => {
+              console.log('✅ Zoom client initialized successfully');
+              if (mountedRef.current) {
+                setIsReady(true);
+                onInitialized?.();
+              }
+              initResolve();
+            },
+            error: (error: any) => {
+              console.error('❌ Zoom init failed:', error);
+              const errorMsg = error.message || error.reason || error.type || 'Initialization failed';
+              if (mountedRef.current) {
+                onError?.(errorMsg);
+              }
+              initReject(new Error(errorMsg));
             }
-            resolve();
-          },
-          error: (error: any) => {
-            console.error('❌ Zoom init failed:', error);
-            const errorMsg = error.message || error.reason || error.type || 'Initialization failed';
-            if (mountedRef.current) {
-              onError?.(errorMsg);
-            }
-            reject(new Error(errorMsg));
-          }
-        };
+          };
 
-        console.log('🔄 Calling client.init with config:', initConfig);
-        client.init(initConfig);
-      });
+          console.log('🔄 Calling client.init with config...');
+          client.init(initConfig);
+        });
 
-    } catch (error: any) {
-      console.error('❌ Init error:', error);
-      if (mountedRef.current) {
-        onError?.(error.message);
+        resolve();
+      } catch (error: any) {
+        console.error('❌ Init error:', error);
+        if (mountedRef.current) {
+          onError?.(error.message);
+        }
+        reject(error);
+      } finally {
+        if (mountedRef.current) {
+          setIsInitializing(false);
+        }
+        // Clear the promise reference when done
+        initPromiseRef.current = null;
       }
-    } finally {
-      if (mountedRef.current) {
-        setIsInitializing(false);
-      }
-    }
+    });
+
+    return initPromiseRef.current;
   }, [sdkLoaded, isInitializing, isReady, onInitialized, onError]);
 
   const joinMeeting = useCallback(async (joinConfig: any) => {
@@ -188,17 +215,30 @@ export function useSimpleZoom({ onInitialized, onError }: UseSimpleZoomProps = {
   }, [isReady]);
 
   const cleanup = useCallback(() => {
+    console.log('🔄 Starting cleanup...');
+    
+    // Clear any pending initialization
+    initPromiseRef.current = null;
+    
     if (clientRef.current) {
       try {
-        console.log('🔄 Cleaning up Zoom client');
-        clientRef.current.leave();
+        // Check if the client has the leave method before calling it
+        if (typeof clientRef.current.leave === 'function') {
+          console.log('🔄 Calling client.leave()...');
+          clientRef.current.leave();
+          console.log('✅ Client left successfully');
+        } else {
+          console.log('⚠️ Client does not have leave method, skipping...');
+        }
       } catch (error) {
         console.error('❌ Cleanup error:', error);
       }
     }
+    
     clientRef.current = null;
     setIsReady(false);
     setIsInitializing(false);
+    console.log('✅ Cleanup completed');
   }, []);
 
   // Load SDK on mount
@@ -214,9 +254,11 @@ export function useSimpleZoom({ onInitialized, onError }: UseSimpleZoomProps = {
 
   // Initialize when SDK is ready
   useEffect(() => {
-    if (sdkLoaded && !isInitializing && !isReady) {
+    if (sdkLoaded && !isInitializing && !isReady && !initPromiseRef.current) {
       // Small delay to ensure container is rendered
-      const timer = setTimeout(initializeZoom, 100);
+      const timer = setTimeout(() => {
+        initializeZoom().catch(console.error);
+      }, 100);
       return () => clearTimeout(timer);
     }
   }, [sdkLoaded, isInitializing, isReady, initializeZoom]);

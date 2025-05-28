@@ -52,6 +52,7 @@ export function ZoomComponentView({
       console.error('❌ Zoom error:', error);
       setError(error);
       onMeetingError?.(error);
+      setIsLoading(false);
     }
   });
 
@@ -87,7 +88,10 @@ export function ZoomComponentView({
   }, []);
 
   const handleJoinMeeting = useCallback(async () => {
-    if (!isReady || hasStartedJoin) return;
+    if (!isReady || hasStartedJoin) {
+      console.log('⏸️ Cannot join yet:', { isReady, hasStartedJoin });
+      return;
+    }
 
     setHasStartedJoin(true);
     
@@ -118,6 +122,7 @@ export function ZoomComponentView({
       setError(error.message);
       setHasStartedJoin(false);
       setCurrentStep('Join failed');
+      setIsLoading(false);
     }
   }, [isReady, hasStartedJoin, meetingNumber, role, providedUserName, user, meetingPassword, getTokens, joinMeeting, onMeetingJoined]);
 
@@ -133,22 +138,25 @@ export function ZoomComponentView({
 
   // Update loading state based on SDK status
   useEffect(() => {
-    if (sdkLoaded && !isInitializing) {
-      setCurrentStep('SDK loaded, initializing...');
+    if (sdkLoaded && !isInitializing && isReady) {
+      setCurrentStep('Ready to join meeting');
     } else if (isInitializing) {
       setCurrentStep('Initializing Zoom client...');
+    } else if (sdkLoaded && !isInitializing) {
+      setCurrentStep('SDK loaded, preparing client...');
     } else if (!sdkLoaded) {
       setCurrentStep('Loading Zoom SDK...');
     }
-  }, [sdkLoaded, isInitializing]);
+  }, [sdkLoaded, isInitializing, isReady]);
 
   // Join when ready
   useEffect(() => {
-    if (isReady && !hasStartedJoin && !isJoined) {
+    if (isReady && !hasStartedJoin && !isJoined && !error) {
+      console.log('✅ Ready to join, starting join process...');
       const timer = setTimeout(handleJoinMeeting, 500);
       return () => clearTimeout(timer);
     }
-  }, [isReady, hasStartedJoin, isJoined, handleJoinMeeting]);
+  }, [isReady, hasStartedJoin, isJoined, error, handleJoinMeeting]);
 
   if (error) {
     return (
