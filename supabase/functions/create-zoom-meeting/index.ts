@@ -113,23 +113,23 @@ serve(async (req) => {
 
     // Use the exact start time from the request for scheduled meetings
     const startTime = new Date(requestBody.start_time);
-    const duration = requestBody.duration || 30; // Ensure duration is always set
+    const duration = requestBody.duration || 30;
     
     console.log("Meeting start time set to:", startTime.toISOString());
     console.log("Meeting duration set to:", duration, "minutes");
     
     const meetingPayload = {
       topic: requestBody.topic || 'Meeting',
-      type: requestBody.type || 2, // Use the type from request (2 for scheduled)
+      type: requestBody.type || 2,
       start_time: startTime.toISOString(),
       duration: duration,
       timezone: requestBody.timezone || 'UTC',
       settings: {
         host_video: requestBody.settings?.host_video ?? true,
         participant_video: requestBody.settings?.participant_video ?? true,
-        join_before_host: requestBody.settings?.join_before_host ?? false,
+        join_before_host: requestBody.settings?.join_before_host ?? true, // Changed to true by default
         mute_upon_entry: requestBody.settings?.mute_upon_entry ?? true,
-        waiting_room: requestBody.settings?.waiting_room ?? true,
+        waiting_room: requestBody.settings?.waiting_room ?? false, // Changed to false when join_before_host is true
         approval_type: 0,
         auto_recording: 'none',
         enforce_login: false,
@@ -169,7 +169,8 @@ serve(async (req) => {
       topic: meetingData.topic,
       startTime: meetingData.start_time,
       duration: meetingData.duration,
-      joinUrl: meetingData.join_url
+      joinUrl: meetingData.join_url,
+      joinBeforeHost: meetingData.settings?.join_before_host
     });
 
     // Store meeting in database with proper duration
@@ -180,7 +181,7 @@ serve(async (req) => {
         meeting_id: meetingData.id.toString(),
         title: meetingData.topic,
         start_time: startTime.toISOString(),
-        duration: meetingData.duration || duration, // Ensure duration is saved
+        duration: meetingData.duration || duration,
         join_url: meetingData.join_url
       });
 
@@ -200,7 +201,11 @@ serve(async (req) => {
         password: meetingData.password || '',
         duration: meetingData.duration || duration,
         status: 'created',
-        useComponentView: true
+        useComponentView: true,
+        settings: {
+          join_before_host: meetingData.settings?.join_before_host,
+          waiting_room: meetingData.settings?.waiting_room
+        }
       }),
       { 
         status: 200, 

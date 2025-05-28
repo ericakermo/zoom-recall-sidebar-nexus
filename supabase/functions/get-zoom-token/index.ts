@@ -3,7 +3,6 @@ import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { encode as base64Encode } from 'https://deno.land/std@0.168.0/encoding/base64.ts'
 
-// Configure CORS headers to allow requests from any origin
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
@@ -13,7 +12,6 @@ const corsHeaders = {
 serve(async (req) => {
   console.log("Get Zoom token function called with method:", req.method);
   
-  // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     console.log("Handling OPTIONS preflight request");
     return new Response(null, { 
@@ -28,7 +26,6 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || ''
     );
 
-    // Get the JWT from the authorization header
     const authHeader = req.headers.get('Authorization');
     if (!authHeader) {
       console.error("No authorization header provided");
@@ -38,10 +35,7 @@ serve(async (req) => {
       );
     }
 
-    // Get the JWT from the authorization header
     const token = authHeader.replace('Bearer ', '');
-    
-    // Verify the JWT to get the user
     const { data: { user }, error: userError } = await supabaseClient.auth.getUser(token);
     
     if (userError || !user) {
@@ -54,7 +48,6 @@ serve(async (req) => {
 
     console.log("User authenticated:", user.id);
 
-    // Get the user's Zoom connection from the database
     const { data: zoomConnection, error: connectionError } = await supabaseClient
       .from('zoom_connections')
       .select('access_token, refresh_token, expires_at')
@@ -79,7 +72,6 @@ serve(async (req) => {
     if (now >= expiresAt) {
       console.log("Access token expired, refreshing...");
       
-      // Refresh the access token
       const refreshResponse = await fetch('https://zoom.us/oauth/token', {
         method: 'POST',
         headers: {
@@ -104,7 +96,6 @@ serve(async (req) => {
       const tokenData = await refreshResponse.json();
       accessToken = tokenData.access_token;
 
-      // Update the stored tokens
       await supabaseClient
         .from('zoom_connections')
         .update({
@@ -117,7 +108,6 @@ serve(async (req) => {
       console.log("Token refreshed successfully");
     }
     
-    // Parse request body
     const { meetingNumber, role, expirationSeconds } = await req.json();
     
     console.log("Generating token for:", {
@@ -126,27 +116,29 @@ serve(async (req) => {
       expirationSeconds: expirationSeconds || 7200
     });
     
-    // Generate JWT signature with enhanced payload
+    // Generate enhanced JWT signature with correct parameters
     const iat = Math.floor(Date.now() / 1000);
-    const exp = expirationSeconds ? iat + expirationSeconds : iat + 7200; // Default 2 hours
+    const exp = expirationSeconds ? iat + expirationSeconds : iat + 7200;
     
     const header = { alg: 'HS256', typ: 'JWT' };
     const payload = {
-      appKey: Deno.env.get('ZOOM_CLIENT_ID'),
       sdkKey: Deno.env.get('ZOOM_CLIENT_ID'),
+      appKey: Deno.env.get('ZOOM_CLIENT_ID'), // Required field
       mn: meetingNumber,
       role,
       iat,
       exp,
-      tokenExp: exp,
-      // Add additional claims for better compatibility
+      tokenExp: exp, // Required field
       alg: 'HS256'
     };
 
-    console.log("JWT payload created:", {
+    console.log("Enhanced JWT payload created:", {
       meetingNumber: payload.mn,
       role: payload.role,
-      tokenExpiration: new Date(payload.exp * 1000).toISOString()
+      sdkKey: payload.sdkKey ? 'present' : 'missing',
+      appKey: payload.appKey ? 'present' : 'missing',
+      tokenExpiration: new Date(payload.exp * 1000).toISOString(),
+      issuedAt: new Date(payload.iat * 1000).toISOString()
     });
 
     const encodedHeader = base64Encode(JSON.stringify(header));
@@ -164,14 +156,16 @@ serve(async (req) => {
     
     const jwt = `${encodedHeader}.${encodedPayload}.${signature}`;
     
-    console.log("JWT signature generated successfully");
+    console.log("Enhanced JWT signature generated successfully");
     
     return new Response(
       JSON.stringify({ 
         accessToken,
         tokenType: 'Bearer',
         sdkKey: Deno.env.get('ZOOM_CLIENT_ID'),
-        signature: jwt
+        signature: jwt,
+        meetingNumber: String(meetingNumber),
+        role: Number(role) || 0
       }),
       { 
         status: 200, 

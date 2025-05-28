@@ -30,6 +30,8 @@ export function ZoomComponentView({
   const [isJoined, setIsJoined] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [currentStep, setCurrentStep] = useState('Initializing Zoom SDK...');
+  const [retryCount, setRetryCount] = useState(0);
+  const maxRetries = 3;
   
   const { user } = useAuth();
 
@@ -54,6 +56,8 @@ export function ZoomComponentView({
 
   const getTokens = useCallback(async (meetingNumber: string, role: number) => {
     try {
+      console.log('🔄 Requesting tokens for meeting:', meetingNumber, 'role:', role);
+      
       const { data: tokenData, error: tokenError } = await supabase.functions.invoke('get-zoom-token', {
         body: {
           meetingNumber,
@@ -62,14 +66,28 @@ export function ZoomComponentView({
         }
       });
 
-      if (tokenError) throw new Error(`Token error: ${tokenError.message}`);
+      if (tokenError) {
+        console.error('❌ Token request failed:', tokenError);
+        throw new Error(`Token error: ${tokenError.message}`);
+      }
+
+      console.log('✅ Tokens received:', {
+        sdkKey: tokenData.sdkKey ? 'present' : 'missing',
+        signature: tokenData.signature ? 'present' : 'missing',
+        meetingNumber: tokenData.meetingNumber,
+        role: tokenData.role
+      });
 
       // Get ZAK token if host
       let zakToken = null;
       if (role === 1) {
+        console.log('🔄 Requesting ZAK token for host...');
         const { data: zakData, error: zakError } = await supabase.functions.invoke('get-zoom-zak');
         if (!zakError && zakData) {
           zakToken = zakData.zak;
+          console.log('✅ ZAK token received');
+        } else {
+          console.warn('⚠️ ZAK token request failed (non-critical):', zakError);
         }
       }
 
@@ -101,12 +119,22 @@ export function ZoomComponentView({
         zak: tokens.zak || ''
       };
 
+      console.log('🔄 Attempting to join meeting with config:', {
+        meetingNumber: joinConfig.meetingNumber,
+        userName: joinConfig.userName,
+        role: joinConfig.role,
+        hasPassword: !!joinConfig.passWord,
+        hasZak: !!joinConfig.zak,
+        sdkKey: joinConfig.sdkKey ? 'present' : 'missing'
+      });
+
       setCurrentStep('Joining meeting...');
       await joinMeeting(joinConfig);
       
       setIsJoined(true);
       setIsLoading(false);
       setCurrentStep('Connected to meeting');
+      setRetryCount(0); // Reset retry count on success
       onMeetingJoined?.();
     } catch (error: any) {
       console.error('❌ Join failed:', error);
@@ -141,19 +169,27 @@ export function ZoomComponentView({
     onMeetingLeft?.();
   }, [leaveMeeting, onMeetingLeft]);
 
+  const handleRetry = useCallback(() => {
+    if (retryCount < maxRetries) {
+      console.log(`🔄 Retrying join attempt ${retryCount + 1}/${maxRetries}`);
+      setRetryCount(prev => prev + 1);
+      setError(null);
+      setIsLoading(true);
+      setCurrentStep('Retrying...');
+      handleJoinMeeting();
+    } else {
+      console.warn('⚠️ Max retry attempts reached');
+    }
+  }, [retryCount, maxRetries, handleJoinMeeting]);
+
   if (error) {
     return (
       <ZoomErrorDisplay
         error={error}
         meetingNumber={meetingNumber}
-        retryCount={0}
-        maxRetries={3}
-        onRetry={() => {
-          setError(null);
-          setIsLoading(true);
-          setCurrentStep('Retrying...');
-          window.location.reload();
-        }}
+        retryCount={retryCount}
+        maxRetries={maxRetries}
+        onRetry={handleRetry}
       />
     );
   }
@@ -164,8 +200,8 @@ export function ZoomComponentView({
         isLoading={isLoading}
         currentStep={currentStep}
         meetingNumber={meetingNumber}
-        retryCount={0}
-        maxRetries={3}
+        retryCount={retryCount}
+        maxRetries={maxRetries}
       />
 
       {/* Zoom meeting container - this is where the meeting UI will render */}

@@ -22,12 +22,10 @@ export function useZoomSDK({ onReady, onError }: UseZoomSDKProps = {}) {
     try {
       console.log('🔄 Creating Zoom embedded client...');
       
-      // Create the embedded client
       clientRef.current = ZoomMtgEmbedded.createClient();
       
       console.log('🔄 Initializing Zoom embedded client...');
       
-      // Initialize with the container element
       await clientRef.current.init({
         zoomAppRoot: containerRef.current,
         language: 'en-US',
@@ -51,6 +49,14 @@ export function useZoomSDK({ onReady, onError }: UseZoomSDKProps = {}) {
     }
 
     console.log('🔄 Joining meeting with embedded client...');
+    console.log('📋 Join config details:', {
+      meetingNumber: joinConfig.meetingNumber,
+      userName: joinConfig.userName,
+      role: joinConfig.role,
+      sdkKey: joinConfig.sdkKey ? 'present' : 'missing',
+      signature: joinConfig.signature ? 'present' : 'missing',
+      hasPassword: !!joinConfig.passWord
+    });
     
     try {
       const result = await clientRef.current.join({
@@ -68,12 +74,34 @@ export function useZoomSDK({ onReady, onError }: UseZoomSDKProps = {}) {
       return result;
     } catch (error: any) {
       console.error('❌ Failed to join meeting:', error);
-      throw new Error(error.message || 'Failed to join meeting');
+      
+      // Enhanced error logging
+      if (error?.errorCode) {
+        console.error(`🔍 Zoom Error Code: ${error.errorCode}`);
+      }
+      if (error?.reason) {
+        console.error(`📝 Zoom Error Reason: ${error.reason}`);
+      }
+      if (error?.type) {
+        console.error(`🏷️ Zoom Error Type: ${error.type}`);
+      }
+      
+      // Provide more specific error messages based on common error codes
+      let errorMessage = error.message || 'Failed to join meeting';
+      if (error?.errorCode === 200) {
+        errorMessage = 'Meeting join failed - check meeting ID, password, or wait for host to start the meeting';
+      } else if (error?.errorCode === 3712) {
+        errorMessage = 'Invalid signature - authentication failed';
+      } else if (error?.errorCode === 1) {
+        errorMessage = 'Meeting not found - check meeting ID';
+      }
+      
+      throw new Error(errorMessage);
     }
   }, [isReady]);
 
   const leaveMeeting = useCallback(() => {
-    if (clientRef.current) {
+    if (clientRef.current && typeof clientRef.current.leave === 'function') {
       console.log('🔄 Leaving meeting...');
       try {
         clientRef.current.leave();
@@ -81,6 +109,8 @@ export function useZoomSDK({ onReady, onError }: UseZoomSDKProps = {}) {
       } catch (error) {
         console.error('❌ Error leaving meeting:', error);
       }
+    } else {
+      console.warn('⚠️ Zoom client not initialized or leave function missing - safe cleanup');
     }
   }, []);
 
@@ -91,14 +121,19 @@ export function useZoomSDK({ onReady, onError }: UseZoomSDKProps = {}) {
     }
   }, [initializeSDK, isSDKLoaded]);
 
-  // Cleanup on unmount
+  // Enhanced cleanup on unmount with defensive guards
   useEffect(() => {
     return () => {
       if (clientRef.current) {
         try {
-          clientRef.current.leave();
+          if (typeof clientRef.current.leave === 'function') {
+            clientRef.current.leave();
+            console.log('🧹 Cleanup: Meeting left successfully');
+          } else {
+            console.warn('⚠️ Cleanup: Leave function not available');
+          }
         } catch (error) {
-          console.error('Cleanup error:', error);
+          console.warn('⚠️ Cleanup warning (non-critical):', error);
         }
       }
     };
