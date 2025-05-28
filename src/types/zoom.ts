@@ -1,3 +1,4 @@
+
 export interface ZoomMeetingConfig {
   signature: string;
   meetingNumber: string;
@@ -20,7 +21,7 @@ export interface ZoomClient {
 declare global {
   interface Window {
     ZoomMtg: any;
-    ZoomMtgEmbedded: any; // Add this to fix TypeScript errors
+    ZoomMtgEmbedded: any;
     React?: any;
     ReactDOM?: any;
   }

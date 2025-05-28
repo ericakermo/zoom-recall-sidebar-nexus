@@ -4,8 +4,6 @@ import { useState, useRef, useCallback, useEffect } from 'react';
 declare global {
   interface Window {
     ZoomMtgEmbedded: any;
-    React: any;
-    ReactDOM: any;
   }
 }
 
