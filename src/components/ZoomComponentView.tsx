@@ -1,4 +1,3 @@
-
 import { useEffect, useState, useCallback } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { useZoomSDK } from '@/hooks/useZoomSDK';
@@ -241,7 +240,7 @@ export function ZoomComponentView({
   }
 
   return (
-    <div className="relative w-full h-full bg-gray-900 rounded-lg overflow-hidden">
+    <div className="relative w-full h-full bg-gray-900 rounded-lg overflow-hidden flex flex-col">
       <ZoomLoadingOverlay
         isLoading={isLoading}
         currentStep={currentStep}
@@ -250,27 +249,30 @@ export function ZoomComponentView({
         maxRetries={maxRetries}
       />
 
-      {/* Zoom meeting container - this is where the meeting UI will render */}
+      {/* Zoom meeting container - make this take up most of the space */}
       <div 
         ref={containerRef}
         id="meetingSDKElement"
-        className="w-full h-full"
+        className="w-full flex-1"
         style={{ 
-          minHeight: '500px',
+          minHeight: '600px',
           minWidth: '800px',
           position: 'relative'
         }}
       />
 
+      {/* Controls container - minimize this space */}
       {isJoined && (
-        <ZoomMeetingControls
-          isJoined={isJoined}
-          isMuted={true}
-          isVideoOff={true}
-          onToggleMute={() => {}}
-          onToggleVideo={() => {}}
-          onLeaveMeeting={handleLeaveMeeting}
-        />
+        <div className="relative h-16 flex-shrink-0">
+          <ZoomMeetingControls
+            isJoined={isJoined}
+            isMuted={true}
+            isVideoOff={true}
+            onToggleMute={() => {}}
+            onToggleVideo={() => {}}
+            onLeaveMeeting={handleLeaveMeeting}
+          />
+        </div>
       )}
     </div>
   );

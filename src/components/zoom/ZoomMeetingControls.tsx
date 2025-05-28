@@ -22,33 +22,33 @@ export function ZoomMeetingControls({
   if (!isJoined) return null;
 
   return (
-    <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 z-40">
-      <div className="flex items-center gap-2 bg-black/50 backdrop-blur-sm rounded-full px-4 py-2">
+    <div className="absolute bottom-2 left-1/2 transform -translate-x-1/2 z-40">
+      <div className="flex items-center gap-2 bg-black/70 backdrop-blur-sm rounded-full px-3 py-2">
         <Button
           size="sm"
           variant={isMuted ? "destructive" : "secondary"}
           onClick={onToggleMute}
-          className="rounded-full w-10 h-10 p-0"
+          className="rounded-full w-8 h-8 p-0"
         >
-          {isMuted ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
+          {isMuted ? <MicOff className="h-3 w-3" /> : <Mic className="h-3 w-3" />}
         </Button>
         
         <Button
           size="sm"
           variant={isVideoOff ? "destructive" : "secondary"}
           onClick={onToggleVideo}
-          className="rounded-full w-10 h-10 p-0"
+          className="rounded-full w-8 h-8 p-0"
         >
-          {isVideoOff ? <VideoOff className="h-4 w-4" /> : <Video className="h-4 w-4" />}
+          {isVideoOff ? <VideoOff className="h-3 w-3" /> : <Video className="h-3 w-3" />}
         </Button>
         
         <Button
           size="sm"
           variant="destructive"
           onClick={onLeaveMeeting}
-          className="rounded-full w-10 h-10 p-0 ml-2"
+          className="rounded-full w-8 h-8 p-0 ml-1"
         >
-          <Phone className="h-4 w-4" />
+          <Phone className="h-3 w-3" />
         </Button>
       </div>
     </div>
