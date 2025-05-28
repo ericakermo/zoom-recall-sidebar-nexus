@@ -3,7 +3,7 @@ import { useState, useRef, useCallback, useEffect } from 'react';
 
 declare global {
   interface Window {
-    ZoomMtgEmbedded: any;
+    ZoomMtg: any;
   }
 }
 
@@ -14,13 +14,11 @@ interface UseZoomSDKProps {
 
 export function useZoomSDK({ onReady, onError }: UseZoomSDKProps = {}) {
   const [isSDKLoaded, setIsSDKLoaded] = useState(false);
-  const [isClientReady, setIsClientReady] = useState(false);
-  const clientRef = useRef<any>(null);
+  const [isReady, setIsReady] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
-  const isInitializedRef = useRef(false);
 
   const loadSDK = useCallback(async () => {
-    if (window.ZoomMtgEmbedded) {
+    if (window.ZoomMtg) {
       console.log('✅ Zoom SDK already available');
       setIsSDKLoaded(true);
       return;
@@ -29,15 +27,7 @@ export function useZoomSDK({ onReady, onError }: UseZoomSDKProps = {}) {
     try {
       console.log('🔄 Loading Zoom Meeting SDK...');
 
-      // Make React available globally (required by Zoom SDK)
-      if (!window.React) {
-        window.React = (await import('react')).default;
-      }
-      if (!window.ReactDOM) {
-        window.ReactDOM = (await import('react-dom')).default;
-      }
-
-      // Load CSS files
+      // Load CSS files first
       const cssFiles = [
         'https://source.zoom.us/3.13.2/css/bootstrap.css',
         'https://source.zoom.us/3.13.2/css/react-select.css'
@@ -52,29 +42,48 @@ export function useZoomSDK({ onReady, onError }: UseZoomSDKProps = {}) {
         }
       }
 
-      // Load SDK script
-      if (!document.querySelector('script[src*="zoom-meeting-embedded"]')) {
-        await new Promise<void>((resolve, reject) => {
+      // Load React dependencies
+      if (!window.React) {
+        await new Promise<void>((resolve) => {
           const script = document.createElement('script');
-          script.src = 'https://source.zoom.us/3.13.2/zoom-meeting-embedded-3.13.2.min.js';
+          script.src = 'https://source.zoom.us/3.13.2/lib/vendor/react.min.js';
           script.async = true;
-          script.onload = () => {
-            console.log('✅ Zoom SDK script loaded');
-            resolve();
-          };
-          script.onerror = () => reject(new Error('Failed to load Zoom SDK'));
+          script.onload = () => resolve();
           document.head.appendChild(script);
         });
       }
 
+      if (!window.ReactDOM) {
+        await new Promise<void>((resolve) => {
+          const script = document.createElement('script');
+          script.src = 'https://source.zoom.us/3.13.2/lib/vendor/react-dom.min.js';
+          script.async = true;
+          script.onload = () => resolve();
+          document.head.appendChild(script);
+        });
+      }
+
+      // Load Zoom SDK
+      await new Promise<void>((resolve, reject) => {
+        const script = document.createElement('script');
+        script.src = 'https://source.zoom.us/3.13.2/zoom-meeting-3.13.2.min.js';
+        script.async = true;
+        script.onload = () => {
+          console.log('✅ Zoom SDK script loaded');
+          resolve();
+        };
+        script.onerror = () => reject(new Error('Failed to load Zoom SDK'));
+        document.head.appendChild(script);
+      });
+
       // Wait for SDK to be available
       let attempts = 0;
-      while (!window.ZoomMtgEmbedded && attempts < 50) {
+      while (!window.ZoomMtg && attempts < 50) {
         await new Promise(resolve => setTimeout(resolve, 100));
         attempts++;
       }
 
-      if (!window.ZoomMtgEmbedded) {
+      if (!window.ZoomMtg) {
         throw new Error('Zoom SDK not available after loading');
       }
 
@@ -86,76 +95,73 @@ export function useZoomSDK({ onReady, onError }: UseZoomSDKProps = {}) {
     }
   }, [onError]);
 
-  const initializeClient = useCallback(async () => {
-    if (!isSDKLoaded || !containerRef.current || isInitializedRef.current) {
+  const initializeSDK = useCallback(() => {
+    if (!isSDKLoaded || !window.ZoomMtg) {
       return;
     }
 
     try {
-      console.log('🔄 Initializing Zoom client...');
-      isInitializedRef.current = true;
+      console.log('🔄 Initializing Zoom SDK...');
+      
+      // Follow the exact pattern from the working sample
+      window.ZoomMtg.setZoomJSLib('https://source.zoom.us/3.13.2/lib', '/av');
+      window.ZoomMtg.preLoadWasm();
+      window.ZoomMtg.prepareWebSDK();
+      window.ZoomMtg.i18n.load('en-US');
+      window.ZoomMtg.i18n.reload('en-US');
 
-      const client = window.ZoomMtgEmbedded.createClient();
-      clientRef.current = client;
-
-      await new Promise<void>((resolve, reject) => {
-        client.init({
-          zoomAppRoot: containerRef.current,
-          language: 'en-US',
-          patchJsMedia: true,
-          leaveOnPageUnload: true,
-          isSupportAV: true,
-          isSupportChat: true,
-          isSupportQA: true,
-          isSupportCC: true,
-          screenShare: true,
-          success: () => {
-            console.log('✅ Zoom client initialized successfully');
-            setIsClientReady(true);
-            onReady?.();
-            resolve();
-          },
-          error: (error: any) => {
-            console.error('❌ Zoom client initialization failed:', error);
-            const errorMsg = error.message || error.reason || 'Client initialization failed';
-            onError?.(errorMsg);
-            reject(new Error(errorMsg));
-          }
-        });
-      });
+      console.log('✅ Zoom SDK initialized');
+      setIsReady(true);
+      onReady?.();
     } catch (error) {
-      console.error('❌ Client initialization error:', error);
-      isInitializedRef.current = false;
+      console.error('❌ Failed to initialize Zoom SDK:', error);
       onError?.(error.message);
     }
   }, [isSDKLoaded, onReady, onError]);
 
   const joinMeeting = useCallback(async (joinConfig: any) => {
-    if (!clientRef.current || !isClientReady) {
-      throw new Error('Zoom client not ready');
+    if (!isReady || !window.ZoomMtg) {
+      throw new Error('Zoom SDK not ready');
     }
 
     console.log('🔄 Joining meeting...');
     
     return new Promise((resolve, reject) => {
-      clientRef.current.join({
-        ...joinConfig,
-        success: (result: any) => {
-          console.log('✅ Successfully joined meeting');
-          resolve(result);
+      window.ZoomMtg.init({
+        leaveUrl: '/calendar',
+        disableCORP: !window.crossOriginIsolated,
+        success: () => {
+          console.log('✅ ZoomMtg.init success');
+          
+          window.ZoomMtg.join({
+            meetingNumber: joinConfig.meetingNumber,
+            userName: joinConfig.userName,
+            signature: joinConfig.signature,
+            sdkKey: joinConfig.sdkKey,
+            userEmail: joinConfig.userEmail,
+            passWord: joinConfig.passWord,
+            success: (result: any) => {
+              console.log('✅ Successfully joined meeting');
+              resolve(result);
+            },
+            error: (error: any) => {
+              console.error('❌ Failed to join meeting:', error);
+              reject(new Error(error.message || error.reason || 'Failed to join meeting'));
+            }
+          });
         },
         error: (error: any) => {
-          console.error('❌ Failed to join meeting:', error);
-          reject(new Error(error.message || error.reason || 'Failed to join meeting'));
+          console.error('❌ ZoomMtg.init failed:', error);
+          reject(new Error(error.message || error.reason || 'Failed to initialize meeting'));
         }
       });
     });
-  }, [isClientReady]);
+  }, [isReady]);
 
   const leaveMeeting = useCallback(() => {
-    if (clientRef.current && typeof clientRef.current.leave === 'function') {
+    if (window.ZoomMtg && typeof window.ZoomMtg.endMeeting === 'function') {
       console.log('🔄 Leaving meeting...');
-      clientRef.current.leave();
+      window.ZoomMtg.endMeeting();
     }
   }, []);
 
@@ -164,20 +170,17 @@ export function useZoomSDK({ onReady, onError }: UseZoomSDKProps = {}) {
     loadSDK();
   }, [loadSDK]);
 
-  // Initialize client when SDK is loaded
+  // Initialize SDK when loaded
   useEffect(() => {
-    if (isSDKLoaded && containerRef.current && !isInitializedRef.current) {
-      const timer = setTimeout(() => {
-        initializeClient();
-      }, 100);
-      return () => clearTimeout(timer);
+    if (isSDKLoaded) {
+      initializeSDK();
     }
-  }, [isSDKLoaded, initializeClient]);
+  }, [isSDKLoaded, initializeSDK]);
 
   return {
     containerRef,
     isSDKLoaded,
-    isClientReady,
+    isReady,
     joinMeeting,
     leaveMeeting
   };

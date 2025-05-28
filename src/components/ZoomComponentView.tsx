@@ -36,12 +36,12 @@ export function ZoomComponentView({
   const {
     containerRef,
     isSDKLoaded,
-    isClientReady,
+    isReady,
     joinMeeting,
     leaveMeeting
   } = useZoomSDK({
     onReady: () => {
-      console.log('✅ Zoom client ready');
+      console.log('✅ Zoom SDK ready');
       setCurrentStep('Getting meeting tokens...');
     },
     onError: (error) => {
@@ -81,8 +81,8 @@ export function ZoomComponentView({
   }, []);
 
   const handleJoinMeeting = useCallback(async () => {
-    if (!isClientReady) {
-      console.log('⏸️ Client not ready yet');
+    if (!isReady) {
+      console.log('⏸️ SDK not ready yet');
       return;
     }
 
@@ -97,8 +97,7 @@ export function ZoomComponentView({
         userName: providedUserName || user?.email || 'Guest',
         userEmail: user?.email || '',
         passWord: meetingPassword || '',
-        role: role || 0,
-        ...(role === 1 && tokens.zak && { zak: tokens.zak })
+        role: role || 0
       };
 
       setCurrentStep('Joining meeting...');
@@ -114,26 +113,26 @@ export function ZoomComponentView({
       setIsLoading(false);
       onMeetingError?.(error.message);
     }
-  }, [isClientReady, meetingNumber, role, providedUserName, user, meetingPassword, getTokens, joinMeeting, onMeetingJoined, onMeetingError]);
+  }, [isReady, meetingNumber, role, providedUserName, user, meetingPassword, getTokens, joinMeeting, onMeetingJoined, onMeetingError]);
 
   // Update current step based on SDK status
   useEffect(() => {
-    if (isClientReady) {
+    if (isReady) {
       setCurrentStep('Ready to join meeting');
     } else if (isSDKLoaded) {
-      setCurrentStep('Initializing Zoom client...');
+      setCurrentStep('Initializing Zoom SDK...');
     } else {
       setCurrentStep('Loading Zoom SDK...');
     }
-  }, [isSDKLoaded, isClientReady]);
+  }, [isSDKLoaded, isReady]);
 
-  // Join when client is ready
+  // Join when ready
   useEffect(() => {
-    if (isClientReady && !isJoined && !error) {
-      console.log('✅ Client ready, starting join process...');
+    if (isReady && !isJoined && !error) {
+      console.log('✅ SDK ready, starting join process...');
       handleJoinMeeting();
     }
-  }, [isClientReady, isJoined, error, handleJoinMeeting]);
+  }, [isReady, isJoined, error, handleJoinMeeting]);
 
   const handleLeaveMeeting = useCallback(() => {
     leaveMeeting();
@@ -168,9 +167,10 @@ export function ZoomComponentView({
         maxRetries={3}
       />
 
+      {/* Zoom meeting container - this is where the meeting UI will render */}
       <div 
         ref={containerRef}
-        id="zoomComponentContainer"
+        id="zmmtg-root"
         className="w-full h-full"
         style={{ 
           minHeight: '500px',
