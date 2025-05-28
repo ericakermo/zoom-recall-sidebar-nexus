@@ -55,18 +55,29 @@ export function useZoomSDK({ onReady, onError }: UseZoomSDKProps = {}) {
       role: joinConfig.role,
       sdkKey: joinConfig.sdkKey ? 'present' : 'missing',
       signature: joinConfig.signature ? 'present' : 'missing',
-      hasPassword: !!joinConfig.passWord
+      hasPassword: !!joinConfig.passWord,
+      hasZak: !!joinConfig.zak
     });
+
+    // Enhanced validation for host role
+    if (joinConfig.role === 1 && !joinConfig.zak) {
+      console.warn('⚠️ Host role (1) specified but no ZAK token provided - this may cause join failure');
+    }
+
+    // Validate meeting number format
+    const meetingNumberStr = String(joinConfig.meetingNumber).replace(/\s+/g, '');
+    if (!/^\d{10,11}$/.test(meetingNumberStr)) {
+      throw new Error(`Invalid meeting number format: ${joinConfig.meetingNumber}`);
+    }
     
     try {
       const result = await clientRef.current.join({
         sdkKey: joinConfig.sdkKey,
         signature: joinConfig.signature,
-        meetingNumber: joinConfig.meetingNumber,
+        meetingNumber: meetingNumberStr,
         password: joinConfig.passWord || '',
         userName: joinConfig.userName,
         userEmail: joinConfig.userEmail || '',
-        tk: joinConfig.tk || '',
         zak: joinConfig.zak || ''
       });
       
@@ -75,7 +86,7 @@ export function useZoomSDK({ onReady, onError }: UseZoomSDKProps = {}) {
     } catch (error: any) {
       console.error('❌ Failed to join meeting:', error);
       
-      // Enhanced error logging
+      // Enhanced error logging with specific code handling
       if (error?.errorCode) {
         console.error(`🔍 Zoom Error Code: ${error.errorCode}`);
       }
@@ -86,14 +97,20 @@ export function useZoomSDK({ onReady, onError }: UseZoomSDKProps = {}) {
         console.error(`🏷️ Zoom Error Type: ${error.type}`);
       }
       
-      // Provide more specific error messages based on common error codes
+      // Provide specific error messages for common scenarios
       let errorMessage = error.message || 'Failed to join meeting';
       if (error?.errorCode === 200) {
-        errorMessage = 'Meeting join failed - check meeting ID, password, or wait for host to start the meeting';
+        if (joinConfig.role === 1) {
+          errorMessage = 'Host join failed - check ZAK token validity and ensure meeting is properly configured for host access';
+        } else {
+          errorMessage = 'Meeting join failed - meeting may not be started, check meeting ID and password, or wait for host to start the meeting';
+        }
       } else if (error?.errorCode === 3712) {
-        errorMessage = 'Invalid signature - authentication failed';
+        errorMessage = 'Invalid signature - authentication failed, check SDK key and signature generation';
       } else if (error?.errorCode === 1) {
-        errorMessage = 'Meeting not found - check meeting ID';
+        errorMessage = 'Meeting not found - verify meeting ID is correct';
+      } else if (error?.errorCode === 3000) {
+        errorMessage = 'Meeting password required or incorrect';
       }
       
       throw new Error(errorMessage);
@@ -101,16 +118,26 @@ export function useZoomSDK({ onReady, onError }: UseZoomSDKProps = {}) {
   }, [isReady]);
 
   const leaveMeeting = useCallback(() => {
-    if (clientRef.current && typeof clientRef.current.leave === 'function') {
+    if (clientRef.current) {
       console.log('🔄 Leaving meeting...');
       try {
-        clientRef.current.leave();
-        console.log('✅ Left meeting successfully');
+        // Enhanced defensive check for leave function
+        if (typeof clientRef.current.leave === 'function') {
+          clientRef.current.leave();
+          console.log('✅ Left meeting successfully');
+        } else {
+          console.warn('⚠️ Leave function not available on Zoom client - attempting cleanup');
+          // Alternative cleanup if leave is not available
+          if (typeof clientRef.current.destroy === 'function') {
+            clientRef.current.destroy();
+            console.log('✅ Zoom client destroyed successfully');
+          }
+        }
       } catch (error) {
-        console.error('❌ Error leaving meeting:', error);
+        console.error('❌ Error during meeting cleanup:', error);
       }
     } else {
-      console.warn('⚠️ Zoom client not initialized or leave function missing - safe cleanup');
+      console.warn('⚠️ Zoom client not initialized - safe cleanup');
     }
   }, []);
 
@@ -121,7 +148,7 @@ export function useZoomSDK({ onReady, onError }: UseZoomSDKProps = {}) {
     }
   }, [initializeSDK, isSDKLoaded]);
 
-  // Enhanced cleanup on unmount with defensive guards
+  // Enhanced cleanup on unmount with better error handling
   useEffect(() => {
     return () => {
       if (clientRef.current) {
@@ -129,11 +156,16 @@ export function useZoomSDK({ onReady, onError }: UseZoomSDKProps = {}) {
           if (typeof clientRef.current.leave === 'function') {
             clientRef.current.leave();
             console.log('🧹 Cleanup: Meeting left successfully');
+          } else if (typeof clientRef.current.destroy === 'function') {
+            clientRef.current.destroy();
+            console.log('🧹 Cleanup: Client destroyed successfully');
           } else {
-            console.warn('⚠️ Cleanup: Leave function not available');
+            console.warn('⚠️ Cleanup: No cleanup method available on client');
           }
         } catch (error) {
           console.warn('⚠️ Cleanup warning (non-critical):', error);
+        } finally {
+          clientRef.current = null;
         }
       }
     };
