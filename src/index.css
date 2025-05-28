@@ -135,13 +135,13 @@
   overflow: hidden;
 }
 
-/* Ensure embedded meeting takes full container and maximizes video space */
+/* Ensure embedded meeting takes full container and optimizes for 1000x600 */
 #meetingSDKElement > div {
   width: 100% !important;
   height: 100% !important;
 }
 
-/* Zoom SDK specific optimizations for video area */
+/* Zoom SDK video sizing - optimized for 1000x600 dimensions */
 #meetingSDKElement .zm-video-container,
 #meetingSDKElement .video-container,
 #meetingSDKElement [class*="video"],
@@ -150,11 +150,17 @@
   max-height: 100% !important;
 }
 
-/* Minimize Zoom's built-in control bar if it conflicts */
+/* Minimize Zoom's built-in control bar to maximize video space */
 #meetingSDKElement .zm-toolbar,
 #meetingSDKElement [class*="toolbar"],
 #meetingSDKElement [class*="control-bar"] {
   height: auto !important;
   min-height: 40px !important;
   max-height: 60px !important;
+}
+
+/* Ensure the video canvas uses the configured 1000x600 size */
+#meetingSDKElement canvas {
+  max-width: 1000px !important;
+  max-height: 600px !important;
 }

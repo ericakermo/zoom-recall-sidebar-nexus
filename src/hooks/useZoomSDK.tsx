@@ -1,4 +1,3 @@
-
 import { useState, useRef, useCallback, useEffect } from 'react';
 import ZoomMtgEmbedded from '@zoom/meetingsdk/embedded';
 
@@ -24,16 +23,31 @@ export function useZoomSDK({ onReady, onError }: UseZoomSDKProps = {}) {
       
       clientRef.current = ZoomMtgEmbedded.createClient();
       
-      console.log('🔄 Initializing Zoom embedded client...');
+      console.log('🔄 Initializing Zoom embedded client with custom video sizing...');
       
       await clientRef.current.init({
         zoomAppRoot: containerRef.current,
         language: 'en-US',
         patchJsMedia: true,
-        leaveOnPageUnload: true
+        leaveOnPageUnload: true,
+        customize: {
+          video: {
+            isResizable: true,
+            viewSizes: {
+              default: {
+                width: 1000,
+                height: 600
+              },
+              ribbon: {
+                width: 300,
+                height: 700
+              }
+            }
+          }
+        }
       });
 
-      console.log('✅ Zoom embedded client initialized successfully');
+      console.log('✅ Zoom embedded client initialized successfully with 1000x600 video size');
       setIsSDKLoaded(true);
       setIsReady(true);
       onReady?.();
