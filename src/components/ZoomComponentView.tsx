@@ -29,7 +29,7 @@ export function ZoomComponentView({
   const [isLoading, setIsLoading] = useState(true);
   const [isJoined, setIsJoined] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [currentStep, setCurrentStep] = useState('Loading Zoom SDK...');
+  const [currentStep, setCurrentStep] = useState('Initializing Zoom SDK...');
   
   const { user } = useAuth();
 
@@ -97,7 +97,8 @@ export function ZoomComponentView({
         userName: providedUserName || user?.email || 'Guest',
         userEmail: user?.email || '',
         passWord: meetingPassword || '',
-        role: role || 0
+        role: role || 0,
+        zak: tokens.zak || ''
       };
 
       setCurrentStep('Joining meeting...');
@@ -170,7 +171,7 @@ export function ZoomComponentView({
       {/* Zoom meeting container - this is where the meeting UI will render */}
       <div 
         ref={containerRef}
-        id="zmmtg-root"
+        id="meetingSDKElement"
         className="w-full h-full"
         style={{ 
           minHeight: '500px',
