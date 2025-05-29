@@ -15,6 +15,7 @@ export function useZoomSDK({ onReady, onError }: UseZoomSDKProps = {}) {
   const clientRef = useRef<any>(null);
   const initializationRef = useRef(false);
   const joinAttemptRef = useRef(false);
+  const isJoiningRef = useRef(false);
 
   const cleanup = useCallback(() => {
     console.log('🧹 Starting Zoom SDK cleanup...');
@@ -42,6 +43,7 @@ export function useZoomSDK({ onReady, onError }: UseZoomSDKProps = {}) {
     setIsJoined(false);
     initializationRef.current = false;
     joinAttemptRef.current = false;
+    isJoiningRef.current = false;
     
     console.log('✅ Zoom SDK cleanup completed');
   }, [isJoined]);
@@ -86,13 +88,14 @@ export function useZoomSDK({ onReady, onError }: UseZoomSDKProps = {}) {
   const initializeSDK = useCallback(async () => {
     if (initializationRef.current || !containerRef.current) {
       console.log('⏸️ SDK initialization skipped - already initialized or container not ready');
-      return;
+      return false;
     }
 
     initializationRef.current = true;
 
     try {
       console.log('🔄 Creating new Zoom embedded client instance...');
+      console.log('📍 Container element:', containerRef.current);
       
       clientRef.current = ZoomMtgEmbedded.createClient();
       
@@ -111,10 +114,12 @@ export function useZoomSDK({ onReady, onError }: UseZoomSDKProps = {}) {
       setIsReady(true);
       onReady?.();
       console.log('✅ Zoom embedded client initialized successfully');
+      return true;
     } catch (error: any) {
       console.error('❌ Failed to initialize Zoom embedded client:', error);
       initializationRef.current = false;
       onError?.(error.message || 'Failed to initialize Zoom SDK');
+      return false;
     }
   }, [onReady, onError]);
 
@@ -123,11 +128,12 @@ export function useZoomSDK({ onReady, onError }: UseZoomSDKProps = {}) {
       throw new Error('Zoom SDK not ready');
     }
 
-    if (joinAttemptRef.current) {
-      console.log('⏸️ Join attempt already in progress');
+    if (isJoiningRef.current || joinAttemptRef.current) {
+      console.log('⏸️ Join attempt already in progress, skipping duplicate');
       return;
     }
 
+    isJoiningRef.current = true;
     joinAttemptRef.current = true;
 
     console.log('🔄 Joining meeting with fixed container...');
@@ -144,6 +150,7 @@ export function useZoomSDK({ onReady, onError }: UseZoomSDKProps = {}) {
     // Validate meeting number format
     const meetingNumberStr = String(joinConfig.meetingNumber).replace(/\s+/g, '');
     if (!/^\d{10,11}$/.test(meetingNumberStr)) {
+      isJoiningRef.current = false;
       joinAttemptRef.current = false;
       throw new Error(`Invalid meeting number format: ${joinConfig.meetingNumber}`);
     }
@@ -195,6 +202,7 @@ export function useZoomSDK({ onReady, onError }: UseZoomSDKProps = {}) {
       
       throw new Error(errorMessage);
     } finally {
+      isJoiningRef.current = false;
       joinAttemptRef.current = false;
     }
   }, [isReady, setSpeakerView]);
@@ -250,9 +258,12 @@ export function useZoomSDK({ onReady, onError }: UseZoomSDKProps = {}) {
     return () => clearInterval(interval);
   }, [isJoined]);
 
-  // Initialize when container is available
+  // Single effect to handle container mounting and initialization
   useEffect(() => {
+    console.log('🔍 Container check - current:', !!containerRef.current, 'initialized:', initializationRef.current);
+    
     if (containerRef.current && !initializationRef.current) {
+      console.log('🎯 Container is ready, initializing SDK...');
       initializeSDK();
     }
   }, [initializeSDK]);

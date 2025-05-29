@@ -29,7 +29,7 @@ export function ZoomComponentView({
   const [error, setError] = useState<string | null>(null);
   const [currentStep, setCurrentStep] = useState('Initializing Zoom SDK...');
   const [retryCount, setRetryCount] = useState(0);
-  const [hasJoinedOnce, setHasJoinedOnce] = useState(false);
+  const [hasTriedJoin, setHasTriedJoin] = useState(false);
   const maxRetries = 2;
   
   const { user } = useAuth();
@@ -44,7 +44,7 @@ export function ZoomComponentView({
     cleanup
   } = useZoomSDK({
     onReady: () => {
-      console.log('✅ Zoom SDK ready');
+      console.log('✅ Zoom SDK ready - preparing to join meeting');
       setCurrentStep('Preparing to join meeting...');
     },
     onError: (error) => {
@@ -97,10 +97,12 @@ export function ZoomComponentView({
   }, []);
 
   const handleJoinMeeting = useCallback(async () => {
-    if (!isReady || hasJoinedOnce) {
-      console.log('⏸️ SDK not ready or already joined once');
+    if (!isReady || hasTriedJoin) {
+      console.log('⏸️ SDK not ready or already tried joining - skipping');
       return;
     }
+
+    setHasTriedJoin(true);
 
     try {
       setCurrentStep('Getting fresh authentication tokens...');
@@ -122,7 +124,6 @@ export function ZoomComponentView({
       setCurrentStep('Joining meeting...');
       await joinMeeting(joinConfig);
       
-      setHasJoinedOnce(true);
       setIsLoading(false);
       setCurrentStep('Connected to meeting');
       setRetryCount(0);
@@ -131,35 +132,39 @@ export function ZoomComponentView({
       console.error('❌ Join failed:', error);
       setError(error.message);
       setIsLoading(false);
+      setHasTriedJoin(false); // Allow retry
       onMeetingError?.(error.message);
     }
-  }, [isReady, hasJoinedOnce, meetingNumber, role, providedUserName, user, meetingPassword, getTokens, joinMeeting, onMeetingJoined, onMeetingError]);
+  }, [isReady, hasTriedJoin, meetingNumber, role, providedUserName, user, meetingPassword, getTokens, joinMeeting, onMeetingJoined, onMeetingError]);
 
   // Update current step based on SDK status
   useEffect(() => {
     if (isJoined) {
       setCurrentStep('Connected to meeting');
       setIsLoading(false);
-    } else if (isReady) {
+    } else if (isReady && !hasTriedJoin) {
       setCurrentStep('Ready to join meeting');
     } else if (isSDKLoaded) {
       setCurrentStep('Initializing Zoom SDK...');
     } else {
       setCurrentStep('Loading Zoom SDK...');
     }
-  }, [isSDKLoaded, isReady, isJoined]);
+  }, [isSDKLoaded, isReady, isJoined, hasTriedJoin]);
 
   // Join when ready (only once)
   useEffect(() => {
-    if (isReady && !hasJoinedOnce && !error) {
-      console.log('✅ SDK ready, starting join process...');
-      handleJoinMeeting();
+    if (isReady && !hasTriedJoin && !error) {
+      console.log('✅ SDK ready and haven\'t tried joining yet - starting join process...');
+      // Small delay to ensure everything is stable
+      setTimeout(() => {
+        handleJoinMeeting();
+      }, 100);
     }
-  }, [isReady, hasJoinedOnce, error, handleJoinMeeting]);
+  }, [isReady, hasTriedJoin, error, handleJoinMeeting]);
 
   const handleLeaveMeeting = useCallback(() => {
     leaveMeeting();
-    setHasJoinedOnce(false);
+    setHasTriedJoin(false);
     onMeetingLeft?.();
   }, [leaveMeeting, onMeetingLeft]);
 
@@ -169,19 +174,20 @@ export function ZoomComponentView({
       setRetryCount(prev => prev + 1);
       setError(null);
       setIsLoading(true);
-      setHasJoinedOnce(false);
+      setHasTriedJoin(false);
       setCurrentStep('Retrying with fresh session...');
       
       // Clean up and retry
       cleanup();
       setTimeout(() => {
-        handleJoinMeeting();
-      }, 1000); // Brief delay to ensure cleanup
+        // Reset the initialization so it can run again
+        window.location.reload(); // For now, reload to ensure clean state
+      }, 1000);
     } else {
       console.warn('⚠️ Max retry attempts reached');
       setError('Maximum retry attempts reached. Please refresh the page to try again.');
     }
-  }, [retryCount, maxRetries, handleJoinMeeting, cleanup]);
+  }, [retryCount, maxRetries, cleanup]);
 
   if (error) {
     return (
@@ -205,7 +211,7 @@ export function ZoomComponentView({
         maxRetries={maxRetries}
       />
 
-      {/* Zoom meeting container - fixed size, non-draggable, centered */}
+      {/* Zoom meeting container - always rendered, fixed size, non-draggable, centered */}
       <div className="zoom-meeting-wrapper">
         <div 
           ref={containerRef}
