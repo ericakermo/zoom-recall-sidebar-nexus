@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -110,14 +109,20 @@ export function ZoomMeeting({
       
       {/* Meeting content */}
       <div className="flex-1 p-4">
-        <ZoomComponentView
-          meetingNumber={meetingNumber}
-          meetingPassword={meetingPassword}
-          userName={userName}
-          role={role}
-          onMeetingJoined={handleMeetingJoined}
-          onMeetingError={handleMeetingError}
-          onMeetingLeft={handleMeetingLeft}
+        <div
+          ref={containerRef}
+          id="meetingSDKElement"
+          style={{
+            width: '100vw',
+            height: '100vh',
+            minHeight: 0,
+            minWidth: 0,
+            background: '#000',
+            overflow: 'hidden',
+            display: 'flex',
+            flexDirection: 'column',
+            borderRadius: 0 // Remove rounding for full fill
+          }}
         />
       </div>
     </div>
