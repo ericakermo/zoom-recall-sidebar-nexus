@@ -30,7 +30,7 @@ export function ZoomComponentView({
   const [currentStep, setCurrentStep] = useState('Initializing Zoom SDK...');
   const [retryCount, setRetryCount] = useState(0);
   const [hasJoinedOnce, setHasJoinedOnce] = useState(false);
-  const maxRetries = 2; // Reduced retries since we're implementing better session management
+  const maxRetries = 2;
   
   const { user } = useAuth();
 
@@ -176,7 +176,7 @@ export function ZoomComponentView({
       cleanup();
       setTimeout(() => {
         handleJoinMeeting();
-      }, 1000); // Brief delay to ensure cleanup
+      }, 1000);
     } else {
       console.warn('⚠️ Max retry attempts reached');
       setError('Maximum retry attempts reached. Please refresh the page to try again.');
@@ -196,7 +196,7 @@ export function ZoomComponentView({
   }
 
   return (
-    <div className="relative w-full h-full bg-gray-900 rounded-lg overflow-hidden">
+    <div className="absolute inset-0 w-full h-full bg-gray-900 overflow-hidden">
       <ZoomLoadingOverlay
         isLoading={isLoading}
         currentStep={currentStep}
@@ -205,11 +205,21 @@ export function ZoomComponentView({
         maxRetries={maxRetries}
       />
 
-      {/* Zoom meeting container */}
+      {/* Zoom meeting container - positioned to fill entire screen */}
       <div 
         ref={containerRef}
         id="meetingSDKElement"
-        className="w-full h-full"
+        className="absolute inset-0 w-full h-full"
+        style={{
+          width: '100%',
+          height: '100%',
+          minHeight: '100%',
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0
+        }}
       />
     </div>
   );
