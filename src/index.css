@@ -101,52 +101,16 @@
   }
 }
 
-/* Zoom meeting wrapper - centers the container */
+/* Simple zoom meeting wrapper - just centers the container */
 .zoom-meeting-wrapper {
   @apply w-full h-full flex items-center justify-center;
   position: relative;
   overflow: hidden;
 }
 
-/* Fixed zoom container - increased by 25% */
+/* Let the SDK handle the size and behavior */
 .zoom-fixed-container {
-  width: 900px;       /* 720 * 1.25 */
-  height: 600px;      /* 480 * 1.25 */
-  max-width: 95vw;
-  max-height: 85vh;
   position: relative;
-  overflow: hidden;
   border-radius: 8px;
   box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-}
-
-/* Responsive adjustments for smaller screens */
-@media (max-width: 640px) {
-  .zoom-fixed-container {
-    width: 90vw;
-    height: 60vh;
-  }
-}
-
-/* Override Zoom SDK's draggable behavior */
-.zoom-fixed-container .react-draggable {
-  position: static !important;
-  transform: none !important;
-}
-
-/* Hide resize handles */
-.zoom-fixed-container .react-resizable-handle {
-  display: none !important;
-}
-
-/* Prevent dragging on zoom elements */
-.zoom-fixed-container .zoommtg-drag-video {
-  cursor: default !important;
-  pointer-events: none !important;
-}
-
-/* Ensure zoom interface fills the container properly */
-.zoom-fixed-container > div {
-  width: 100% !important;
-  height: 100% !important;
 }

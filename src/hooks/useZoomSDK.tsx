@@ -14,7 +14,6 @@ export function useZoomSDK({ onReady, onError }: UseZoomSDKProps = {}) {
   const containerRef = useRef<HTMLDivElement>(null);
   const clientRef = useRef<any>(null);
   const initializationRef = useRef(false);
-  const joinAttemptRef = useRef(false);
   const isJoiningRef = useRef(false);
 
   const cleanup = useCallback(() => {
@@ -42,47 +41,9 @@ export function useZoomSDK({ onReady, onError }: UseZoomSDKProps = {}) {
     setIsReady(false);
     setIsJoined(false);
     initializationRef.current = false;
-    joinAttemptRef.current = false;
     isJoiningRef.current = false;
     
     console.log('✅ Zoom SDK cleanup completed');
-  }, [isJoined]);
-
-  const setSpeakerView = useCallback(async () => {
-    if (!clientRef.current || !isJoined) return;
-
-    try {
-      console.log('🔄 Setting up speaker view for single participant...');
-      
-      // Try to get attendee list and current user info
-      if (typeof clientRef.current.getAttendeeslist === 'function') {
-        const attendees = await clientRef.current.getAttendeeslist();
-        console.log('👥 Current attendees:', attendees?.length || 0);
-        
-        // If only one participant (yourself), enable speaker view
-        if (attendees && attendees.length <= 1) {
-          // Set gallery view to false (speaker view)
-          if (typeof clientRef.current.setGalleryView === 'function') {
-            await clientRef.current.setGalleryView(false);
-            console.log('✅ Speaker view enabled');
-          }
-          
-          // Try to pin own video if media stream is available
-          if (typeof clientRef.current.getMediaStream === 'function') {
-            const mediaStream = clientRef.current.getMediaStream();
-            if (mediaStream && typeof mediaStream.pinVideo === 'function') {
-              const currentUser = await clientRef.current.getCurrentUserInfo();
-              if (currentUser?.userId) {
-                await mediaStream.pinVideo({ userId: currentUser.userId });
-                console.log('✅ Own video pinned in speaker view');
-              }
-            }
-          }
-        }
-      }
-    } catch (error) {
-      console.warn('⚠️ Speaker view setup failed (non-critical):', error);
-    }
   }, [isJoined]);
 
   const initializeSDK = useCallback(async () => {
@@ -99,21 +60,29 @@ export function useZoomSDK({ onReady, onError }: UseZoomSDKProps = {}) {
       
       clientRef.current = ZoomMtgEmbedded.createClient();
       
-      console.log('🔄 Initializing Zoom embedded client...');
+      console.log('🔄 Initializing Zoom embedded client with fixed size...');
       
-      // Simple SDK configuration without aggressive overrides
+      // Use SDK's built-in configuration for fixed size and non-resizable
       await clientRef.current.init({
         debug: true,
         zoomAppRoot: containerRef.current,
         language: 'en-US',
         patchJsMedia: true,
-        leaveOnPageUnload: true
+        leaveOnPageUnload: true,
+        customize: {
+          video: {
+            isResizable: false,
+            viewSizes: {
+              default: { width: 900, height: 600 }
+            }
+          }
+        }
       });
 
       setIsSDKLoaded(true);
       setIsReady(true);
       onReady?.();
-      console.log('✅ Zoom embedded client initialized successfully');
+      console.log('✅ Zoom embedded client initialized with fixed 900x600 size');
       return true;
     } catch (error: any) {
       console.error('❌ Failed to initialize Zoom embedded client:', error);
@@ -128,15 +97,14 @@ export function useZoomSDK({ onReady, onError }: UseZoomSDKProps = {}) {
       throw new Error('Zoom SDK not ready');
     }
 
-    if (isJoiningRef.current || joinAttemptRef.current) {
+    if (isJoiningRef.current) {
       console.log('⏸️ Join attempt already in progress, skipping duplicate');
       return;
     }
 
     isJoiningRef.current = true;
-    joinAttemptRef.current = true;
 
-    console.log('🔄 Joining meeting with fixed container...');
+    console.log('🔄 Joining meeting...');
     console.log('📋 Join config details:', {
       meetingNumber: joinConfig.meetingNumber,
       userName: joinConfig.userName,
@@ -151,7 +119,6 @@ export function useZoomSDK({ onReady, onError }: UseZoomSDKProps = {}) {
     const meetingNumberStr = String(joinConfig.meetingNumber).replace(/\s+/g, '');
     if (!/^\d{10,11}$/.test(meetingNumberStr)) {
       isJoiningRef.current = false;
-      joinAttemptRef.current = false;
       throw new Error(`Invalid meeting number format: ${joinConfig.meetingNumber}`);
     }
     
@@ -167,33 +134,17 @@ export function useZoomSDK({ onReady, onError }: UseZoomSDKProps = {}) {
       });
       
       setIsJoined(true);
-      console.log('✅ Successfully joined meeting with fixed container');
-      
-      // Set up speaker view after a short delay to allow SDK to stabilize
-      setTimeout(() => {
-        setSpeakerView();
-      }, 3000);
+      console.log('✅ Successfully joined meeting');
       
       return result;
     } catch (error: any) {
       console.error('❌ Failed to join meeting:', error);
       
-      if (error?.errorCode) {
-        console.error(`🔍 Zoom Error Code: ${error.errorCode}`);
-      }
-      if (error?.reason) {
-        console.error(`📝 Zoom Error Reason: ${error.reason}`);
-      }
-      
       let errorMessage = error.message || 'Failed to join meeting';
       if (error?.errorCode === 200) {
-        if (joinConfig.role === 1) {
-          errorMessage = 'Host join failed - this usually means there is an active session conflict. Please refresh the page and try again, or the ZAK token may be expired.';
-        } else {
-          errorMessage = 'Meeting join failed - meeting may not be started or there may be a session conflict. Try refreshing the page.';
-        }
+        errorMessage = 'Meeting join failed - please refresh and try again';
       } else if (error?.errorCode === 3712) {
-        errorMessage = 'Invalid signature - authentication failed, check SDK key and signature generation';
+        errorMessage = 'Invalid signature - authentication failed';
       } else if (error?.errorCode === 1) {
         errorMessage = 'Meeting not found - verify meeting ID is correct';
       } else if (error?.errorCode === 3000) {
@@ -203,9 +154,8 @@ export function useZoomSDK({ onReady, onError }: UseZoomSDKProps = {}) {
       throw new Error(errorMessage);
     } finally {
       isJoiningRef.current = false;
-      joinAttemptRef.current = false;
     }
-  }, [isReady, setSpeakerView]);
+  }, [isReady]);
 
   const leaveMeeting = useCallback(() => {
     if (clientRef.current && isJoined) {
@@ -224,75 +174,20 @@ export function useZoomSDK({ onReady, onError }: UseZoomSDKProps = {}) {
     }
   }, [isJoined]);
 
-  // Monitor attendee changes and adjust view accordingly
+  // Initialize when container is ready
   useEffect(() => {
-    if (!clientRef.current || !isJoined) return;
-
-    const checkAttendees = async () => {
-      try {
-        if (typeof clientRef.current.getAttendeeslist === 'function') {
-          const attendees = await clientRef.current.getAttendeeslist();
-          
-          // If more than one person joins, unpin own video
-          if (attendees && attendees.length > 1) {
-            if (typeof clientRef.current.getMediaStream === 'function') {
-              const mediaStream = clientRef.current.getMediaStream();
-              if (mediaStream && typeof mediaStream.unpinVideo === 'function') {
-                const currentUser = await clientRef.current.getCurrentUserInfo();
-                if (currentUser?.userId) {
-                  await mediaStream.unpinVideo({ userId: currentUser.userId });
-                  console.log('✅ Unpinned own video - others have joined');
-                }
-              }
-            }
-          }
-        }
-      } catch (error) {
-        console.warn('⚠️ Attendee check failed (non-critical):', error);
-      }
-    };
-
-    // Check attendees periodically
-    const interval = setInterval(checkAttendees, 10000); // Check every 10 seconds
-
-    return () => clearInterval(interval);
-  }, [isJoined]);
-
-  // Single effect to handle container mounting and initialization
-  useEffect(() => {
-    console.log('🔍 Container check - current:', !!containerRef.current, 'initialized:', initializationRef.current);
-    
     if (containerRef.current && !initializationRef.current) {
       console.log('🎯 Container is ready, initializing SDK...');
       initializeSDK();
     }
   }, [initializeSDK]);
 
-  // Cleanup on unmount and page unload
+  // Cleanup on unmount
   useEffect(() => {
-    const handleBeforeUnload = () => {
-      console.log('🔄 Page unload detected, cleaning up Zoom session...');
-      cleanup();
-    };
-
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === 'hidden') {
-        console.log('🔄 Page hidden, leaving meeting...');
-        if (clientRef.current && isJoined) {
-          leaveMeeting();
-        }
-      }
-    };
-
-    window.addEventListener('beforeunload', handleBeforeUnload);
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-
     return () => {
-      window.removeEventListener('beforeunload', handleBeforeUnload);
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
       cleanup();
     };
-  }, [isJoined, leaveMeeting, cleanup]);
+  }, [cleanup]);
 
   return {
     containerRef,
