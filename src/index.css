@@ -101,16 +101,31 @@
   }
 }
 
-/* Simple zoom meeting wrapper - just centers the container */
+/* Wrapper to center the Zoom meeting view */
 .zoom-meeting-wrapper {
-  @apply w-full h-full flex items-center justify-center;
-  position: relative;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100%;
+  width: 100%;
   overflow: hidden;
 }
 
-/* Let the SDK handle the size and behavior */
+/* Fixed-size container matching SDK config (16:9 aspect ratio) */
 .zoom-fixed-container {
+  width: 900px;
+  height: 506px;
+  max-width: 95vw;
+  max-height: 85vh;
   position: relative;
   border-radius: 8px;
+  overflow: hidden;
+  background-color: black;
   box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+}
+
+/* Ensure internal Zoom SDK fills the container completely */
+.zoom-fixed-container > div {
+  width: 100% !important;
+  height: 100% !important;
 }

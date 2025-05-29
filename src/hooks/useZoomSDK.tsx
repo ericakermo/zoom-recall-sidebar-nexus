@@ -68,7 +68,7 @@ export function useZoomSDK({ onReady, onError }: UseZoomSDKProps = {}) {
       
       clientRef.current = ZoomMtgEmbedded.createClient();
       
-      console.log('🔄 Initializing Zoom embedded client with fixed size...');
+      console.log('🔄 Initializing Zoom embedded client with 16:9 aspect ratio (900x506)...');
       
       await clientRef.current.init({
         debug: true,
@@ -80,7 +80,8 @@ export function useZoomSDK({ onReady, onError }: UseZoomSDKProps = {}) {
           video: {
             isResizable: false,
             viewSizes: {
-              default: { width: 900, height: 600 }
+              default: { width: 900, height: 506 }, // 16:9 aspect ratio
+              ribbon: { width: 450 }
             }
           }
         }
@@ -88,7 +89,7 @@ export function useZoomSDK({ onReady, onError }: UseZoomSDKProps = {}) {
 
       setIsSDKLoaded(true);
       setIsReady(true);
-      console.log('✅ Zoom embedded client initialized with fixed 900x600 size');
+      console.log('✅ Zoom embedded client initialized with 16:9 aspect ratio (900x506)');
       
       // Only call onReady if we're not in cleanup mode
       if (!cleanupInProgressRef.current) {
@@ -103,6 +104,38 @@ export function useZoomSDK({ onReady, onError }: UseZoomSDKProps = {}) {
       return false;
     }
   }, [onReady, onError]);
+
+  const setupSpeakerView = useCallback(async () => {
+    if (!clientRef.current || !isJoined) {
+      console.log('⏸️ Cannot setup speaker view - client not ready or not joined');
+      return;
+    }
+
+    try {
+      console.log('🔄 Setting up speaker view and pinning own video...');
+      
+      // Set to speaker view (not gallery view)
+      if (typeof clientRef.current.setGalleryView === 'function') {
+        await clientRef.current.setGalleryView(false);
+        console.log('✅ Speaker view enabled');
+      }
+
+      // Get current user and pin their video
+      if (typeof clientRef.current.getCurrentUserInfo === 'function' && 
+          typeof clientRef.current.getMediaStream === 'function') {
+        
+        const currentUser = await clientRef.current.getCurrentUserInfo();
+        const mediaStream = clientRef.current.getMediaStream();
+        
+        if (currentUser?.userId && mediaStream?.pinVideo) {
+          await mediaStream.pinVideo({ userId: currentUser.userId });
+          console.log('✅ Own video pinned in speaker view');
+        }
+      }
+    } catch (error) {
+      console.warn('⚠️ Speaker view setup warning (non-critical):', error);
+    }
+  }, [isJoined]);
 
   const joinMeeting = useCallback(async (joinConfig: any) => {
     console.log('📍 joinMeeting called - Current state:', {
@@ -159,6 +192,11 @@ export function useZoomSDK({ onReady, onError }: UseZoomSDKProps = {}) {
       setIsJoined(true);
       console.log('✅ Successfully joined meeting');
       
+      // Setup speaker view after successful join
+      setTimeout(() => {
+        setupSpeakerView();
+      }, 2000); // Small delay to ensure meeting is fully loaded
+      
       return result;
     } catch (error: any) {
       console.error('❌ Failed to join meeting:', error);
@@ -178,7 +216,7 @@ export function useZoomSDK({ onReady, onError }: UseZoomSDKProps = {}) {
     } finally {
       isJoiningRef.current = false;
     }
-  }, [isReady]);
+  }, [isReady, setupSpeakerView]);
 
   const leaveMeeting = useCallback(() => {
     if (clientRef.current && isJoined && !cleanupInProgressRef.current) {
