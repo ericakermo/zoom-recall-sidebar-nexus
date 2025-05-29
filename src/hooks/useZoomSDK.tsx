@@ -1,3 +1,4 @@
+
 import { useState, useRef, useCallback, useEffect } from 'react';
 import ZoomMtgEmbedded from '@zoom/meetingsdk/embedded';
 
@@ -43,6 +44,43 @@ export function useZoomSDK({ onReady, onError }: UseZoomSDKProps = {}) {
     joinAttemptRef.current = false;
     
     console.log('✅ Zoom SDK cleanup completed');
+  }, [isJoined]);
+
+  const setSpeakerView = useCallback(async () => {
+    if (!clientRef.current || !isJoined) return;
+
+    try {
+      console.log('🔄 Setting up speaker view for single participant...');
+      
+      // Try to get attendee list and current user info
+      if (typeof clientRef.current.getAttendeeslist === 'function') {
+        const attendees = await clientRef.current.getAttendeeslist();
+        console.log('👥 Current attendees:', attendees?.length || 0);
+        
+        // If only one participant (yourself), enable speaker view
+        if (attendees && attendees.length <= 1) {
+          // Set gallery view to false (speaker view)
+          if (typeof clientRef.current.setGalleryView === 'function') {
+            await clientRef.current.setGalleryView(false);
+            console.log('✅ Speaker view enabled');
+          }
+          
+          // Try to pin own video if media stream is available
+          if (typeof clientRef.current.getMediaStream === 'function') {
+            const mediaStream = clientRef.current.getMediaStream();
+            if (mediaStream && typeof mediaStream.pinVideo === 'function') {
+              const currentUser = await clientRef.current.getCurrentUserInfo();
+              if (currentUser?.userId) {
+                await mediaStream.pinVideo({ userId: currentUser.userId });
+                console.log('✅ Own video pinned in speaker view');
+              }
+            }
+          }
+        }
+      }
+    } catch (error) {
+      console.warn('⚠️ Speaker view setup failed (non-critical):', error);
+    }
   }, [isJoined]);
 
   const initializeSDK = useCallback(async () => {
@@ -123,6 +161,12 @@ export function useZoomSDK({ onReady, onError }: UseZoomSDKProps = {}) {
       
       setIsJoined(true);
       console.log('✅ Successfully joined meeting with fixed container');
+      
+      // Set up speaker view after a short delay to allow SDK to stabilize
+      setTimeout(() => {
+        setSpeakerView();
+      }, 3000);
+      
       return result;
     } catch (error: any) {
       console.error('❌ Failed to join meeting:', error);
@@ -153,7 +197,7 @@ export function useZoomSDK({ onReady, onError }: UseZoomSDKProps = {}) {
     } finally {
       joinAttemptRef.current = false;
     }
-  }, [isReady]);
+  }, [isReady, setSpeakerView]);
 
   const leaveMeeting = useCallback(() => {
     if (clientRef.current && isJoined) {
@@ -170,6 +214,40 @@ export function useZoomSDK({ onReady, onError }: UseZoomSDKProps = {}) {
         console.error('❌ Error during meeting leave:', error);
       }
     }
+  }, [isJoined]);
+
+  // Monitor attendee changes and adjust view accordingly
+  useEffect(() => {
+    if (!clientRef.current || !isJoined) return;
+
+    const checkAttendees = async () => {
+      try {
+        if (typeof clientRef.current.getAttendeeslist === 'function') {
+          const attendees = await clientRef.current.getAttendeeslist();
+          
+          // If more than one person joins, unpin own video
+          if (attendees && attendees.length > 1) {
+            if (typeof clientRef.current.getMediaStream === 'function') {
+              const mediaStream = clientRef.current.getMediaStream();
+              if (mediaStream && typeof mediaStream.unpinVideo === 'function') {
+                const currentUser = await clientRef.current.getCurrentUserInfo();
+                if (currentUser?.userId) {
+                  await mediaStream.unpinVideo({ userId: currentUser.userId });
+                  console.log('✅ Unpinned own video - others have joined');
+                }
+              }
+            }
+          }
+        }
+      } catch (error) {
+        console.warn('⚠️ Attendee check failed (non-critical):', error);
+      }
+    };
+
+    // Check attendees periodically
+    const interval = setInterval(checkAttendees, 10000); // Check every 10 seconds
+
+    return () => clearInterval(interval);
   }, [isJoined]);
 
   // Initialize when container is available

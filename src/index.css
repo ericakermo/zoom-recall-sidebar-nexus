@@ -108,12 +108,12 @@
   overflow: hidden;
 }
 
-/* Fixed zoom container that prevents dragging/resizing */
+/* Fixed zoom container - increased by 25% */
 .zoom-fixed-container {
-  width: 720px;
-  height: 480px;
-  max-width: 90vw;
-  max-height: 80vh;
+  width: 900px;       /* 720 * 1.25 */
+  height: 600px;      /* 480 * 1.25 */
+  max-width: 95vw;
+  max-height: 85vh;
   position: relative;
   overflow: hidden;
   border-radius: 8px;
