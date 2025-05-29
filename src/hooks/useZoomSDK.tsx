@@ -59,10 +59,18 @@ export function useZoomSDK({ onReady, onError }: UseZoomSDKProps = {}) {
       
       clientRef.current = ZoomMtgEmbedded.createClient();
       
-      console.log('🔄 Initializing Zoom embedded client with fixed video dimensions...');
+      console.log('🔄 Initializing Zoom embedded client with calculated video dimensions...');
       
-      // Use the exact settings you provided
+      // Get container dimensions and calculate 90% for video
       let meetingSDKElement = containerRef.current;
+      const containerWidth = meetingSDKElement.offsetWidth || 1000;
+      const containerHeight = meetingSDKElement.offsetHeight || 600;
+      
+      // Use 90% of container dimensions for video, leaving 10% for controls
+      const videoWidth = Math.floor(containerWidth * 0.9);
+      const videoHeight = Math.floor(containerHeight * 0.9);
+      
+      console.log(`📏 Container: ${containerWidth}x${containerHeight}, Video: ${videoWidth}x${videoHeight}`);
       
       await clientRef.current.init({
         zoomAppRoot: meetingSDKElement,
@@ -72,12 +80,12 @@ export function useZoomSDK({ onReady, onError }: UseZoomSDKProps = {}) {
             isResizable: true,
             viewSizes: {
               default: {
-                width: 1000,
-                height: 600
+                width: videoWidth,
+                height: videoHeight
               },
               ribbon: {
-                width: 300,
-                height: 700
+                width: Math.floor(videoWidth * 0.3),
+                height: Math.floor(videoHeight * 1.1)
               }
             }
           }
@@ -87,7 +95,7 @@ export function useZoomSDK({ onReady, onError }: UseZoomSDKProps = {}) {
       setIsSDKLoaded(true);
       setIsReady(true);
       onReady?.();
-      console.log('✅ Zoom embedded client initialized successfully with fixed video dimensions');
+      console.log('✅ Zoom embedded client initialized successfully with calculated video dimensions');
     } catch (error: any) {
       console.error('❌ Failed to initialize Zoom embedded client:', error);
       initializationRef.current = false;
