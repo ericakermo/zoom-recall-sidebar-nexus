@@ -115,15 +115,39 @@ const Meeting = () => {
   const isHost = meetingData.user_id === user.id;
 
   return (
-    <div className="h-screen w-screen overflow-hidden bg-black">
-      {/* Full-screen meeting content */}
-      <ZoomMeeting
-        meetingNumber={meetingData.meeting_id}
-        meetingPassword={meetingPassword}
-        userName={user.email || 'Guest'}
-        role={isHost ? 1 : 0}
-        onMeetingEnd={handleMeetingEnd}
-      />
+    <div className="flex flex-col h-screen">
+      {/* Header */}
+      <div className="flex items-center justify-between p-4 border-b bg-white">
+        <div className="flex items-center gap-3">
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            onClick={() => navigate('/calendar')}
+            className="flex items-center gap-2"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            Back to Calendar
+          </Button>
+        </div>
+        
+        <div className="text-center">
+          <h1 className="text-lg font-semibold">{meetingData.title}</h1>
+          <p className="text-sm text-gray-600">Meeting ID: {meetingData.meeting_id}</p>
+        </div>
+        
+        <div className="w-32"></div> {/* Spacer for centering */}
+      </div>
+
+      {/* Meeting Content */}
+      <div className="flex-1 p-4 bg-gray-50">
+        <ZoomMeeting
+          meetingNumber={meetingData.meeting_id}
+          meetingPassword={meetingPassword}
+          userName={user.email || 'Guest'}
+          role={isHost ? 1 : 0}
+          onMeetingEnd={handleMeetingEnd}
+        />
+      </div>
     </div>
   );
 };
