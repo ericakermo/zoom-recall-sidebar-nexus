@@ -27,20 +27,12 @@ export function ZoomMeeting({
   const navigate = useNavigate();
   const { toast } = useToast();
 
-  console.log('🎯 ZoomMeeting received props:', {
-    meetingNumber,
-    userName,
-    role,
-    roleText: role === 1 ? 'Host' : 'Attendee',
-    hasPassword: !!meetingPassword
-  });
-
   const handleMeetingJoined = () => {
     setIsConnected(true);
     console.log('✅ Meeting joined successfully');
     toast({
       title: "Connected",
-      description: `You have joined the meeting as ${role === 1 ? 'Host' : 'Attendee'}`
+      description: "You have joined the meeting"
     });
   };
 
@@ -69,12 +61,13 @@ export function ZoomMeeting({
           </div>
           
           <div className="text-sm text-gray-600 mb-6">
-            <p className="font-medium mb-2">Debug Info:</p>
+            <p className="font-medium mb-2">Troubleshooting tips:</p>
             <ul className="list-disc list-inside text-left space-y-1">
-              <li>Meeting ID: {meetingNumber}</li>
-              <li>Role: {role === 1 ? 'Host' : 'Attendee'}</li>
-              <li>User: {userName}</li>
-              <li>Has Password: {meetingPassword ? 'Yes' : 'No'}</li>
+              <li>Check your internet connection</li>
+              <li>Verify the meeting ID is correct</li>
+              <li>Allow camera and microphone access</li>
+              <li>Try using Chrome browser</li>
+              <li>Ensure meeting hasn't ended</li>
             </ul>
           </div>
           
@@ -105,14 +98,12 @@ export function ZoomMeeting({
       <div className="flex items-center justify-between p-4 bg-white border-b">
         <div>
           <h2 className="text-lg font-semibold">Zoom Meeting</h2>
-          <p className="text-sm text-gray-600">
-            Meeting ID: {meetingNumber} | Role: {role === 1 ? 'Host' : 'Attendee'}
-          </p>
+          <p className="text-sm text-gray-600">Meeting ID: {meetingNumber}</p>
         </div>
         {isConnected && (
           <div className="flex items-center gap-2">
             <div className="h-2 w-2 bg-green-500 rounded-full animate-pulse"></div>
-            <span className="text-sm text-green-600 font-medium">Connected as {role === 1 ? 'Host' : 'Attendee'}</span>
+            <span className="text-sm text-green-600 font-medium">Connected</span>
           </div>
         )}
       </div>
