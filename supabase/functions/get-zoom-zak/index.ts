@@ -61,13 +61,14 @@ serve(async (req) => {
 
     console.log("Zoom connection found, requesting ZAK token");
 
-    // Check if token has expired and refresh if needed
+    // Check if token has expired and refresh if needed with buffer time
     const now = new Date();
     const expiresAt = new Date(zoomConnection.expires_at);
+    const bufferTime = 5 * 60 * 1000; // 5 minutes buffer
     let accessToken = zoomConnection.access_token;
 
-    if (now >= expiresAt) {
-      console.log("Access token expired, refreshing before getting ZAK...");
+    if (now.getTime() >= (expiresAt.getTime() - bufferTime)) {
+      console.log("Access token expired or expiring soon, refreshing before getting ZAK...");
       
       const refreshResponse = await fetch('https://zoom.us/oauth/token', {
         method: 'POST',
@@ -105,6 +106,8 @@ serve(async (req) => {
         .eq('user_id', user.id);
 
       console.log("Token refreshed successfully before ZAK request");
+    } else {
+      console.log("Access token is still valid for ZAK request");
     }
 
     // Get ZAK token from Zoom with enhanced error handling
