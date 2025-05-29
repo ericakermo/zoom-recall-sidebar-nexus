@@ -53,7 +53,7 @@ export function ZoomMeeting({
 
   if (error) {
     return (
-      <div className="flex flex-col items-center justify-center h-full p-4">
+      <div className="flex flex-col items-center justify-center min-h-[400px] p-4">
         <div className="text-center max-w-md">
           <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg">
             <p className="text-red-600 font-medium">Unable to Join Meeting</p>
@@ -93,11 +93,12 @@ export function ZoomMeeting({
   }
 
   return (
-    <div className="h-full bg-white rounded-lg shadow-sm border overflow-hidden">
-      {/* Meeting status bar */}
-      <div className="flex items-center justify-between px-4 py-2 bg-gray-50 border-b">
-        <div className="text-sm text-gray-600">
-          Meeting: {meetingNumber}
+    <div className="flex flex-col h-full bg-gray-50 rounded-lg overflow-hidden">
+      {/* Meeting header */}
+      <div className="flex items-center justify-between p-4 bg-white border-b">
+        <div>
+          <h2 className="text-lg font-semibold">Zoom Meeting</h2>
+          <p className="text-sm text-gray-600">Meeting ID: {meetingNumber}</p>
         </div>
         {isConnected && (
           <div className="flex items-center gap-2">
@@ -107,8 +108,8 @@ export function ZoomMeeting({
         )}
       </div>
       
-      {/* Zoom meeting container */}
-      <div className="h-full">
+      {/* Meeting content - render ZoomComponentView */}
+      <div className="flex-1">
         <ZoomComponentView
           meetingNumber={meetingNumber}
           meetingPassword={meetingPassword}
