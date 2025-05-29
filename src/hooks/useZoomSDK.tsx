@@ -17,17 +17,15 @@ export function useZoomSDK({ onReady, onError }: UseZoomSDKProps = {}) {
   const joinAttemptRef = useRef(false);
 
   const cleanup = useCallback(() => {
-    console.log('🧹 Starting comprehensive Zoom SDK cleanup...');
+    console.log('🧹 Starting Zoom SDK cleanup...');
     
     if (clientRef.current) {
       try {
-        // Force leave if still joined
         if (isJoined && typeof clientRef.current.leave === 'function') {
           clientRef.current.leave();
-          console.log('✅ Force left meeting during cleanup');
+          console.log('✅ Left meeting during cleanup');
         }
         
-        // Destroy the client
         if (typeof clientRef.current.destroy === 'function') {
           clientRef.current.destroy();
           console.log('✅ Destroyed Zoom client');
@@ -39,19 +37,13 @@ export function useZoomSDK({ onReady, onError }: UseZoomSDKProps = {}) {
       clientRef.current = null;
     }
     
-    // Clear the container
-    if (containerRef.current) {
-      containerRef.current.innerHTML = '';
-      console.log('✅ Cleared container content');
-    }
-    
     setIsSDKLoaded(false);
     setIsReady(false);
     setIsJoined(false);
     initializationRef.current = false;
     joinAttemptRef.current = false;
     
-    console.log('✅ Comprehensive Zoom SDK cleanup completed');
+    console.log('✅ Zoom SDK cleanup completed');
   }, [isJoined]);
 
   const initializeSDK = useCallback(async () => {
@@ -65,33 +57,26 @@ export function useZoomSDK({ onReady, onError }: UseZoomSDKProps = {}) {
     try {
       console.log('🔄 Creating new Zoom embedded client instance...');
       
-      // Ensure container is clean before initialization
-      containerRef.current.innerHTML = '';
-      
       clientRef.current = ZoomMtgEmbedded.createClient();
       
-      console.log('🔄 Initializing Zoom embedded client with enhanced responsive video configuration...');
+      console.log('🔄 Initializing Zoom embedded client with responsive video configuration...');
       
+      // Use the working configuration you provided
       await clientRef.current.init({
-        debug: false, // Disable debug to reduce console noise
+        debug: true,
         zoomAppRoot: containerRef.current,
         language: 'en-US',
         patchJsMedia: true,
         leaveOnPageUnload: true,
         customize: {
           video: {
-            isResizable: true, // Allow resizing for better responsiveness
+            isResizable: false,
             viewSizes: {
               default: {
                 width: '100%',
                 height: '100%'
               }
             }
-          },
-          meetingInfo: {
-            showInvite: false,
-            showParticipant: true,
-            showMeetingID: false
           }
         }
       });
@@ -99,7 +84,7 @@ export function useZoomSDK({ onReady, onError }: UseZoomSDKProps = {}) {
       setIsSDKLoaded(true);
       setIsReady(true);
       onReady?.();
-      console.log('✅ Zoom embedded client initialized successfully with enhanced settings');
+      console.log('✅ Zoom embedded client initialized successfully with custom video settings');
     } catch (error: any) {
       console.error('❌ Failed to initialize Zoom embedded client:', error);
       initializationRef.current = false;
@@ -119,7 +104,7 @@ export function useZoomSDK({ onReady, onError }: UseZoomSDKProps = {}) {
 
     joinAttemptRef.current = true;
 
-    console.log('🔄 Joining meeting with enhanced session handling...');
+    console.log('🔄 Joining meeting with fresh session...');
     console.log('📋 Join config details:', {
       meetingNumber: joinConfig.meetingNumber,
       userName: joinConfig.userName,
@@ -162,8 +147,6 @@ export function useZoomSDK({ onReady, onError }: UseZoomSDKProps = {}) {
       }
       
       let errorMessage = error.message || 'Failed to join meeting';
-      
-      // Enhanced error handling
       if (error?.errorCode === 200) {
         if (joinConfig.role === 1) {
           errorMessage = 'Host join failed - this usually means there is an active session conflict. Please refresh the page and try again, or the ZAK token may be expired.';
@@ -176,17 +159,6 @@ export function useZoomSDK({ onReady, onError }: UseZoomSDKProps = {}) {
         errorMessage = 'Meeting not found - verify meeting ID is correct';
       } else if (error?.errorCode === 3000) {
         errorMessage = 'Meeting password required or incorrect';
-      } else if (error?.errorCode === 3001) {
-        errorMessage = 'Meeting has been restricted by the host';
-      } else if (error?.errorCode === 3002) {
-        errorMessage = 'Invalid meeting password';
-      } else if (error?.errorCode === 3003) {
-        errorMessage = 'Meeting waiting room is enabled - waiting for host to admit you';
-      }
-      
-      // Add error code to message for debugging
-      if (error?.errorCode) {
-        errorMessage += ` (Error Code: ${error.errorCode})`;
       }
       
       throw new Error(errorMessage);
@@ -219,7 +191,7 @@ export function useZoomSDK({ onReady, onError }: UseZoomSDKProps = {}) {
     }
   }, [initializeSDK]);
 
-  // Enhanced cleanup on unmount and page unload
+  // Cleanup on unmount and page unload
   useEffect(() => {
     const handleBeforeUnload = () => {
       console.log('🔄 Page unload detected, cleaning up Zoom session...');
@@ -228,8 +200,10 @@ export function useZoomSDK({ onReady, onError }: UseZoomSDKProps = {}) {
 
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'hidden') {
-        console.log('🔄 Page hidden, preparing for cleanup...');
-        // Don't immediately leave on visibility change to avoid issues with mobile browsers
+        console.log('🔄 Page hidden, leaving meeting...');
+        if (clientRef.current && isJoined) {
+          leaveMeeting();
+        }
       }
     };
 
@@ -241,7 +215,7 @@ export function useZoomSDK({ onReady, onError }: UseZoomSDKProps = {}) {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
       cleanup();
     };
-  }, [cleanup]);
+  }, [isJoined, leaveMeeting, cleanup]);
 
   return {
     containerRef,

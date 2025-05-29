@@ -32,77 +32,46 @@ const Meeting = () => {
 
   useEffect(() => {
     const loadMeetingData = async () => {
-      if (!user || !id) {
-        setError('User not authenticated or meeting ID missing');
-        setIsLoading(false);
-        return;
-      }
+      if (!user || !id) return;
 
       try {
         setIsLoading(true);
         setError(null);
-        
-        console.log('🔍 Loading meeting data for ID:', id);
 
-        // Get meeting details from database with proper error handling
+        // Get meeting details from database
         const { data: meeting, error: meetingError } = await supabase
           .from('zoom_meetings')
           .select('*')
           .eq('id', id)
-          .maybeSingle(); // Use maybeSingle instead of single to handle no results
+          .single();
 
-        console.log('📋 Meeting query result:', { meeting, meetingError });
-
-        if (meetingError) {
-          console.error('❌ Database error:', meetingError);
-          throw new Error(`Database error: ${meetingError.message}`);
+        if (meetingError || !meeting) {
+          throw new Error('Meeting not found');
         }
 
-        if (!meeting) {
-          console.error('❌ Meeting not found in database');
-          throw new Error('Meeting not found. It may have been deleted or you may not have access to it.');
-        }
-
-        console.log('✅ Meeting found:', meeting.title, meeting.meeting_id);
         setMeetingData(meeting);
 
-        // Get meeting password with error handling
-        try {
-          const { data: meetingDetails, error: detailsError } = await supabase.functions.invoke('get-meeting-details', {
-            body: { meetingId: meeting.meeting_id }
-          });
+        // Get meeting password
+        const { data: meetingDetails, error: detailsError } = await supabase.functions.invoke('get-meeting-details', {
+          body: { meetingId: meeting.meeting_id }
+        });
 
-          if (!detailsError && meetingDetails?.password) {
-            setMeetingPassword(meetingDetails.password);
-            console.log('✅ Meeting password retrieved');
-          } else {
-            console.log('⚠️ No password found for meeting, proceeding without');
-          }
-        } catch (passwordError) {
-          console.warn('⚠️ Failed to get meeting password, proceeding without:', passwordError);
-          // Don't fail the entire flow if password retrieval fails
+        if (!detailsError && meetingDetails?.password) {
+          setMeetingPassword(meetingDetails.password);
         }
 
         setIsLoading(false);
       } catch (err: any) {
-        console.error('❌ Error loading meeting:', err);
+        console.error('Error loading meeting:', err);
         setError(err.message || 'Failed to load meeting');
         setIsLoading(false);
-        
-        // Show toast for better user feedback
-        toast({
-          title: "Meeting Load Error",
-          description: err.message || 'Failed to load meeting',
-          variant: "destructive"
-        });
       }
     };
 
     loadMeetingData();
-  }, [id, user, toast]);
+  }, [id, user]);
 
   const handleMeetingEnd = () => {
-    console.log('🔄 Meeting ended, navigating back to calendar');
     navigate('/calendar');
   };
 
@@ -125,7 +94,6 @@ const Meeting = () => {
         <div className="text-center">
           <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4" />
           <p className="text-lg">Loading meeting...</p>
-          <p className="text-sm text-gray-600 mt-2">Meeting ID: {id}</p>
         </div>
       </div>
     );
@@ -134,26 +102,11 @@ const Meeting = () => {
   if (error || !meetingData) {
     return (
       <div className="flex items-center justify-center h-screen">
-        <div className="text-center max-w-md mx-auto p-6">
-          <h2 className="text-xl font-semibold text-red-600 mb-4">Meeting Not Found</h2>
-          <p className="text-gray-600 mb-4">{error || 'The requested meeting could not be found.'}</p>
-          <div className="text-sm text-gray-500 mb-6">
-            <p>Meeting ID: {id}</p>
-            <p className="mt-2">This could happen if:</p>
-            <ul className="list-disc list-inside text-left mt-1">
-              <li>The meeting was deleted</li>
-              <li>You don't have access to this meeting</li>
-              <li>The meeting ID is incorrect</li>
-            </ul>
-          </div>
-          <div className="flex gap-3 justify-center">
-            <Button onClick={() => navigate('/calendar')}>
-              Back to Calendar
-            </Button>
-            <Button onClick={() => window.location.reload()} variant="outline">
-              Retry
-            </Button>
-          </div>
+        <div className="text-center max-w-md">
+          <p className="text-lg text-red-600 mb-4">{error || 'Meeting not found'}</p>
+          <Button onClick={() => navigate('/calendar')}>
+            Back to Calendar
+          </Button>
         </div>
       </div>
     );
@@ -180,7 +133,6 @@ const Meeting = () => {
         <div className="text-center">
           <h1 className="text-lg font-semibold">{meetingData.title}</h1>
           <p className="text-sm text-gray-600">Meeting ID: {meetingData.meeting_id}</p>
-          <p className="text-xs text-gray-500">Role: {isHost ? 'Host' : 'Participant'}</p>
         </div>
         
         <div className="w-32"></div> {/* Spacer for centering */}
