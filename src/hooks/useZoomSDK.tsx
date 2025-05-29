@@ -15,8 +15,15 @@ export function useZoomSDK({ onReady, onError }: UseZoomSDKProps = {}) {
   const clientRef = useRef<any>(null);
   const initializationRef = useRef(false);
   const isJoiningRef = useRef(false);
+  const cleanupInProgressRef = useRef(false);
 
   const cleanup = useCallback(() => {
+    if (cleanupInProgressRef.current) {
+      console.log('⏸️ Cleanup already in progress, skipping...');
+      return;
+    }
+
+    cleanupInProgressRef.current = true;
     console.log('🧹 Starting Zoom SDK cleanup...');
     
     if (clientRef.current) {
@@ -42,13 +49,14 @@ export function useZoomSDK({ onReady, onError }: UseZoomSDKProps = {}) {
     setIsJoined(false);
     initializationRef.current = false;
     isJoiningRef.current = false;
+    cleanupInProgressRef.current = false;
     
     console.log('✅ Zoom SDK cleanup completed');
   }, [isJoined]);
 
   const initializeSDK = useCallback(async () => {
-    if (initializationRef.current || !containerRef.current) {
-      console.log('⏸️ SDK initialization skipped - already initialized or container not ready');
+    if (initializationRef.current || !containerRef.current || cleanupInProgressRef.current) {
+      console.log('⏸️ SDK initialization skipped - already initialized, container not ready, or cleanup in progress');
       return false;
     }
 
@@ -62,7 +70,6 @@ export function useZoomSDK({ onReady, onError }: UseZoomSDKProps = {}) {
       
       console.log('🔄 Initializing Zoom embedded client with fixed size...');
       
-      // Use SDK's built-in configuration for fixed size and non-resizable
       await clientRef.current.init({
         debug: true,
         zoomAppRoot: containerRef.current,
@@ -81,8 +88,13 @@ export function useZoomSDK({ onReady, onError }: UseZoomSDKProps = {}) {
 
       setIsSDKLoaded(true);
       setIsReady(true);
-      onReady?.();
       console.log('✅ Zoom embedded client initialized with fixed 900x600 size');
+      
+      // Only call onReady if we're not in cleanup mode
+      if (!cleanupInProgressRef.current) {
+        onReady?.();
+      }
+      
       return true;
     } catch (error: any) {
       console.error('❌ Failed to initialize Zoom embedded client:', error);
@@ -93,6 +105,13 @@ export function useZoomSDK({ onReady, onError }: UseZoomSDKProps = {}) {
   }, [onReady, onError]);
 
   const joinMeeting = useCallback(async (joinConfig: any) => {
+    console.log('📍 joinMeeting called - Current state:', {
+      isReady,
+      isJoined,
+      isJoining: isJoiningRef.current,
+      cleanupInProgress: cleanupInProgressRef.current
+    });
+
     if (!isReady || !clientRef.current) {
       throw new Error('Zoom SDK not ready');
     }
@@ -100,6 +119,10 @@ export function useZoomSDK({ onReady, onError }: UseZoomSDKProps = {}) {
     if (isJoiningRef.current) {
       console.log('⏸️ Join attempt already in progress, skipping duplicate');
       return;
+    }
+
+    if (cleanupInProgressRef.current) {
+      throw new Error('Cannot join during cleanup');
     }
 
     isJoiningRef.current = true;
@@ -158,7 +181,7 @@ export function useZoomSDK({ onReady, onError }: UseZoomSDKProps = {}) {
   }, [isReady]);
 
   const leaveMeeting = useCallback(() => {
-    if (clientRef.current && isJoined) {
+    if (clientRef.current && isJoined && !cleanupInProgressRef.current) {
       console.log('🔄 Leaving meeting...');
       try {
         if (typeof clientRef.current.leave === 'function') {
@@ -174,17 +197,18 @@ export function useZoomSDK({ onReady, onError }: UseZoomSDKProps = {}) {
     }
   }, [isJoined]);
 
-  // Initialize when container is ready
+  // Initialize when container is ready - run only once
   useEffect(() => {
-    if (containerRef.current && !initializationRef.current) {
+    if (containerRef.current && !initializationRef.current && !cleanupInProgressRef.current) {
       console.log('🎯 Container is ready, initializing SDK...');
       initializeSDK();
     }
-  }, [initializeSDK]);
+  }, []); // Empty dependency array to run only once
 
-  // Cleanup on unmount
+  // Cleanup on unmount only
   useEffect(() => {
     return () => {
+      console.log('🔄 Component unmounting, cleaning up...');
       cleanup();
     };
   }, [cleanup]);
