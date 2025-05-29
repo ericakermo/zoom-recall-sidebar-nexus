@@ -1,4 +1,3 @@
-
 import { useEffect, useState, useCallback } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { useZoomSDK } from '@/hooks/useZoomSDK';
@@ -196,7 +195,7 @@ export function ZoomComponentView({
   }
 
   return (
-    <div className="relative w-full h-full bg-gray-900 rounded-lg overflow-hidden">
+    <div className="relative w-full h-full">
       <ZoomLoadingOverlay
         isLoading={isLoading}
         currentStep={currentStep}
@@ -205,10 +204,9 @@ export function ZoomComponentView({
         maxRetries={maxRetries}
       />
 
-      {/* Zoom meeting container */}
+      {/* Zoom meeting container - simplified */}
       <div 
         ref={containerRef}
-        id="meetingSDKElement"
         className="w-full h-full"
       />
     </div>
