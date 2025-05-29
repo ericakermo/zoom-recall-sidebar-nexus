@@ -58,21 +58,24 @@ export function useZoomSDK({ onReady, onError }: UseZoomSDKProps = {}) {
       
       clientRef.current = ZoomMtgEmbedded.createClient();
       
-      console.log('🔄 Initializing Zoom embedded client with minimal configuration...');
+      console.log('🔄 Initializing Zoom embedded client...');
       
-      // Solution 3: Minimal SDK configuration to avoid conflicts
+      // Minimal SDK configuration focused on non-draggable fixed container
       await clientRef.current.init({
         debug: true,
         zoomAppRoot: containerRef.current,
         language: 'en-US',
         patchJsMedia: true,
-        leaveOnPageUnload: true
+        leaveOnPageUnload: true,
+        // Force container to be non-draggable and fixed size
+        enforceGalleryView: true,
+        disableDraggable: true
       });
 
       setIsSDKLoaded(true);
       setIsReady(true);
       onReady?.();
-      console.log('✅ Zoom embedded client initialized successfully with minimal config');
+      console.log('✅ Zoom embedded client initialized with fixed container settings');
     } catch (error: any) {
       console.error('❌ Failed to initialize Zoom embedded client:', error);
       initializationRef.current = false;
@@ -92,7 +95,7 @@ export function useZoomSDK({ onReady, onError }: UseZoomSDKProps = {}) {
 
     joinAttemptRef.current = true;
 
-    console.log('🔄 Joining meeting with fresh session...');
+    console.log('🔄 Joining meeting with fixed container...');
     console.log('📋 Join config details:', {
       meetingNumber: joinConfig.meetingNumber,
       userName: joinConfig.userName,
@@ -122,7 +125,7 @@ export function useZoomSDK({ onReady, onError }: UseZoomSDKProps = {}) {
       });
       
       setIsJoined(true);
-      console.log('✅ Successfully joined meeting');
+      console.log('✅ Successfully joined meeting with fixed container');
       return result;
     } catch (error: any) {
       console.error('❌ Failed to join meeting:', error);

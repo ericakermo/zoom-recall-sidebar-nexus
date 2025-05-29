@@ -1,3 +1,4 @@
+
 import { useEffect, useState, useCallback } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { useZoomSDK } from '@/hooks/useZoomSDK';
@@ -204,18 +205,10 @@ export function ZoomComponentView({
         maxRetries={maxRetries}
       />
 
-      {/* Zoom meeting container - fixed positioned to fill parent */}
+      {/* Zoom meeting container - fixed positioned and non-draggable */}
       <div 
         ref={containerRef}
-        className="absolute inset-0"
-        style={{
-          position: 'absolute',
-          top: 0,
-          left: 0,
-          width: '100%',
-          height: '100%',
-          zIndex: 1
-        }}
+        className="zoom-container"
       />
     </div>
   );
