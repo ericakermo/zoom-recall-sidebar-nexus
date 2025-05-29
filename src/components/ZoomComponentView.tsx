@@ -1,4 +1,3 @@
-
 import { useEffect, useState, useCallback } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { useZoomSDK } from '@/hooks/useZoomSDK';
@@ -246,7 +245,7 @@ export function ZoomComponentView({
   }
 
   return (
-    <div className="relative w-full h-full bg-gray-900 rounded-lg overflow-hidden flex flex-col">
+    <div className="relative w-full h-full bg-gray-900 rounded-lg overflow-hidden">
       <ZoomLoadingOverlay
         isLoading={isLoading}
         currentStep={currentStep}
@@ -255,31 +254,17 @@ export function ZoomComponentView({
         maxRetries={maxRetries}
       />
 
-      {/* Zoom meeting container - make this take up most of the space */}
+      {/* Zoom meeting container - full space with no custom controls */}
       <div 
         ref={containerRef}
         id="meetingSDKElement"
-        className="w-full flex-1"
+        className="w-full h-full"
         style={{ 
-          minHeight: '600px',
-          minWidth: '800px',
-          position: 'relative'
+          position: 'relative',
+          minHeight: '100%',
+          minWidth: '100%'
         }}
       />
-
-      {/* Controls container - minimize this space */}
-      {isJoined && (
-        <div className="relative h-16 flex-shrink-0">
-          <ZoomMeetingControls
-            isJoined={isJoined}
-            isMuted={true}
-            isVideoOff={true}
-            onToggleMute={() => {}}
-            onToggleVideo={() => {}}
-            onLeaveMeeting={handleLeaveMeeting}
-          />
-        </div>
-      )}
     </div>
   );
 }

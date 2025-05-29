@@ -60,16 +60,30 @@ export function useZoomSDK({ onReady, onError }: UseZoomSDKProps = {}) {
         zoomAppRoot: containerRef.current,
         language: 'en-US',
         patchJsMedia: true,
-        leaveOnPageUnload: false, // Critical: prevent cleanup on tab switch
+        leaveOnPageUnload: false,
         customize: {
           video: {
-            isResizable: true,
+            isResizable: false, // Let Zoom handle sizing
             viewSizes: {
               default: {
                 width: '100%',
                 height: '100%'
               }
+            },
+            popper: {
+              disableDraggable: true // Prevent dragging to let it fill container
             }
+          },
+          toolbar: {
+            buttons: [
+              {
+                text: 'Leave',
+                className: 'CustomLeaveButton',
+                onClick: () => {
+                  console.log('Custom leave button clicked');
+                }
+              }
+            ]
           }
         }
       });
