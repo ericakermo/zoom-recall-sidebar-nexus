@@ -1,3 +1,4 @@
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -100,20 +101,83 @@
   }
 }
 
-/* Zoom Meeting SDK Container - Simple and minimal approach */
-#meetingSDKElement {
+/* Zoom Meeting SDK Container - Responsive and full-height approach */
+.zoom-container-wrapper {
   width: 100%;
-  height: 100%;
-  max-height: 600px;
-  position: relative;
-  display: block;
+  height: 100vh;
+  min-height: 500px;
+  display: flex;
+  flex-direction: column;
   background-color: #000;
   border-radius: 8px;
   overflow: hidden;
 }
 
-/* Minimal styling - let Zoom handle everything internally */
+#meetingSDKElement {
+  width: 100%;
+  height: 100%;
+  min-height: 500px;
+  flex: 1;
+  position: relative;
+  display: block;
+  background-color: #000;
+  overflow: hidden;
+}
+
+/* Let Zoom handle internal layout completely */
 #meetingSDKElement > div {
+  width: 100% !important;
+  height: 100% !important;
+}
+
+/* Ensure Zoom's internal video containers scale properly */
+#meetingSDKElement .zoom-MuiPaper-root,
+#meetingSDKElement .zoom-sdk-video-canvas,
+#meetingSDKElement .zoom-MuiTabs-root {
+  width: 100% !important;
+  height: 100% !important;
+  max-width: none !important;
+  max-height: none !important;
+}
+
+/* Mobile optimizations */
+@media (max-width: 768px) {
+  .zoom-container-wrapper {
+    height: 100dvh; /* Better mobile viewport handling */
+    min-height: 400px;
+    border-radius: 0; /* Full screen on mobile */
+  }
+  
+  #meetingSDKElement {
+    min-height: 400px;
+  }
+}
+
+/* Desktop responsive breakpoints */
+@media (min-width: 769px) and (max-width: 1200px) {
+  .zoom-container-wrapper {
+    min-height: 600px;
+  }
+  
+  #meetingSDKElement {
+    min-height: 600px;
+  }
+}
+
+@media (min-width: 1201px) {
+  .zoom-container-wrapper {
+    min-height: 700px;
+  }
+  
+  #meetingSDKElement {
+    min-height: 700px;
+  }
+}
+
+/* Ensure video elements fill space properly */
+#meetingSDKElement video,
+#meetingSDKElement canvas {
+  object-fit: cover;
   width: 100%;
   height: 100%;
 }
