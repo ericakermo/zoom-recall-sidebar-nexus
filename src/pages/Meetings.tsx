@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { ZoomMeetingContainer } from '@/components/ZoomMeetingContainer';
+import { ZoomMeeting } from '@/components/ZoomMeeting';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/context/AuthContext';
 import { Video, VideoOff, X } from 'lucide-react';
@@ -203,23 +203,12 @@ const Meetings = () => {
             Meeting ID: {activeMeeting}
           </div>
           
-          <ZoomMeetingContainer 
+          <ZoomMeeting 
             meetingNumber={activeMeeting}
             userName={user?.email || 'Guest'} 
-            role={isHosting ? 1 : 0}
-            onJoinSuccess={() => {
-              toast({
-                title: "Connected",
-                description: "You have joined the meeting"
-              });
-            }}
-            onError={(error) => {
-              toast({
-                title: "Meeting Error",
-                description: error,
-                variant: "destructive"
-              });
-            }}
+            role={isHosting ? 1 : 0} // 1 for host, 0 for attendee
+            onMeetingEnd={handleMeetingEnd}
+            zak={zoomCredentials?.zak} // Pass ZAK token to ZoomMeeting component
           />
         </div>
       ) : (
