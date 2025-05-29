@@ -15,20 +15,17 @@ export function useZoomSDK({ onReady, onError }: UseZoomSDKProps = {}) {
   const clientRef = useRef<any>(null);
   const initializationRef = useRef(false);
   const joinAttemptRef = useRef(false);
-  const cleanupRef = useRef<() => void>();
 
   const cleanup = useCallback(() => {
     console.log('🧹 Starting Zoom SDK cleanup...');
     
     if (clientRef.current) {
       try {
-        // Leave meeting if joined
         if (isJoined && typeof clientRef.current.leave === 'function') {
           clientRef.current.leave();
           console.log('✅ Left meeting during cleanup');
         }
         
-        // Destroy the client instance
         if (typeof clientRef.current.destroy === 'function') {
           clientRef.current.destroy();
           console.log('✅ Destroyed Zoom client');
@@ -40,7 +37,6 @@ export function useZoomSDK({ onReady, onError }: UseZoomSDKProps = {}) {
       clientRef.current = null;
     }
     
-    // Reset states
     setIsSDKLoaded(false);
     setIsReady(false);
     setIsJoined(false);
@@ -49,11 +45,6 @@ export function useZoomSDK({ onReady, onError }: UseZoomSDKProps = {}) {
     
     console.log('✅ Zoom SDK cleanup completed');
   }, [isJoined]);
-
-  // Store cleanup function reference
-  useEffect(() => {
-    cleanupRef.current = cleanup;
-  }, [cleanup]);
 
   const initializeSDK = useCallback(async () => {
     if (initializationRef.current || !containerRef.current) {
@@ -66,47 +57,18 @@ export function useZoomSDK({ onReady, onError }: UseZoomSDKProps = {}) {
     try {
       console.log('🔄 Creating new Zoom embedded client instance...');
       
-      // Always create a fresh client instance to avoid session conflicts
+      // Create fresh client instance following Zoom's official pattern
       clientRef.current = ZoomMtgEmbedded.createClient();
       
-      console.log('🔄 Initializing Zoom embedded client with enhanced settings...');
+      console.log('🔄 Initializing Zoom embedded client following official guidelines...');
       
+      // Minimal initialization following Zoom's sample - let SDK handle UI
       await clientRef.current.init({
         debug: true,
         zoomAppRoot: containerRef.current,
         language: 'en-US',
         patchJsMedia: true,
-        leaveOnPageUnload: true, // Enable automatic cleanup
-        customize: {
-          video: {
-            isResizable: false,
-            viewSizes: {
-              default: {
-                width: '100%',
-                height: '100%'
-              },
-              ribbon: {
-                width: '25%',
-                height: '100%'
-              }
-            },
-            popper: {
-              disableDraggable: true
-            }
-          },
-          toolbar: {
-            buttons: [
-              {
-                text: 'Leave',
-                className: 'CustomLeaveButton',
-                onClick: () => {
-                  console.log('Custom leave button clicked');
-                  leaveMeeting();
-                }
-              }
-            ]
-          }
-        }
+        leaveOnPageUnload: true
       });
 
       setIsSDKLoaded(true);
@@ -151,6 +113,7 @@ export function useZoomSDK({ onReady, onError }: UseZoomSDKProps = {}) {
     }
     
     try {
+      // Join following Zoom's official pattern
       const result = await clientRef.current.join({
         sdkKey: joinConfig.sdkKey,
         signature: joinConfig.signature,
@@ -167,7 +130,6 @@ export function useZoomSDK({ onReady, onError }: UseZoomSDKProps = {}) {
     } catch (error: any) {
       console.error('❌ Failed to join meeting:', error);
       
-      // Enhanced error logging
       if (error?.errorCode) {
         console.error(`🔍 Zoom Error Code: ${error.errorCode}`);
       }
@@ -175,7 +137,6 @@ export function useZoomSDK({ onReady, onError }: UseZoomSDKProps = {}) {
         console.error(`📝 Zoom Error Reason: ${error.reason}`);
       }
       
-      // Provide specific error messages
       let errorMessage = error.message || 'Failed to join meeting';
       if (error?.errorCode === 200) {
         if (joinConfig.role === 1) {
@@ -225,9 +186,7 @@ export function useZoomSDK({ onReady, onError }: UseZoomSDKProps = {}) {
   useEffect(() => {
     const handleBeforeUnload = () => {
       console.log('🔄 Page unload detected, cleaning up Zoom session...');
-      if (cleanupRef.current) {
-        cleanupRef.current();
-      }
+      cleanup();
     };
 
     const handleVisibilityChange = () => {
@@ -239,21 +198,15 @@ export function useZoomSDK({ onReady, onError }: UseZoomSDKProps = {}) {
       }
     };
 
-    // Add event listeners for proper cleanup
     window.addEventListener('beforeunload', handleBeforeUnload);
     document.addEventListener('visibilitychange', handleVisibilityChange);
 
-    // Cleanup on component unmount
     return () => {
       window.removeEventListener('beforeunload', handleBeforeUnload);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
-      
-      // Final cleanup
-      if (cleanupRef.current) {
-        cleanupRef.current();
-      }
+      cleanup();
     };
-  }, [isJoined, leaveMeeting]);
+  }, [isJoined, leaveMeeting, cleanup]);
 
   return {
     containerRef,
