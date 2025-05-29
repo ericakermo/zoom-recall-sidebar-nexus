@@ -1,4 +1,3 @@
-
 import { useEffect, useState, useCallback } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { useZoomSDK } from '@/hooks/useZoomSDK';
@@ -205,16 +204,13 @@ export function ZoomComponentView({
         maxRetries={maxRetries}
       />
 
-      {/* Zoom meeting container - forced fullscreen */}
+      {/* Zoom meeting container - explicit dimensions forced */}
       <div 
         ref={containerRef}
-        className="absolute inset-0 w-full h-full"
+        className="w-full h-full"
         style={{
           width: '100%',
-          height: '100%',
-          position: 'absolute',
-          top: 0,
-          left: 0
+          height: '100%'
         }}
       />
     </div>

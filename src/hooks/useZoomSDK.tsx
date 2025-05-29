@@ -1,4 +1,3 @@
-
 import { useState, useRef, useCallback, useEffect } from 'react';
 import ZoomMtgEmbedded from '@zoom/meetingsdk/embedded';
 
@@ -59,9 +58,16 @@ export function useZoomSDK({ onReady, onError }: UseZoomSDKProps = {}) {
       
       clientRef.current = ZoomMtgEmbedded.createClient();
       
-      console.log('🔄 Initializing Zoom embedded client with fullscreen configuration...');
+      console.log('🔄 Initializing Zoom embedded client with explicit dimensions...');
       
-      // Force fullscreen configuration
+      // Get container dimensions
+      const containerRect = containerRef.current.getBoundingClientRect();
+      const containerWidth = containerRect.width || window.innerWidth;
+      const containerHeight = containerRect.height || window.innerHeight;
+      
+      console.log(`📐 Container dimensions: ${containerWidth}x${containerHeight}`);
+      
+      // Solution 2: Use explicit viewSizes configuration
       await clientRef.current.init({
         debug: true,
         zoomAppRoot: containerRef.current,
@@ -71,28 +77,29 @@ export function useZoomSDK({ onReady, onError }: UseZoomSDKProps = {}) {
         customize: {
           video: {
             isResizable: false,
+            isDraggable: false,
             viewSizes: {
               default: {
-                width: '100%',
-                height: '100%'
+                width: `${Math.floor(containerWidth)}px`,
+                height: `${Math.floor(containerHeight)}px`
+              },
+              minimize: {
+                width: `${Math.floor(containerWidth)}px`,
+                height: `${Math.floor(containerHeight)}px`
               }
             },
             popper: {
               disableDraggable: true,
+              disableResize: true,
               anchorElement: containerRef.current,
-              placement: 'top'
+              placement: 'center'
             }
           },
+          meetingInfo: {
+            isVisible: false
+          },
           toolbar: {
-            buttons: [
-              {
-                text: 'Custom Button',
-                className: 'CustomButton',
-                onClick: () => {
-                  console.log('custom button');
-                }
-              }
-            ]
+            isVisible: true
           }
         }
       });
@@ -100,7 +107,7 @@ export function useZoomSDK({ onReady, onError }: UseZoomSDKProps = {}) {
       setIsSDKLoaded(true);
       setIsReady(true);
       onReady?.();
-      console.log('✅ Zoom embedded client initialized successfully with fullscreen configuration');
+      console.log('✅ Zoom embedded client initialized successfully with explicit dimensions');
     } catch (error: any) {
       console.error('❌ Failed to initialize Zoom embedded client:', error);
       initializationRef.current = false;
