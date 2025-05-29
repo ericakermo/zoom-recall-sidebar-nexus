@@ -1,4 +1,3 @@
-
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -101,10 +100,12 @@
   }
 }
 
-/* Zoom Meeting SDK Container - Allow full height */
+/* Zoom Meeting SDK Container - Fixed responsive dimensions */
 #meetingSDKElement {
   width: 100%;
-  height: 100%;
+  height: 70vh; /* Fixed responsive height - 70% of viewport height */
+  min-height: 400px; /* Minimum height for smaller screens */
+  max-height: 800px; /* Maximum height for larger screens */
   position: relative;
   display: block;
   background-color: #000;
@@ -112,8 +113,18 @@
   overflow: hidden;
 }
 
-/* Minimal styling - let Zoom handle everything internally */
+/* Ensure Zoom content fills the container properly */
 #meetingSDKElement > div {
-  width: 100%;
-  height: 100%;
+  width: 100% !important;
+  height: 100% !important;
+  position: relative !important;
+}
+
+/* Force Zoom video elements to respect container bounds */
+#meetingSDKElement video,
+#meetingSDKElement canvas,
+#meetingSDKElement .zoom-video-container {
+  max-width: 100% !important;
+  max-height: 100% !important;
+  object-fit: contain !important;
 }
