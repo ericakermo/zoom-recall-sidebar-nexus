@@ -59,22 +59,25 @@ export function useZoomSDK({ onReady, onError }: UseZoomSDKProps = {}) {
       
       clientRef.current = ZoomMtgEmbedded.createClient();
       
-      console.log('🔄 Initializing Zoom embedded client with responsive video configuration...');
+      console.log('🔄 Initializing Zoom embedded client with fixed video dimensions...');
       
-      // Use the working configuration you provided
+      // Use the exact settings you provided
+      let meetingSDKElement = containerRef.current;
+      
       await clientRef.current.init({
-        debug: true,
-        zoomAppRoot: containerRef.current,
+        zoomAppRoot: meetingSDKElement,
         language: 'en-US',
-        patchJsMedia: true,
-        leaveOnPageUnload: true,
         customize: {
           video: {
-            isResizable: false,
+            isResizable: true,
             viewSizes: {
               default: {
-                width: '100%',
-                height: '100%'
+                width: 1000,
+                height: 600
+              },
+              ribbon: {
+                width: 300,
+                height: 700
               }
             }
           }
@@ -84,7 +87,7 @@ export function useZoomSDK({ onReady, onError }: UseZoomSDKProps = {}) {
       setIsSDKLoaded(true);
       setIsReady(true);
       onReady?.();
-      console.log('✅ Zoom embedded client initialized successfully with custom video settings');
+      console.log('✅ Zoom embedded client initialized successfully with fixed video dimensions');
     } catch (error: any) {
       console.error('❌ Failed to initialize Zoom embedded client:', error);
       initializationRef.current = false;
