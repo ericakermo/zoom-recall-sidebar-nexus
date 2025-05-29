@@ -108,19 +108,17 @@ export function ZoomMeeting({
         )}
       </div>
       
-      {/* Meeting content - 16:9 aspect ratio container */}
-      <div className="flex-1 flex items-center justify-center p-4 bg-gray-50">
-        <div className="w-full max-w-6xl aspect-video bg-black rounded-lg overflow-hidden">
-          <ZoomComponentView
-            meetingNumber={meetingNumber}
-            meetingPassword={meetingPassword}
-            userName={userName}
-            role={role}
-            onMeetingJoined={handleMeetingJoined}
-            onMeetingError={handleMeetingError}
-            onMeetingLeft={handleMeetingLeft}
-          />
-        </div>
+      {/* Meeting content - full height container */}
+      <div className="flex-1 bg-black">
+        <ZoomComponentView
+          meetingNumber={meetingNumber}
+          meetingPassword={meetingPassword}
+          userName={userName}
+          role={role}
+          onMeetingJoined={handleMeetingJoined}
+          onMeetingError={handleMeetingError}
+          onMeetingLeft={handleMeetingLeft}
+        />
       </div>
     </div>
   );

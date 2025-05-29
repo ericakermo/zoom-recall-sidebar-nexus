@@ -1,4 +1,3 @@
-
 import { useState, useRef, useCallback, useEffect } from 'react';
 import ZoomMtgEmbedded from '@zoom/meetingsdk/embedded';
 
@@ -59,9 +58,9 @@ export function useZoomSDK({ onReady, onError }: UseZoomSDKProps = {}) {
       
       clientRef.current = ZoomMtgEmbedded.createClient();
       
-      console.log('🔄 Initializing Zoom embedded client with responsive video configuration...');
+      console.log('🔄 Initializing Zoom embedded client with full container settings...');
       
-      // Use the working configuration you provided
+      // Configure for full container usage without resizing
       await clientRef.current.init({
         debug: true,
         zoomAppRoot: containerRef.current,
@@ -76,7 +75,13 @@ export function useZoomSDK({ onReady, onError }: UseZoomSDKProps = {}) {
                 width: '100%',
                 height: '100%'
               }
+            },
+            popper: {
+              disableDraggable: true
             }
+          },
+          meetingInfo: {
+            isVisible: false
           }
         }
       });
@@ -84,7 +89,7 @@ export function useZoomSDK({ onReady, onError }: UseZoomSDKProps = {}) {
       setIsSDKLoaded(true);
       setIsReady(true);
       onReady?.();
-      console.log('✅ Zoom embedded client initialized successfully with custom video settings');
+      console.log('✅ Zoom embedded client initialized successfully with full container settings');
     } catch (error: any) {
       console.error('❌ Failed to initialize Zoom embedded client:', error);
       initializationRef.current = false;
