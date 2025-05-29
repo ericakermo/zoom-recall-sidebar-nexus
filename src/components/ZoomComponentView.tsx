@@ -1,3 +1,4 @@
+
 import { useEffect, useState, useCallback } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { useZoomSDK } from '@/hooks/useZoomSDK';
@@ -204,12 +205,17 @@ export function ZoomComponentView({
         maxRetries={maxRetries}
       />
 
-      {/* Zoom meeting container with optimized dimensions */}
+      {/* Zoom meeting container with fixed dimensions */}
       <div 
         ref={containerRef}
         id="meetingSDKElement"
         className="w-full h-full"
-        style={{ minHeight: '600px' }}
+        style={{ 
+          minHeight: '600px',
+          minWidth: '800px',
+          width: '100%',
+          height: '100%'
+        }}
       />
     </div>
   );

@@ -1,3 +1,4 @@
+
 import { useState, useRef, useCallback, useEffect } from 'react';
 import ZoomMtgEmbedded from '@zoom/meetingsdk/embedded';
 
@@ -58,28 +59,22 @@ export function useZoomSDK({ onReady, onError }: UseZoomSDKProps = {}) {
       
       clientRef.current = ZoomMtgEmbedded.createClient();
       
-      console.log('🔄 Initializing Zoom embedded client with dynamic dimensions...');
-      
-      // Get dynamic container dimensions
-      const container = containerRef.current;
-      const { width, height } = container.getBoundingClientRect();
-      
-      console.log(`📏 Container dimensions: ${width}x${height}`);
+      console.log('🔄 Initializing Zoom embedded client...');
       
       await clientRef.current.init({
-        zoomAppRoot: container,
+        zoomAppRoot: containerRef.current,
         language: 'en-US',
         customize: {
           video: {
             isResizable: true,
             viewSizes: {
               default: {
-                width: Math.floor(width * 0.95),
-                height: Math.floor(height * 0.85)
+                width: 800,
+                height: 600
               },
               ribbon: {
-                width: Math.floor(width * 0.3),
-                height: Math.floor(height * 0.9)
+                width: 300,
+                height: 700
               }
             }
           }
@@ -89,7 +84,7 @@ export function useZoomSDK({ onReady, onError }: UseZoomSDKProps = {}) {
       setIsSDKLoaded(true);
       setIsReady(true);
       onReady?.();
-      console.log('✅ Zoom embedded client initialized with dynamic video dimensions');
+      console.log('✅ Zoom embedded client initialized successfully');
     } catch (error: any) {
       console.error('❌ Failed to initialize Zoom embedded client:', error);
       initializationRef.current = false;

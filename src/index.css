@@ -86,23 +86,22 @@
   }
 }
 
-/* Zoom Meeting SDK Container - Optimized with flex layout */
+/* Zoom Meeting SDK Container */
 #meetingSDKElement {
   width: 100% !important;
   height: 100% !important;
-  display: flex !important;
-  flex-direction: column !important;
-  justify-content: flex-start !important;
-  align-items: center !important;
+  display: block !important;
   background-color: #000 !important;
   overflow: hidden !important;
   position: relative !important;
   border-radius: 8px;
   padding: 0 !important;
   margin: 0 !important;
+  min-height: 600px !important;
+  min-width: 800px !important;
 }
 
-/* Force all Zoom UI elements to use available space efficiently */
+/* Force all Zoom UI elements to use available space */
 #meetingSDKElement > div,
 #meetingSDKElement .react-draggable {
   width: 100% !important;
@@ -122,7 +121,7 @@
   max-height: none !important;
 }
 
-/* Force object-fit: cover for Zoom Videos */
+/* Video elements styling */
 #meetingSDKElement video,
 #meetingSDKElement canvas {
   object-fit: cover !important;
