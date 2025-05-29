@@ -1,3 +1,4 @@
+
 import { useEffect, useState, useCallback } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { useZoomSDK } from '@/hooks/useZoomSDK';
@@ -26,10 +27,10 @@ export function ZoomComponentView({
   onMeetingLeft
 }: ZoomComponentViewProps) {
   const [isLoading, setIsLoading] = useState(true);
-  const [isJoined, setIsJoined] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [currentStep, setCurrentStep] = useState('Initializing Zoom SDK...');
   const [retryCount, setRetryCount] = useState(0);
+  const [hasJoinedOnce, setHasJoinedOnce] = useState(false);
   const maxRetries = 3;
   
   const { user } = useAuth();
@@ -38,6 +39,7 @@ export function ZoomComponentView({
     containerRef,
     isSDKLoaded,
     isReady,
+    isJoined,
     joinMeeting,
     leaveMeeting
   } = useZoomSDK({
@@ -129,8 +131,8 @@ export function ZoomComponentView({
   }, []);
 
   const handleJoinMeeting = useCallback(async () => {
-    if (!isReady) {
-      console.log('⏸️ SDK not ready yet');
+    if (!isReady || hasJoinedOnce) {
+      console.log('⏸️ SDK not ready or already joined once');
       return;
     }
 
@@ -176,7 +178,7 @@ export function ZoomComponentView({
       setCurrentStep('Joining meeting...');
       await joinMeeting(joinConfig);
       
-      setIsJoined(true);
+      setHasJoinedOnce(true);
       setIsLoading(false);
       setCurrentStep('Connected to meeting');
       setRetryCount(0);
@@ -187,30 +189,33 @@ export function ZoomComponentView({
       setIsLoading(false);
       onMeetingError?.(error.message);
     }
-  }, [isReady, meetingNumber, role, providedUserName, user, meetingPassword, validateMeetingState, getTokens, joinMeeting, onMeetingJoined, onMeetingError]);
+  }, [isReady, hasJoinedOnce, meetingNumber, role, providedUserName, user, meetingPassword, validateMeetingState, getTokens, joinMeeting, onMeetingJoined, onMeetingError]);
 
   // Update current step based on SDK status
   useEffect(() => {
-    if (isReady) {
+    if (isJoined) {
+      setCurrentStep('Connected to meeting');
+      setIsLoading(false);
+    } else if (isReady) {
       setCurrentStep('Ready to join meeting');
     } else if (isSDKLoaded) {
       setCurrentStep('Initializing Zoom SDK...');
     } else {
       setCurrentStep('Loading Zoom SDK...');
     }
-  }, [isSDKLoaded, isReady]);
+  }, [isSDKLoaded, isReady, isJoined]);
 
-  // Join when ready
+  // Join when ready (only once)
   useEffect(() => {
-    if (isReady && !isJoined && !error) {
+    if (isReady && !hasJoinedOnce && !error) {
       console.log('✅ SDK ready, starting join process...');
       handleJoinMeeting();
     }
-  }, [isReady, isJoined, error, handleJoinMeeting]);
+  }, [isReady, hasJoinedOnce, error, handleJoinMeeting]);
 
   const handleLeaveMeeting = useCallback(() => {
     leaveMeeting();
-    setIsJoined(false);
+    setHasJoinedOnce(false);
     onMeetingLeft?.();
   }, [leaveMeeting, onMeetingLeft]);
 
@@ -220,6 +225,7 @@ export function ZoomComponentView({
       setRetryCount(prev => prev + 1);
       setError(null);
       setIsLoading(true);
+      setHasJoinedOnce(false);
       setCurrentStep('Retrying...');
       handleJoinMeeting();
     } else {

@@ -1,3 +1,4 @@
+
 import { useState, useRef, useCallback, useEffect } from 'react';
 import ZoomMtgEmbedded from '@zoom/meetingsdk/embedded';
 
@@ -6,30 +7,60 @@ interface UseZoomSDKProps {
   onError?: (error: string) => void;
 }
 
+// Global singleton to prevent multiple SDK instances
+let globalZoomClient: any = null;
+let globalInitialized = false;
+
 export function useZoomSDK({ onReady, onError }: UseZoomSDKProps = {}) {
-  const [isSDKLoaded, setIsSDKLoaded] = useState(false);
-  const [isReady, setIsReady] = useState(false);
+  const [isSDKLoaded, setIsSDKLoaded] = useState(globalInitialized);
+  const [isReady, setIsReady] = useState(globalInitialized);
+  const [isJoined, setIsJoined] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
-  const clientRef = useRef<any>(null);
+  const clientRef = useRef<any>(globalZoomClient);
+  const initializationRef = useRef(false);
+  const joinAttemptRef = useRef(false);
+
+  // Track visibility changes to prevent cleanup on tab switch
+  const [isVisible, setIsVisible] = useState(!document.hidden);
+
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      setIsVisible(!document.hidden);
+      console.log('🔄 Tab visibility changed:', !document.hidden ? 'visible' : 'hidden');
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+  }, []);
 
   const initializeSDK = useCallback(async () => {
-    if (!containerRef.current) {
-      console.log('⏸️ Container not ready yet');
+    // Prevent multiple initialization attempts
+    if (initializationRef.current || globalInitialized || !containerRef.current) {
+      console.log('⏸️ SDK initialization skipped - already initialized or container not ready');
       return;
     }
 
+    initializationRef.current = true;
+
     try {
-      console.log('🔄 Creating Zoom embedded client...');
+      console.log('🔄 Creating Zoom embedded client (singleton)...');
       
-      clientRef.current = ZoomMtgEmbedded.createClient();
+      // Use global client if it exists, otherwise create new one
+      if (!globalZoomClient) {
+        globalZoomClient = ZoomMtgEmbedded.createClient();
+        clientRef.current = globalZoomClient;
+      } else {
+        clientRef.current = globalZoomClient;
+        console.log('✅ Using existing global Zoom client');
+      }
       
-      console.log('🔄 Initializing Zoom embedded client with responsive video sizing...');
+      console.log('🔄 Initializing Zoom embedded client...');
       
       await clientRef.current.init({
         zoomAppRoot: containerRef.current,
         language: 'en-US',
         patchJsMedia: true,
-        leaveOnPageUnload: true,
+        leaveOnPageUnload: false, // Critical: prevent cleanup on tab switch
         customize: {
           video: {
             isResizable: true,
@@ -43,12 +74,14 @@ export function useZoomSDK({ onReady, onError }: UseZoomSDKProps = {}) {
         }
       });
 
-      console.log('✅ Zoom embedded client initialized successfully with responsive sizing');
+      globalInitialized = true;
       setIsSDKLoaded(true);
       setIsReady(true);
       onReady?.();
+      console.log('✅ Zoom embedded client initialized successfully');
     } catch (error: any) {
       console.error('❌ Failed to initialize Zoom embedded client:', error);
+      initializationRef.current = false;
       onError?.(error.message || 'Failed to initialize Zoom SDK');
     }
   }, [onReady, onError]);
@@ -57,6 +90,14 @@ export function useZoomSDK({ onReady, onError }: UseZoomSDKProps = {}) {
     if (!isReady || !clientRef.current) {
       throw new Error('Zoom SDK not ready');
     }
+
+    // Prevent multiple join attempts
+    if (joinAttemptRef.current) {
+      console.log('⏸️ Join attempt already in progress');
+      return;
+    }
+
+    joinAttemptRef.current = true;
 
     console.log('🔄 Joining meeting with embedded client...');
     console.log('📋 Join config details:', {
@@ -77,6 +118,7 @@ export function useZoomSDK({ onReady, onError }: UseZoomSDKProps = {}) {
     // Validate meeting number format
     const meetingNumberStr = String(joinConfig.meetingNumber).replace(/\s+/g, '');
     if (!/^\d{10,11}$/.test(meetingNumberStr)) {
+      joinAttemptRef.current = false;
       throw new Error(`Invalid meeting number format: ${joinConfig.meetingNumber}`);
     }
     
@@ -91,6 +133,7 @@ export function useZoomSDK({ onReady, onError }: UseZoomSDKProps = {}) {
         zak: joinConfig.zak || ''
       });
       
+      setIsJoined(true);
       console.log('✅ Successfully joined meeting with embedded client');
       return result;
     } catch (error: any) {
@@ -124,6 +167,8 @@ export function useZoomSDK({ onReady, onError }: UseZoomSDKProps = {}) {
       }
       
       throw new Error(errorMessage);
+    } finally {
+      joinAttemptRef.current = false;
     }
   }, [isReady]);
 
@@ -131,60 +176,54 @@ export function useZoomSDK({ onReady, onError }: UseZoomSDKProps = {}) {
     if (clientRef.current) {
       console.log('🔄 Leaving meeting...');
       try {
-        // Enhanced defensive check for leave function
         if (typeof clientRef.current.leave === 'function') {
           clientRef.current.leave();
+          setIsJoined(false);
           console.log('✅ Left meeting successfully');
         } else {
-          console.warn('⚠️ Leave function not available on Zoom client - attempting cleanup');
-          // Alternative cleanup if leave is not available
-          if (typeof clientRef.current.destroy === 'function') {
-            clientRef.current.destroy();
-            console.log('✅ Zoom client destroyed successfully');
-          }
+          console.warn('⚠️ Leave function not available on Zoom client');
         }
       } catch (error) {
-        console.error('❌ Error during meeting cleanup:', error);
+        console.error('❌ Error during meeting leave:', error);
       }
-    } else {
-      console.warn('⚠️ Zoom client not initialized - safe cleanup');
     }
   }, []);
 
-  // Initialize when container is available
+  // Initialize when container is available and not already initialized
   useEffect(() => {
-    if (containerRef.current && !isSDKLoaded) {
+    if (containerRef.current && !globalInitialized && !initializationRef.current) {
       initializeSDK();
     }
-  }, [initializeSDK, isSDKLoaded]);
+  }, [initializeSDK]);
 
-  // Enhanced cleanup on unmount with better error handling
+  // Only cleanup on actual unmount, not on tab switch
   useEffect(() => {
     return () => {
-      if (clientRef.current) {
+      // Only cleanup if the page is actually being unloaded
+      if (document.visibilityState === 'hidden') {
+        console.log('🧹 Tab hidden - preserving Zoom session');
+        return;
+      }
+
+      // Only cleanup on actual component unmount
+      if (clientRef.current && !isVisible) {
         try {
           if (typeof clientRef.current.leave === 'function') {
             clientRef.current.leave();
             console.log('🧹 Cleanup: Meeting left successfully');
-          } else if (typeof clientRef.current.destroy === 'function') {
-            clientRef.current.destroy();
-            console.log('🧹 Cleanup: Client destroyed successfully');
-          } else {
-            console.warn('⚠️ Cleanup: No cleanup method available on client');
           }
         } catch (error) {
           console.warn('⚠️ Cleanup warning (non-critical):', error);
-        } finally {
-          clientRef.current = null;
         }
       }
     };
-  }, []);
+  }, [isVisible]);
 
   return {
     containerRef,
     isSDKLoaded,
     isReady,
+    isJoined,
     joinMeeting,
     leaveMeeting
   };
