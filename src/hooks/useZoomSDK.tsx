@@ -58,56 +58,21 @@ export function useZoomSDK({ onReady, onError }: UseZoomSDKProps = {}) {
       
       clientRef.current = ZoomMtgEmbedded.createClient();
       
-      console.log('🔄 Initializing Zoom embedded client with explicit dimensions...');
+      console.log('🔄 Initializing Zoom embedded client with minimal configuration...');
       
-      // Get container dimensions
-      const containerRect = containerRef.current.getBoundingClientRect();
-      const containerWidth = containerRect.width || window.innerWidth;
-      const containerHeight = containerRect.height || window.innerHeight;
-      
-      console.log(`📐 Container dimensions: ${containerWidth}x${containerHeight}`);
-      
-      // Solution 2: Use explicit viewSizes configuration
+      // Solution 3: Minimal SDK configuration to avoid conflicts
       await clientRef.current.init({
         debug: true,
         zoomAppRoot: containerRef.current,
         language: 'en-US',
         patchJsMedia: true,
-        leaveOnPageUnload: true,
-        customize: {
-          video: {
-            isResizable: false,
-            isDraggable: false,
-            viewSizes: {
-              default: {
-                width: `${Math.floor(containerWidth)}px`,
-                height: `${Math.floor(containerHeight)}px`
-              },
-              minimize: {
-                width: `${Math.floor(containerWidth)}px`,
-                height: `${Math.floor(containerHeight)}px`
-              }
-            },
-            popper: {
-              disableDraggable: true,
-              disableResize: true,
-              anchorElement: containerRef.current,
-              placement: 'center'
-            }
-          },
-          meetingInfo: {
-            isVisible: false
-          },
-          toolbar: {
-            isVisible: true
-          }
-        }
+        leaveOnPageUnload: true
       });
 
       setIsSDKLoaded(true);
       setIsReady(true);
       onReady?.();
-      console.log('✅ Zoom embedded client initialized successfully with explicit dimensions');
+      console.log('✅ Zoom embedded client initialized successfully with minimal config');
     } catch (error: any) {
       console.error('❌ Failed to initialize Zoom embedded client:', error);
       initializationRef.current = false;

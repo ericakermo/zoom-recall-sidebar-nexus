@@ -108,8 +108,8 @@ export function ZoomMeeting({
         )}
       </div>
       
-      {/* Meeting content - full height container with explicit dimensions */}
-      <div className="flex-1 bg-black zoom-meeting-container">
+      {/* Meeting content - fixed positioned container */}
+      <div className="relative flex-1">
         <ZoomComponentView
           meetingNumber={meetingNumber}
           meetingPassword={meetingPassword}

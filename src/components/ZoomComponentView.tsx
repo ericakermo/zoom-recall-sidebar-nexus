@@ -195,7 +195,7 @@ export function ZoomComponentView({
   }
 
   return (
-    <div className="relative w-full h-full">
+    <div className="absolute inset-0">
       <ZoomLoadingOverlay
         isLoading={isLoading}
         currentStep={currentStep}
@@ -204,13 +204,17 @@ export function ZoomComponentView({
         maxRetries={maxRetries}
       />
 
-      {/* Zoom meeting container - explicit dimensions forced */}
+      {/* Zoom meeting container - fixed positioned to fill parent */}
       <div 
         ref={containerRef}
-        className="w-full h-full"
+        className="absolute inset-0"
         style={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
           width: '100%',
-          height: '100%'
+          height: '100%',
+          zIndex: 1
         }}
       />
     </div>
