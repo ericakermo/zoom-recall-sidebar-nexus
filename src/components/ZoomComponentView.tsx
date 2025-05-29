@@ -1,3 +1,4 @@
+
 import { useEffect, useRef } from 'react';
 import { useZoomSDK } from '@/hooks/useZoomSDK';
 
@@ -15,48 +16,70 @@ export function ZoomComponentView({
   meetingNumber,
   meetingPassword,
   userName,
-  role = 1,
+  role = 0, // Default to attendee
   onMeetingJoined,
   onMeetingError,
   onMeetingLeft
 }: ZoomComponentViewProps) {
   const containerRef = useRef<HTMLDivElement>(null);
 
+  console.log('🎯 ZoomComponentView props:', {
+    meetingNumber,
+    userName,
+    role,
+    roleText: role === 1 ? 'Host' : 'Attendee'
+  });
+
   // Your useZoomSDK hook should handle init/join/leave logic
   const { isSDKLoaded, isReady, isJoined, joinMeeting, leaveMeeting } = useZoomSDK({
-    onReady: () => { /* ... */ },
-    onError: (error) => { /* ... */ }
+    onReady: () => {
+      console.log('✅ SDK ready in ZoomComponentView');
+    },
+    onError: (error) => {
+      console.error('❌ SDK error in ZoomComponentView:', error);
+      onMeetingError?.(error);
+    }
   });
 
   useEffect(() => {
-    if (isReady && containerRef.current) {
+    if (isReady && containerRef.current && meetingNumber) {
+      console.log('🚀 Starting join process with role:', role === 1 ? 'Host' : 'Attendee');
+      
       // joinMeeting should handle the join logic
       joinMeeting({
         meetingNumber,
-        password: meetingPassword,
-        userName,
-        role
+        password: meetingPassword || '',
+        userName: userName || 'Guest',
+        role: role
+      }).then(() => {
+        console.log('✅ Join successful');
+        onMeetingJoined?.();
+      }).catch((error) => {
+        console.error('❌ Join failed:', error);
+        onMeetingError?.(error.message || 'Failed to join meeting');
       });
     }
+    
     // Cleanup on unmount
     return () => {
-      leaveMeeting();
+      if (isJoined) {
+        console.log('🧹 Cleaning up on unmount');
+        leaveMeeting();
+        onMeetingLeft?.();
+      }
     };
-  }, [isReady, meetingNumber, meetingPassword, userName, role, joinMeeting, leaveMeeting]);
+  }, [isReady, meetingNumber, meetingPassword, userName, role, joinMeeting, leaveMeeting, isJoined, onMeetingJoined, onMeetingError, onMeetingLeft]);
 
   return (
-    <div
-      ref={containerRef}
-      id="meetingSDKElement"
-      style={{
-        width: '100%',
-        height: '100%',
-        minHeight: 0,
-        minWidth: 0,
-        background: '#000',
-        borderRadius: 8,
-        overflow: 'hidden'
-      }}
-    />
+    <div className="flex flex-col h-full bg-gray-50 rounded-lg overflow-hidden">
+      <div
+        ref={containerRef}
+        id="meetingSDKElement"
+        className="flex-1 w-full bg-black rounded-lg"
+        style={{
+          minHeight: '400px'
+        }}
+      />
+    </div>
   );
 }

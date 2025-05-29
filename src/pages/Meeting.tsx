@@ -38,6 +38,9 @@ const Meeting = () => {
         setIsLoading(true);
         setError(null);
 
+        console.log('🔍 Loading meeting data for ID:', id);
+        console.log('👤 Current user ID:', user.id);
+
         // Get meeting details from database
         const { data: meeting, error: meetingError } = await supabase
           .from('zoom_meetings')
@@ -46,8 +49,14 @@ const Meeting = () => {
           .single();
 
         if (meetingError || !meeting) {
+          console.error('❌ Meeting query error:', meetingError);
           throw new Error('Meeting not found');
         }
+
+        console.log('📅 Meeting data loaded:', meeting);
+        console.log('🔐 Meeting host user_id:', meeting.user_id);
+        console.log('👤 Current user_id:', user.id);
+        console.log('🎯 Is host?', meeting.user_id === user.id);
 
         setMeetingData(meeting);
 
@@ -58,11 +67,14 @@ const Meeting = () => {
 
         if (!detailsError && meetingDetails?.password) {
           setMeetingPassword(meetingDetails.password);
+          console.log('🔑 Meeting password retrieved');
+        } else {
+          console.log('ℹ️ No password required for meeting');
         }
 
         setIsLoading(false);
       } catch (err: any) {
-        console.error('Error loading meeting:', err);
+        console.error('❌ Error loading meeting:', err);
         setError(err.message || 'Failed to load meeting');
         setIsLoading(false);
       }
@@ -113,6 +125,13 @@ const Meeting = () => {
   }
 
   const isHost = meetingData.user_id === user.id;
+  
+  console.log('🎯 Final host determination:', {
+    meetingUserId: meetingData.user_id,
+    currentUserId: user.id,
+    isHost: isHost,
+    roleToPass: isHost ? 1 : 0
+  });
 
   return (
     <div className="flex flex-col h-screen">
@@ -132,7 +151,11 @@ const Meeting = () => {
         
         <div className="text-center">
           <h1 className="text-lg font-semibold">{meetingData.title}</h1>
-          <p className="text-sm text-gray-600">Meeting ID: {meetingData.meeting_id}</p>
+          <p className="text-sm text-gray-600">
+            Meeting ID: {meetingData.meeting_id} | 
+            Role: {isHost ? 'Host' : 'Attendee'} |
+            User: {user.email}
+          </p>
         </div>
         
         <div className="w-32"></div> {/* Spacer for centering */}
