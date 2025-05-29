@@ -1,4 +1,3 @@
-
 import { useState, useRef, useCallback, useEffect } from 'react';
 import ZoomMtgEmbedded from '@zoom/meetingsdk/embedded';
 
@@ -59,16 +58,16 @@ export function useZoomSDK({ onReady, onError }: UseZoomSDKProps = {}) {
       
       clientRef.current = ZoomMtgEmbedded.createClient();
       
-      console.log('🔄 Initializing Zoom embedded client with calculated video dimensions...');
+      console.log('🔄 Initializing Zoom embedded client with optimized video dimensions...');
       
-      // Get container dimensions and calculate 90% for video
+      // Get container dimensions and use most of the space for video
       let meetingSDKElement = containerRef.current;
-      const containerWidth = meetingSDKElement.offsetWidth || 1000;
-      const containerHeight = meetingSDKElement.offsetHeight || 600;
+      const containerWidth = meetingSDKElement.offsetWidth || 1200;
+      const containerHeight = meetingSDKElement.offsetHeight || 700;
       
-      // Use 90% of container dimensions for video, leaving 10% for controls
-      const videoWidth = Math.floor(containerWidth * 0.9);
-      const videoHeight = Math.floor(containerHeight * 0.9);
+      // Use 95% of container dimensions for video to maximize space utilization
+      const videoWidth = Math.floor(containerWidth * 0.95);
+      const videoHeight = Math.floor(containerHeight * 0.85); // Leave 15% for controls
       
       console.log(`📏 Container: ${containerWidth}x${containerHeight}, Video: ${videoWidth}x${videoHeight}`);
       
@@ -84,8 +83,8 @@ export function useZoomSDK({ onReady, onError }: UseZoomSDKProps = {}) {
                 height: videoHeight
               },
               ribbon: {
-                width: Math.floor(videoWidth * 0.3),
-                height: Math.floor(videoHeight * 1.1)
+                width: Math.floor(videoWidth * 0.4),
+                height: Math.floor(videoHeight * 1.0)
               }
             }
           }
@@ -95,7 +94,7 @@ export function useZoomSDK({ onReady, onError }: UseZoomSDKProps = {}) {
       setIsSDKLoaded(true);
       setIsReady(true);
       onReady?.();
-      console.log('✅ Zoom embedded client initialized successfully with calculated video dimensions');
+      console.log('✅ Zoom embedded client initialized successfully with optimized video dimensions');
     } catch (error: any) {
       console.error('❌ Failed to initialize Zoom embedded client:', error);
       initializationRef.current = false;

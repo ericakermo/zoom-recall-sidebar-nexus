@@ -1,4 +1,3 @@
-
 import { useEffect, useState, useCallback } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { useZoomSDK } from '@/hooks/useZoomSDK';
@@ -30,7 +29,7 @@ export function ZoomComponentView({
   const [currentStep, setCurrentStep] = useState('Initializing Zoom SDK...');
   const [retryCount, setRetryCount] = useState(0);
   const [hasJoinedOnce, setHasJoinedOnce] = useState(false);
-  const maxRetries = 2; // Reduced retries since we're implementing better session management
+  const maxRetries = 2;
   
   const { user } = useAuth();
 
@@ -176,7 +175,7 @@ export function ZoomComponentView({
       cleanup();
       setTimeout(() => {
         handleJoinMeeting();
-      }, 1000); // Brief delay to ensure cleanup
+      }, 1000);
     } else {
       console.warn('⚠️ Max retry attempts reached');
       setError('Maximum retry attempts reached. Please refresh the page to try again.');
@@ -205,11 +204,12 @@ export function ZoomComponentView({
         maxRetries={maxRetries}
       />
 
-      {/* Zoom meeting container */}
+      {/* Zoom meeting container with optimized dimensions */}
       <div 
         ref={containerRef}
         id="meetingSDKElement"
         className="w-full h-full"
+        style={{ minHeight: '600px' }}
       />
     </div>
   );
