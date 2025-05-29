@@ -101,82 +101,30 @@
   }
 }
 
-/* Zoom Meeting SDK Container - Optimized for 90% video, 10% controls */
+/* Zoom Meeting SDK Container - Clean layout with proper spacing */
 #meetingSDKElement {
   width: 100%;
-  height: 70vh; /* Fixed responsive height - 70% of viewport height */
-  min-height: 400px; /* Minimum height for smaller screens */
-  max-height: 800px; /* Maximum height for larger screens */
+  height: 100%;
   position: relative;
-  display: flex;
-  flex-direction: column;
+  display: block;
   background-color: #000;
   border-radius: 8px;
   overflow: hidden;
 }
 
-/* Ensure main video area takes up 90% of container */
-#meetingSDKElement > div:first-child {
-  flex: 0.9;
-  width: 100% !important;
-  height: 90% !important;
-  position: relative !important;
-}
-
-/* Reserve 10% space for controls at bottom */
-#meetingSDKElement .zoom-MuiPaper-root:last-child {
-  flex: 0.1;
-  min-height: 10%;
-  position: relative !important;
-  bottom: 0 !important;
-}
-
-/* Force Zoom video elements to respect the 90% container bounds */
-#meetingSDKElement video,
-#meetingSDKElement canvas,
-#meetingSDKElement .zoom-video-container {
-  max-width: 100% !important;
-  max-height: 90% !important;
-  object-fit: contain !important;
-}
-
-/* Target the specific Zoom UI elements to fit within 90% */
+/* Ensure Zoom UI elements respect container boundaries */
+#meetingSDKElement > div,
 #meetingSDKElement .react-draggable,
-#meetingSDKElement .zoom-MuiBox-root:not(.css-woj72k),
-#meetingSDKElement .zoom-MuiPaper-root:not(:last-child) {
+#meetingSDKElement .zoom-MuiBox-root,
+#meetingSDKElement .zoom-MuiPaper-root {
   max-width: 100% !important;
-  max-height: 90% !important;
+  max-height: 100% !important;
 }
 
-/* Ensure canvas elements maintain aspect ratio within 90% bounds */
-#meetingSDKElement canvas[aria-label="Screen share"],
-#meetingSDKElement canvas[aria-label="Participant Videos"],
-#meetingSDKElement #zoom-sdk-video-canvas {
+/* Video elements should fit within container */
+#meetingSDKElement video,
+#meetingSDKElement canvas {
   max-width: 100% !important;
-  max-height: 90% !important;
-  width: auto !important;
-  height: auto !important;
+  max-height: 100% !important;
   object-fit: contain !important;
-}
-
-/* Constrain video elements specifically to 90% */
-#meetingSDKElement #ZOOM_WEB_SDK_SELF_VIDEO {
-  max-width: 100% !important;
-  max-height: 90% !important;
-  width: auto !important;
-  height: auto !important;
-  object-fit: contain !important;
-}
-
-/* Controls bar styling - ensure it uses the bottom 10% */
-#meetingSDKElement .zoom-MuiPaper-root.css-woj72k {
-  position: absolute !important;
-  bottom: 0 !important;
-  left: 0 !important;
-  right: 0 !important;
-  height: 10% !important;
-  min-height: 40px !important;
-  background: rgba(0, 0, 0, 0.8) !important;
-  backdrop-filter: blur(8px) !important;
-  z-index: 100 !important;
 }
