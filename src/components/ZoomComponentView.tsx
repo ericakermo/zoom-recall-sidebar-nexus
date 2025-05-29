@@ -1,4 +1,3 @@
-
 import { useEffect, useState, useCallback } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { useZoomSDK } from '@/hooks/useZoomSDK';
@@ -221,7 +220,7 @@ export function ZoomComponentView({
   }
 
   return (
-    <div className="flex flex-col w-full h-full bg-gray-900 rounded-lg overflow-hidden">
+    <div className="flex flex-col w-full h-full bg-gray-900 rounded-lg overflow-hidden p-0 m-0" style={{ minHeight: 0, minWidth: 0 }}>
       <ZoomLoadingOverlay
         isLoading={isLoading}
         currentStep={currentStep}
@@ -234,7 +233,8 @@ export function ZoomComponentView({
       <div 
         ref={containerRef}
         id="meetingSDKElement"
-        className="flex-1 w-full"
+        className="flex-1 w-full h-full p-0 m-0"
+        style={{ minHeight: 0, minWidth: 0 }}
       />
     </div>
   );
