@@ -119,3 +119,74 @@
   height: 100%;
   flex: 1;
 }
+
+/* Responsive overrides for Zoom SDK video components */
+#meetingSDKElement canvas,
+#meetingSDKElement video {
+  width: 100% !important;
+  height: 100% !important;
+  max-width: 100% !important;
+  max-height: 100% !important;
+  object-fit: contain;
+}
+
+/* Make Zoom's main video containers responsive */
+#meetingSDKElement div[class*="css-"] {
+  width: 100% !important;
+  height: 100% !important;
+}
+
+/* Specifically target the participant video containers */
+#meetingSDKElement ul[class*="css-"],
+#meetingSDKElement li[class*="css-"] {
+  width: 100% !important;
+  height: auto !important;
+  position: relative !important;
+  top: auto !important;
+  left: auto !important;
+}
+
+/* Self video element responsive override */
+#ZOOM_WEB_SDK_SELF_VIDEO {
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: cover;
+}
+
+/* Zoom SDK video canvas responsive override */
+#zoom-sdk-video-canvas {
+  width: 100% !important;
+  height: 100% !important;
+}
+
+/* Zoom meeting widget containers */
+.zoom-MuiPaper-root {
+  max-width: 100% !important;
+}
+
+/* Zoom video panel containers */
+div[role="tabpanel"] div[width],
+div[role="tabpanel"] canvas,
+div[role="tabpanel"] video,
+div[role="tabpanel"] ul {
+  width: 100% !important;
+  height: 100% !important;
+}
+
+/* Ensure participant thumbnails are responsive */
+.zoom-MuiListItem-root {
+  width: 100% !important;
+  height: auto !important;
+  position: relative !important;
+  top: auto !important;
+  left: auto !important;
+  margin: 4px !important;
+}
+
+/* Gallery view responsive adjustments */
+div[id*="suspension-view-tabpanel"] > div {
+  width: 100% !important;
+  height: 100% !important;
+  display: flex !important;
+  flex-direction: column !important;
+}
