@@ -1,3 +1,4 @@
+
 import { useEffect, useState, useCallback } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { useZoomSDK } from '@/hooks/useZoomSDK';
@@ -29,7 +30,7 @@ export function ZoomComponentView({
   const [currentStep, setCurrentStep] = useState('Initializing Zoom SDK...');
   const [retryCount, setRetryCount] = useState(0);
   const [hasJoinedOnce, setHasJoinedOnce] = useState(false);
-  const maxRetries = 2; // Reduced retries since we're implementing better session management
+  const maxRetries = 2;
   
   const { user } = useAuth();
 
@@ -204,10 +205,17 @@ export function ZoomComponentView({
         maxRetries={maxRetries}
       />
 
-      {/* Zoom meeting container - simplified */}
+      {/* Zoom meeting container - forced fullscreen */}
       <div 
         ref={containerRef}
-        className="w-full h-full"
+        className="absolute inset-0 w-full h-full"
+        style={{
+          width: '100%',
+          height: '100%',
+          position: 'absolute',
+          top: 0,
+          left: 0
+        }}
       />
     </div>
   );

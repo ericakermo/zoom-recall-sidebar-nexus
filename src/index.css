@@ -100,3 +100,51 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* Zoom SDK Override Styles - Force Full Container */
+.zoom-meeting-container {
+  position: relative !important;
+  width: 100% !important;
+  height: 100% !important;
+  overflow: hidden !important;
+}
+
+/* Target Zoom's embedded video container */
+.zoom-meeting-container > div {
+  width: 100% !important;
+  height: 100% !important;
+  position: absolute !important;
+  top: 0 !important;
+  left: 0 !important;
+}
+
+/* Override Zoom's default video sizing */
+.zoom-meeting-container video,
+.zoom-meeting-container canvas,
+.zoom-meeting-container [data-testid*="video"],
+.zoom-meeting-container [class*="video"] {
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: cover !important;
+}
+
+/* Hide Zoom's resize handles and drag elements */
+.zoom-meeting-container [class*="resize"],
+.zoom-meeting-container [class*="drag"],
+.zoom-meeting-container [class*="handle"] {
+  display: none !important;
+}
+
+/* Force Zoom meeting window to fill container */
+.zoom-meeting-container [class*="meeting-window"],
+.zoom-meeting-container [class*="video-window"],
+.zoom-meeting-container [role="application"] {
+  width: 100% !important;
+  height: 100% !important;
+  position: absolute !important;
+  top: 0 !important;
+  left: 0 !important;
+  transform: none !important;
+  margin: 0 !important;
+  border: none !important;
+}

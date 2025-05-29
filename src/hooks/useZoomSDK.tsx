@@ -59,9 +59,9 @@ export function useZoomSDK({ onReady, onError }: UseZoomSDKProps = {}) {
       
       clientRef.current = ZoomMtgEmbedded.createClient();
       
-      console.log('🔄 Initializing Zoom embedded client with basic configuration...');
+      console.log('🔄 Initializing Zoom embedded client with fullscreen configuration...');
       
-      // Use minimal, working configuration
+      // Force fullscreen configuration
       await clientRef.current.init({
         debug: true,
         zoomAppRoot: containerRef.current,
@@ -76,7 +76,23 @@ export function useZoomSDK({ onReady, onError }: UseZoomSDKProps = {}) {
                 width: '100%',
                 height: '100%'
               }
+            },
+            popper: {
+              disableDraggable: true,
+              anchorElement: containerRef.current,
+              placement: 'top'
             }
+          },
+          toolbar: {
+            buttons: [
+              {
+                text: 'Custom Button',
+                className: 'CustomButton',
+                onClick: () => {
+                  console.log('custom button');
+                }
+              }
+            ]
           }
         }
       });
@@ -84,7 +100,7 @@ export function useZoomSDK({ onReady, onError }: UseZoomSDKProps = {}) {
       setIsSDKLoaded(true);
       setIsReady(true);
       onReady?.();
-      console.log('✅ Zoom embedded client initialized successfully with basic configuration');
+      console.log('✅ Zoom embedded client initialized successfully with fullscreen configuration');
     } catch (error: any) {
       console.error('❌ Failed to initialize Zoom embedded client:', error);
       initializationRef.current = false;
