@@ -195,27 +195,34 @@ export function ZoomComponentView({
   }
 
   return (
-    <div className="flex flex-col w-full h-full bg-gray-900 rounded-lg overflow-hidden p-0 m-0" style={{ minHeight: 0, minWidth: 0 }}>
-      <ZoomLoadingOverlay
-        isLoading={isLoading}
-        currentStep={currentStep}
-        meetingNumber={meetingNumber}
-        retryCount={retryCount}
-        maxRetries={maxRetries}
-      />
+    <div class="flex flex-col h-full bg-gray-50 rounded-lg overflow-hidden">
+      <div class="flex items-center justify-between p-4 bg-white border-b">
+        <!-- header -->
+      </div>
+      <div class="flex-1">
+        <div class="flex flex-col w-full h-full bg-gray-900 rounded-lg overflow-hidden p-0 m-0" style="min-height: 0px; min-width: 0px;">
+          <ZoomLoadingOverlay
+            isLoading={isLoading}
+            currentStep={currentStep}
+            meetingNumber={meetingNumber}
+            retryCount={retryCount}
+            maxRetries={maxRetries}
+          />
 
-      {/* Zoom meeting container - now takes full available space */}
-      <div 
-        ref={containerRef}
-        id="meetingSDKElement"
-        className="flex-1 w-full h-full p-0 m-0 relative"
-        style={{ 
-          minHeight: 0, 
-          minWidth: 0,
-          display: 'flex',
-          flexDirection: 'column'
-        }}
-      />
+          {/* Zoom meeting container - now takes full available space */}
+          <div 
+            ref={containerRef}
+            id="meetingSDKElement"
+            className="flex-1 w-full h-full p-0 m-0 relative"
+            style={{ 
+              minHeight: 0, 
+              minWidth: 0,
+              display: 'flex',
+              flexDirection: 'column'
+            }}
+          />
+        </div>
+      </div>
     </div>
   );
 }
