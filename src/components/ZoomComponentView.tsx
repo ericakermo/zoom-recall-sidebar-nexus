@@ -15,7 +15,7 @@ export function ZoomComponentView({
   meetingNumber,
   meetingPassword,
   userName,
-  role = 0,
+  role = 1,
   onMeetingJoined,
   onMeetingError,
   onMeetingLeft
