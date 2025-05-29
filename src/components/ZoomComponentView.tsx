@@ -1,3 +1,4 @@
+
 import { useEffect, useState, useCallback } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { useZoomSDK } from '@/hooks/useZoomSDK';
@@ -29,7 +30,7 @@ export function ZoomComponentView({
   const [currentStep, setCurrentStep] = useState('Initializing Zoom SDK...');
   const [retryCount, setRetryCount] = useState(0);
   const [hasJoinedOnce, setHasJoinedOnce] = useState(false);
-  const maxRetries = 2;
+  const maxRetries = 2; // Reduced retries since we're implementing better session management
   
   const { user } = useAuth();
 
@@ -195,7 +196,7 @@ export function ZoomComponentView({
   }
 
   return (
-    <div className="zoom-container-wrapper">
+    <div className="relative w-full h-full bg-gray-900 rounded-lg overflow-hidden">
       <ZoomLoadingOverlay
         isLoading={isLoading}
         currentStep={currentStep}
@@ -204,10 +205,11 @@ export function ZoomComponentView({
         maxRetries={maxRetries}
       />
 
-      {/* Zoom meeting container - now uses proper responsive wrapper */}
+      {/* Zoom meeting container */}
       <div 
         ref={containerRef}
         id="meetingSDKElement"
+        className="w-full h-full"
       />
     </div>
   );
