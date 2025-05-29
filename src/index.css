@@ -1,4 +1,3 @@
-
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -101,28 +100,20 @@
   }
 }
 
-/* Zoom Meeting SDK Container - Provide proper container without interfering with internal layout */
+/* Zoom Meeting SDK Container - Simple and minimal approach */
 #meetingSDKElement {
   width: 100%;
   height: 100%;
   max-height: 600px;
   position: relative;
-  display: flex;
-  flex-direction: column;
+  display: block;
   background-color: #000;
   border-radius: 8px;
   overflow: hidden;
 }
 
-/* Let Zoom SDK handle its own internal layout - minimal container setup */
+/* Minimal styling - let Zoom handle everything internally */
 #meetingSDKElement > div {
   width: 100%;
   height: 100%;
-  flex: 1;
-}
-
-/* Only ensure the main container itself is responsive - don't override internal Zoom positioning */
-#meetingSDKElement canvas,
-#meetingSDKElement video {
-  object-fit: contain;
 }
