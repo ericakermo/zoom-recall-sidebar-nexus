@@ -196,7 +196,7 @@ export function ZoomComponentView({
   }
 
   return (
-    <div className="absolute inset-0">
+    <div className="relative w-full h-full">
       <ZoomLoadingOverlay
         isLoading={isLoading}
         currentStep={currentStep}
@@ -205,11 +205,13 @@ export function ZoomComponentView({
         maxRetries={maxRetries}
       />
 
-      {/* Zoom meeting container - fixed positioned and non-draggable */}
-      <div 
-        ref={containerRef}
-        className="zoom-container"
-      />
+      {/* Zoom meeting container - fixed size, non-draggable, centered */}
+      <div className="zoom-meeting-wrapper">
+        <div 
+          ref={containerRef}
+          className="zoom-fixed-container"
+        />
+      </div>
     </div>
   );
 }

@@ -60,22 +60,19 @@ export function useZoomSDK({ onReady, onError }: UseZoomSDKProps = {}) {
       
       console.log('🔄 Initializing Zoom embedded client...');
       
-      // Minimal SDK configuration focused on non-draggable fixed container
+      // Simple SDK configuration without aggressive overrides
       await clientRef.current.init({
         debug: true,
         zoomAppRoot: containerRef.current,
         language: 'en-US',
         patchJsMedia: true,
-        leaveOnPageUnload: true,
-        // Force container to be non-draggable and fixed size
-        enforceGalleryView: true,
-        disableDraggable: true
+        leaveOnPageUnload: true
       });
 
       setIsSDKLoaded(true);
       setIsReady(true);
       onReady?.();
-      console.log('✅ Zoom embedded client initialized with fixed container settings');
+      console.log('✅ Zoom embedded client initialized successfully');
     } catch (error: any) {
       console.error('❌ Failed to initialize Zoom embedded client:', error);
       initializationRef.current = false;

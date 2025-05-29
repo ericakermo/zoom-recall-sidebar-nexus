@@ -101,44 +101,52 @@
   }
 }
 
-/* Fixed zoom container that prevents dragging/resizing */
-.zoom-container {
-  @apply fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 max-w-full max-h-screen w-[720px] h-[480px] sm:w-[90vw] sm:h-[60vh];
-  z-index: 10;
+/* Zoom meeting wrapper - centers the container */
+.zoom-meeting-wrapper {
+  @apply w-full h-full flex items-center justify-center;
+  position: relative;
   overflow: hidden;
-  pointer-events: auto;
 }
 
-/* Override Zoom SDK's draggable elements */
-.zoom-container .react-draggable {
-  transform: none !important;
+/* Fixed zoom container that prevents dragging/resizing */
+.zoom-fixed-container {
+  width: 720px;
+  height: 480px;
+  max-width: 90vw;
+  max-height: 80vh;
+  position: relative;
+  overflow: hidden;
+  border-radius: 8px;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+}
+
+/* Responsive adjustments for smaller screens */
+@media (max-width: 640px) {
+  .zoom-fixed-container {
+    width: 90vw;
+    height: 60vh;
+  }
+}
+
+/* Override Zoom SDK's draggable behavior */
+.zoom-fixed-container .react-draggable {
   position: static !important;
-  width: 100% !important;
-  height: 100% !important;
+  transform: none !important;
 }
 
 /* Hide resize handles */
-.zoom-container .react-resizable-handle {
+.zoom-fixed-container .react-resizable-handle {
   display: none !important;
 }
 
-/* Ensure Zoom elements fill the container */
-.zoom-container > div {
-  width: 100% !important;
-  height: 100% !important;
-  position: static !important;
-  transform: none !important;
-}
-
-/* Force the Zoom meeting interface to fill container */
-.zoom-container .zoom-MuiBox-root {
-  width: 100% !important;
-  height: 100% !important;
-  max-width: none !important;
-  max-height: none !important;
-}
-
-/* Disable dragging on the main meeting container */
-.zoom-container .zoommtg-drag-video {
+/* Prevent dragging on zoom elements */
+.zoom-fixed-container .zoommtg-drag-video {
   cursor: default !important;
+  pointer-events: none !important;
+}
+
+/* Ensure zoom interface fills the container properly */
+.zoom-fixed-container > div {
+  width: 100% !important;
+  height: 100% !important;
 }
