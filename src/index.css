@@ -1,3 +1,4 @@
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -126,5 +127,33 @@
 #meetingSDKElement .zoom-video-container {
   max-width: 100% !important;
   max-height: 100% !important;
+  object-fit: contain !important;
+}
+
+/* Target the specific Zoom UI elements from your snippet */
+#meetingSDKElement .react-draggable,
+#meetingSDKElement .zoom-MuiBox-root,
+#meetingSDKElement .zoom-MuiPaper-root {
+  max-width: 100% !important;
+  max-height: 100% !important;
+}
+
+/* Ensure canvas elements maintain aspect ratio within bounds */
+#meetingSDKElement canvas[aria-label="Screen share"],
+#meetingSDKElement canvas[aria-label="Participant Videos"],
+#meetingSDKElement #zoom-sdk-video-canvas {
+  max-width: 100% !important;
+  max-height: 100% !important;
+  width: auto !important;
+  height: auto !important;
+  object-fit: contain !important;
+}
+
+/* Constrain video elements specifically */
+#meetingSDKElement #ZOOM_WEB_SDK_SELF_VIDEO {
+  max-width: 100% !important;
+  max-height: 100% !important;
+  width: auto !important;
+  height: auto !important;
   object-fit: contain !important;
 }
