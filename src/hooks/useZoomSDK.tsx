@@ -106,13 +106,38 @@ export function useZoomSDK({ onReady, onError }: UseZoomSDKProps = {}) {
   }, [onReady, onError]);
 
   const setupSpeakerView = useCallback(async () => {
-    if (!clientRef.current || !isJoined) {
-      console.log('⏸️ Cannot setup speaker view - client not ready or not joined');
+    console.log('🔄 setupSpeakerView called with state:', { 
+      hasClient: !!clientRef.current, 
+      isJoined,
+      cleanupInProgress: cleanupInProgressRef.current 
+    });
+
+    if (!clientRef.current || !isJoined || cleanupInProgressRef.current) {
+      console.log('⏸️ Cannot setup speaker view - conditions not met');
       return;
     }
 
     try {
-      console.log('🔄 Setting up speaker view and pinning own video...');
+      console.log('🔄 Setting up speaker view and video...');
+      
+      // Wait a bit for the meeting to fully load
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      // Enable video first
+      const mediaStream = clientRef.current.getMediaStream();
+      if (mediaStream) {
+        console.log('🔄 Starting video...');
+        if (typeof mediaStream.startVideo === 'function') {
+          await mediaStream.startVideo();
+          console.log('✅ Video started');
+        }
+        
+        // Unmute audio
+        if (typeof mediaStream.unmuteAudio === 'function') {
+          await mediaStream.unmuteAudio();
+          console.log('✅ Audio unmuted');
+        }
+      }
       
       // Set to speaker view (not gallery view)
       if (typeof clientRef.current.setGalleryView === 'function') {
@@ -121,19 +146,28 @@ export function useZoomSDK({ onReady, onError }: UseZoomSDKProps = {}) {
       }
 
       // Get current user and pin their video
-      if (typeof clientRef.current.getCurrentUserInfo === 'function' && 
-          typeof clientRef.current.getMediaStream === 'function') {
-        
-        const currentUser = await clientRef.current.getCurrentUserInfo();
-        const mediaStream = clientRef.current.getMediaStream();
-        
-        if (currentUser?.userId && mediaStream?.pinVideo) {
-          await mediaStream.pinVideo({ userId: currentUser.userId });
-          console.log('✅ Own video pinned in speaker view');
-        }
+      const currentUser = await clientRef.current.getCurrentUserInfo();
+      console.log('📍 Current user info:', currentUser);
+      
+      if (currentUser?.userId && mediaStream?.pinVideo) {
+        await mediaStream.pinVideo({ userId: currentUser.userId });
+        console.log('✅ Own video pinned in speaker view');
       }
+      
+      console.log('✅ Speaker view setup completed');
     } catch (error) {
-      console.warn('⚠️ Speaker view setup warning (non-critical):', error);
+      console.error('❌ Speaker view setup error:', error);
+      // Try alternative approach
+      try {
+        console.log('🔄 Trying alternative video setup...');
+        const mediaStream = clientRef.current.getMediaStream();
+        if (mediaStream && typeof mediaStream.startVideo === 'function') {
+          await mediaStream.startVideo();
+          console.log('✅ Video started via alternative method');
+        }
+      } catch (altError) {
+        console.warn('⚠️ Alternative video setup also failed:', altError);
+      }
     }
   }, [isJoined]);
 
@@ -189,13 +223,14 @@ export function useZoomSDK({ onReady, onError }: UseZoomSDKProps = {}) {
         zak: joinConfig.zak || ''
       });
       
+      console.log('✅ Successfully joined meeting, setting isJoined to true');
       setIsJoined(true);
-      console.log('✅ Successfully joined meeting');
       
-      // Setup speaker view after successful join
-      setTimeout(() => {
-        setupSpeakerView();
-      }, 2000); // Small delay to ensure meeting is fully loaded
+      // Setup speaker view with a longer delay to ensure meeting is fully ready
+      setTimeout(async () => {
+        console.log('🔄 Delayed speaker view setup starting...');
+        await setupSpeakerView();
+      }, 3000);
       
       return result;
     } catch (error: any) {
