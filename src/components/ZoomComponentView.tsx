@@ -1,7 +1,6 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { useZoomSDK } from '@/hooks/useZoomSDK';
-import { ZoomMeetingControls } from '@/components/zoom/ZoomMeetingControls';
 import { ZoomLoadingOverlay } from '@/components/zoom/ZoomLoadingOverlay';
 import { ZoomErrorDisplay } from '@/components/zoom/ZoomErrorDisplay';
 import { supabase } from '@/integrations/supabase/client';
@@ -254,16 +253,11 @@ export function ZoomComponentView({
         maxRetries={maxRetries}
       />
 
-      {/* Zoom meeting container - full space with no custom controls */}
+      {/* Zoom meeting container - properly configured for SDK */}
       <div 
         ref={containerRef}
         id="meetingSDKElement"
         className="w-full h-full"
-        style={{ 
-          position: 'relative',
-          minHeight: '100%',
-          minWidth: '100%'
-        }}
       />
     </div>
   );

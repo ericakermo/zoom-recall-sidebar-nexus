@@ -54,24 +54,29 @@ export function useZoomSDK({ onReady, onError }: UseZoomSDKProps = {}) {
         console.log('✅ Using existing global Zoom client');
       }
       
-      console.log('🔄 Initializing Zoom embedded client...');
+      console.log('🔄 Initializing Zoom embedded client with proper dimension settings...');
       
       await clientRef.current.init({
+        debug: true,
         zoomAppRoot: containerRef.current,
         language: 'en-US',
         patchJsMedia: true,
         leaveOnPageUnload: false,
         customize: {
           video: {
-            isResizable: false, // Let Zoom handle sizing
+            isResizable: false,
             viewSizes: {
               default: {
                 width: '100%',
                 height: '100%'
+              },
+              ribbon: {
+                width: '25%',
+                height: '100%'
               }
             },
             popper: {
-              disableDraggable: true // Prevent dragging to let it fill container
+              disableDraggable: true
             }
           },
           toolbar: {
@@ -92,7 +97,7 @@ export function useZoomSDK({ onReady, onError }: UseZoomSDKProps = {}) {
       setIsSDKLoaded(true);
       setIsReady(true);
       onReady?.();
-      console.log('✅ Zoom embedded client initialized successfully');
+      console.log('✅ Zoom embedded client initialized successfully with custom dimensions');
     } catch (error: any) {
       console.error('❌ Failed to initialize Zoom embedded client:', error);
       initializationRef.current = false;

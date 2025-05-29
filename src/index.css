@@ -1,3 +1,4 @@
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -100,48 +101,25 @@
   }
 }
 
-/* Zoom Meeting Styles - Updated for 2025 SDK */
-#zmmtg-root {
-  display: block;
-  position: fixed;
-  width: 100%;
-  height: 100%;
-  top: 0;
-  left: 0;
-  z-index: 1000;
-}
-
-.zoom-meeting {
-  position: relative;
-}
-
-.ReactModalPortal {
-  z-index: 1001;
-}
-
-/* Zoom Component View Styles - Optimized for latest SDK */
-.zoom-app {
-  width: 100%;
-  height: 100%;
-  min-height: 500px;
-}
-
+/* Zoom Meeting SDK Styles - Following Zoom's Best Practices */
 #meetingSDKElement {
   width: 100% !important;
   height: 100% !important;
+  position: relative !important;
+  display: flex !important;
+  flex-direction: column !important;
   border-radius: 8px;
   overflow: hidden;
-  position: relative !important;
 }
 
-/* Force Zoom's main container to fill parent */
+/* Ensure Zoom's main container fills the space properly */
 #meetingSDKElement > div[aria-label="Zoom app container"] {
   width: 100% !important;
   height: 100% !important;
   position: relative !important;
 }
 
-/* Make the draggable container fill the space */
+/* Fix for draggable container to fill space without transform issues */
 #meetingSDKElement .react-draggable {
   width: 100% !important;
   height: 100% !important;
@@ -149,21 +127,14 @@
   transform: none !important;
 }
 
-/* Force the MuiBox container to fill */
-#meetingSDKElement .zoom-MuiBox-root.css-1vu2yqv {
+/* Ensure MuiBox containers use full space */
+#meetingSDKElement .zoom-MuiBox-root {
   width: 100% !important;
   height: 100% !important;
   position: relative !important;
 }
 
-/* Make the resizable container fill */
-#meetingSDKElement .react-resizable.zoom-MuiBox-root {
-  width: 100% !important;
-  height: 100% !important;
-  position: relative !important;
-}
-
-/* Force the main paper container to fill */
+/* Make sure the paper container fills properly */
 #meetingSDKElement .zoom-MuiPaper-root {
   width: 100% !important;
   height: 100% !important;
@@ -171,17 +142,16 @@
   margin: 0 !important;
 }
 
-/* Ensure video participants fill the available space */
+/* Video participant containers */
 #meetingSDKElement .zoom-MuiListItem-root,
 #meetingSDKElement li[aria-label*="Avatar"] {
   width: 100% !important;
   height: 100% !important;
   max-width: 100% !important;
   max-height: 100% !important;
-  position: relative !important;
 }
 
-/* Ensure video content takes full container space */
+/* Video content sizing */
 #meetingSDKElement .zoom-MuiCardMedia-root,
 #meetingSDKElement .zoom-MuiCardMedia-img,
 #meetingSDKElement img[alt*="avatar"] {
@@ -190,7 +160,7 @@
   object-fit: cover !important;
 }
 
-/* Force video grid to use full space */
+/* Video grid layout */
 #meetingSDKElement .zoom-MuiList-root,
 #meetingSDKElement ul {
   width: 100% !important;
@@ -199,23 +169,7 @@
   margin: 0 !important;
 }
 
-/* Override any fixed dimensions from Zoom */
-#meetingSDKElement * {
-  max-width: 100% !important;
-  max-height: 100% !important;
-}
-
-/* Ensure all Zoom containers respect the parent dimensions */
-#meetingSDKElement .zoom-MuiBox-root,
-#meetingSDKElement .zm-video-container,
-#meetingSDKElement .video-container,
-#meetingSDKElement [class*="video"],
-#meetingSDKElement [class*="participant"] {
-  width: 100% !important;
-  height: 100% !important;
-}
-
-/* Keep Zoom's native toolbar visible and properly positioned */
+/* Keep Zoom's native toolbar positioned correctly */
 #meetingSDKElement .zm-toolbar,
 #meetingSDKElement [class*="toolbar"],
 #meetingSDKElement [class*="control-bar"] {
