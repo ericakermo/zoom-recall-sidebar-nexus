@@ -101,11 +101,11 @@
   }
 }
 
-/* Zoom Meeting SDK Container - Keep main container constrained */
+/* Zoom Meeting SDK Container - Provide proper container without interfering with internal layout */
 #meetingSDKElement {
   width: 100%;
   height: 100%;
-  max-height: 600px; /* Constrain maximum height */
+  max-height: 600px;
   position: relative;
   display: flex;
   flex-direction: column;
@@ -114,67 +114,15 @@
   overflow: hidden;
 }
 
-/* Let Zoom SDK handle its own internal styling - minimal container setup */
+/* Let Zoom SDK handle its own internal layout - minimal container setup */
 #meetingSDKElement > div {
   width: 100%;
   height: 100%;
   flex: 1;
 }
 
-/* Make internal Zoom video elements responsive within the constrained container */
+/* Only ensure the main container itself is responsive - don't override internal Zoom positioning */
 #meetingSDKElement canvas,
 #meetingSDKElement video {
-  max-width: 100% !important;
-  max-height: 100% !important;
   object-fit: contain;
-}
-
-/* Target specific Zoom video containers for responsiveness */
-#meetingSDKElement .zoom-MuiPaper-root {
-  max-width: 100% !important;
-}
-
-/* Make video panel containers responsive within bounds */
-#meetingSDKElement div[role="tabpanel"] canvas,
-#meetingSDKElement div[role="tabpanel"] video {
-  max-width: 100% !important;
-  max-height: 100% !important;
-  object-fit: contain;
-}
-
-/* Self video element - responsive but contained */
-#ZOOM_WEB_SDK_SELF_VIDEO {
-  max-width: 100% !important;
-  max-height: 100% !important;
-  object-fit: cover;
-}
-
-/* Zoom SDK video canvas - responsive but contained */
-#zoom-sdk-video-canvas {
-  max-width: 100% !important;
-  max-height: 100% !important;
-}
-
-/* Ensure participant thumbnails are responsive but not oversized */
-#meetingSDKElement .zoom-MuiListItem-root {
-  max-width: 100% !important;
-  position: relative !important;
-  top: auto !important;
-  left: auto !important;
-  margin: 4px !important;
-}
-
-/* Gallery view responsive adjustments - contained within parent */
-#meetingSDKElement div[id*="suspension-view-tabpanel"] > div {
-  max-width: 100% !important;
-  max-height: 100% !important;
-  display: flex !important;
-  flex-direction: column !important;
-}
-
-/* Prevent the main Zoom widget from growing beyond container */
-#meetingSDKElement .zoom-MuiPaper-root {
-  max-width: 100% !important;
-  max-height: 100% !important;
-  box-sizing: border-box;
 }
