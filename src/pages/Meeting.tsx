@@ -115,9 +115,9 @@ const Meeting = () => {
   const isHost = meetingData.user_id === user.id;
 
   return (
-    <div className="h-screen flex flex-col bg-gray-50">
+    <div className="min-h-screen flex flex-col bg-gray-50">
       {/* Header - Fixed at top */}
-      <div className="flex items-center justify-between p-4 bg-white border-b shadow-sm z-10">
+      <div className="h-14 flex items-center justify-between p-4 bg-white border-b shadow-sm z-10">
         <Button 
           variant="ghost" 
           size="sm" 
@@ -140,8 +140,8 @@ const Meeting = () => {
       </div>
 
       {/* Main meeting area - Takes remaining space */}
-      <div className="flex-1 p-6">
-        <div className="h-full max-w-7xl mx-auto">
+      <main className="flex-1 flex justify-center items-center bg-gray-900 p-4">
+        <div className="w-full max-w-[1200px] h-full relative">
           <ZoomMeeting
             meetingNumber={meetingData.meeting_id}
             meetingPassword={meetingPassword}
@@ -150,7 +150,7 @@ const Meeting = () => {
             onMeetingEnd={handleMeetingEnd}
           />
         </div>
-      </div>
+      </main>
     </div>
   );
 };

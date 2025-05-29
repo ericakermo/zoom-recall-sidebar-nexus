@@ -86,15 +86,18 @@
   }
 }
 
-/* Zoom Meeting SDK Container - Optimized for maximum space utilization */
+/* Zoom Meeting SDK Container - Optimized with flex layout */
 #meetingSDKElement {
   width: 100% !important;
   height: 100% !important;
-  position: relative;
-  display: block;
-  background-color: #000;
+  display: flex !important;
+  flex-direction: column !important;
+  justify-content: flex-start !important;
+  align-items: center !important;
+  background-color: #000 !important;
+  overflow: hidden !important;
+  position: relative !important;
   border-radius: 8px;
-  overflow: hidden;
   padding: 0 !important;
   margin: 0 !important;
 }
@@ -119,12 +122,12 @@
   max-height: none !important;
 }
 
-/* Enhanced video elements for maximum space utilization */
+/* Force object-fit: cover for Zoom Videos */
 #meetingSDKElement video,
 #meetingSDKElement canvas {
+  object-fit: cover !important;
   width: 100% !important;
   height: 100% !important;
-  object-fit: cover !important;
   border-radius: 0 !important;
   padding: 0 !important;
   margin: 0 !important;

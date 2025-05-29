@@ -58,33 +58,28 @@ export function useZoomSDK({ onReady, onError }: UseZoomSDKProps = {}) {
       
       clientRef.current = ZoomMtgEmbedded.createClient();
       
-      console.log('🔄 Initializing Zoom embedded client with space-optimized dimensions...');
+      console.log('🔄 Initializing Zoom embedded client with dynamic dimensions...');
       
-      // Get container dimensions and maximize video space utilization
-      let meetingSDKElement = containerRef.current;
-      const containerWidth = meetingSDKElement.offsetWidth || 1200;
-      const containerHeight = meetingSDKElement.offsetHeight || 700;
+      // Get dynamic container dimensions
+      const container = containerRef.current;
+      const { width, height } = container.getBoundingClientRect();
       
-      // Use much more space for video content - 98% width and 90% height
-      const videoWidth = Math.floor(containerWidth * 0.98);
-      const videoHeight = Math.floor(containerHeight * 0.90);
-      
-      console.log(`📏 Optimized for space: Container ${containerWidth}x${containerHeight}, Video ${videoWidth}x${videoHeight}`);
+      console.log(`📏 Container dimensions: ${width}x${height}`);
       
       await clientRef.current.init({
-        zoomAppRoot: meetingSDKElement,
+        zoomAppRoot: container,
         language: 'en-US',
         customize: {
           video: {
             isResizable: true,
             viewSizes: {
               default: {
-                width: videoWidth,
-                height: videoHeight
+                width: Math.floor(width * 0.95),
+                height: Math.floor(height * 0.85)
               },
               ribbon: {
-                width: Math.floor(videoWidth * 0.35),
-                height: videoHeight
+                width: Math.floor(width * 0.3),
+                height: Math.floor(height * 0.9)
               }
             }
           }
@@ -94,7 +89,7 @@ export function useZoomSDK({ onReady, onError }: UseZoomSDKProps = {}) {
       setIsSDKLoaded(true);
       setIsReady(true);
       onReady?.();
-      console.log('✅ Zoom embedded client initialized with space-optimized video dimensions');
+      console.log('✅ Zoom embedded client initialized with dynamic video dimensions');
     } catch (error: any) {
       console.error('❌ Failed to initialize Zoom embedded client:', error);
       initializationRef.current = false;
