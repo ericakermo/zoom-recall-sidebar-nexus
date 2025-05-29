@@ -64,19 +64,21 @@ serve(async (req) => {
       console.error("No Zoom connection found for user:", connectionError);
       return new Response(
         JSON.stringify({ 
-          canJoin: false, 
-          reason: 'No Zoom connection found. Please connect your Zoom account first.' 
+          canJoin: true, // Allow join attempt even without connection validation
+          reason: 'No Zoom connection found - proceeding without validation',
+          meetingStatus: 'unknown'
         }),
         { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    // Check if token has expired and refresh if needed
+    // Check if token has expired and refresh if needed with buffer
     const now = new Date();
     const expiresAt = new Date(zoomConnection.expires_at);
+    const bufferTime = 5 * 60 * 1000; // 5 minutes buffer
     let accessToken = zoomConnection.access_token;
 
-    if (now >= expiresAt) {
+    if (now.getTime() >= (expiresAt.getTime() - bufferTime)) {
       console.log("Access token expired, refreshing...");
       
       const refreshResponse = await fetch('https://zoom.us/oauth/token', {
@@ -95,8 +97,9 @@ serve(async (req) => {
         console.error("Failed to refresh token");
         return new Response(
           JSON.stringify({ 
-            canJoin: false, 
-            reason: 'Failed to refresh Zoom token. Please reconnect your Zoom account.' 
+            canJoin: true, // Allow join attempt even if refresh fails
+            reason: 'Token refresh failed - proceeding without validation',
+            meetingStatus: 'unknown'
           }),
           { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
@@ -117,85 +120,86 @@ serve(async (req) => {
         .eq('user_id', user.id);
     }
 
-    // Get meeting details from Zoom
+    // Get meeting details from Zoom with timeout
     console.log("Fetching meeting details from Zoom API");
-    const meetingResponse = await fetch(`https://api.zoom.us/v2/meetings/${meetingId}`, {
-      headers: {
-        'Authorization': `Bearer ${accessToken}`
-      }
-    });
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
 
-    if (!meetingResponse.ok) {
-      if (meetingResponse.status === 404) {
+    try {
+      const meetingResponse = await fetch(`https://api.zoom.us/v2/meetings/${meetingId}`, {
+        headers: {
+          'Authorization': `Bearer ${accessToken}`
+        },
+        signal: controller.signal
+      });
+
+      clearTimeout(timeoutId);
+
+      if (!meetingResponse.ok) {
+        if (meetingResponse.status === 404) {
+          return new Response(
+            JSON.stringify({ 
+              canJoin: false, 
+              reason: 'Meeting not found or has been deleted',
+              meetingStatus: 'not_found'
+            }),
+            { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+        
+        // For other errors, allow join attempt
         return new Response(
           JSON.stringify({ 
-            canJoin: false, 
-            reason: 'Meeting not found or has been deleted' 
+            canJoin: true, 
+            reason: 'Could not validate meeting status - proceeding with join attempt',
+            meetingStatus: 'unknown'
           }),
           { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
-      
-      const errorText = await meetingResponse.text();
-      console.error("Failed to get meeting details:", errorText);
+
+      const meetingData = await meetingResponse.json();
+      console.log("Meeting data retrieved:", {
+        status: meetingData.status,
+        type: meetingData.type,
+        start_time: meetingData.start_time
+      });
+
+      // Always allow join attempt - let Zoom SDK handle the actual validation
       return new Response(
         JSON.stringify({ 
-          canJoin: false, 
-          reason: 'Failed to validate meeting status' 
+          canJoin: true, 
+          reason: 'Meeting validation successful',
+          meetingStatus: meetingData.status,
+          startTime: meetingData.start_time,
+          duration: meetingData.duration,
+          joinBeforeHost: meetingData.settings?.join_before_host || false
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    } catch (error) {
+      clearTimeout(timeoutId);
+      console.warn('Meeting validation timeout or error:', error);
+      
+      // On timeout or error, allow join attempt
+      return new Response(
+        JSON.stringify({ 
+          canJoin: true, 
+          reason: 'Meeting validation timed out - proceeding with join attempt',
+          meetingStatus: 'unknown'
         }),
         { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
-
-    const meetingData = await meetingResponse.json();
-    console.log("Meeting data retrieved:", {
-      status: meetingData.status,
-      type: meetingData.type,
-      start_time: meetingData.start_time
-    });
-
-    // Validate meeting status
-    const currentTime = new Date();
-    const startTime = new Date(meetingData.start_time);
-    const endTime = new Date(startTime.getTime() + (meetingData.duration * 60000));
-
-    let canJoin = true;
-    let reason = '';
-
-    // Check if meeting has ended
-    if (currentTime > endTime) {
-      canJoin = false;
-      reason = 'Meeting has already ended';
-    }
-    // Check if it's an instant meeting (type 1) or scheduled meeting (type 2)
-    else if (meetingData.type === 2) {
-      // For scheduled meetings, check if it's too early
-      const allowedEarlyJoin = 10 * 60 * 1000; // 10 minutes before start time
-      if (currentTime < new Date(startTime.getTime() - allowedEarlyJoin)) {
-        canJoin = false;
-        reason = 'Meeting has not started yet. You can join 10 minutes before the scheduled start time.';
-      }
-    }
-
-    return new Response(
-      JSON.stringify({ 
-        canJoin, 
-        reason,
-        meetingStatus: meetingData.status,
-        startTime: meetingData.start_time,
-        duration: meetingData.duration,
-        joinBeforeHost: meetingData.settings?.join_before_host || false
-      }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
   } catch (error) {
     console.error('Error validating meeting status:', error);
     return new Response(
       JSON.stringify({ 
-        canJoin: false, 
-        reason: 'Internal server error while validating meeting status' 
+        canJoin: true, // Always allow join attempt as fallback
+        reason: 'Validation error - proceeding with join attempt',
+        meetingStatus: 'unknown'
       }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
 });
