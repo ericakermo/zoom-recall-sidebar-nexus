@@ -11,9 +11,6 @@ import Profile from "./pages/Profile";
 import Settings from "./pages/Settings";
 import Meetings from "./pages/Meetings";
 import Meeting from "./pages/Meeting";
-import ZoomSample from "./pages/ZoomSample";
-import JoinMeeting from "./pages/JoinMeeting";
-import NotFound from "./pages/NotFound";
 import Auth from "./pages/Auth";
 import { AuthProvider } from "./context/AuthContext";
 import ProtectedRoute from "./components/ProtectedRoute";
@@ -71,21 +68,6 @@ const App = () => (
                 </Layout>
               </ProtectedRoute>
             } />
-            <Route path="/meetings/join" element={
-              <ProtectedRoute>
-                <Layout>
-                  <JoinMeeting />
-                </Layout>
-              </ProtectedRoute>
-            } />
-            <Route path="/zoom-sample" element={
-              <ProtectedRoute>
-                <Layout>
-                  <ZoomSample />
-                </Layout>
-              </ProtectedRoute>
-            } />
-            <Route path="*" element={<NotFound />} />
           </Routes>
         </AuthProvider>
       </BrowserRouter>
