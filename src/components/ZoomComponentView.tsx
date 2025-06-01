@@ -34,23 +34,55 @@ export function ZoomComponentView({
   const [error, setError] = useState<string | null>(null);
   const [currentStep, setCurrentStep] = useState('Loading Zoom SDK...');
   const [retryCount, setRetryCount] = useState(0);
-  const [hasAttemptedJoin, setHasAttemptedJoin] = useState(false);
-  const [client, setClient] = useState<any>(null);
+  const [joinState, setJoinState] = useState<'idle' | 'loading' | 'joining' | 'joined' | 'failed'>('idle');
   const maxRetries = 2;
   
   const { user } = useAuth();
   const containerRef = useRef<HTMLDivElement>(null);
+  const clientRef = useRef<any>(null);
+  const joinAttemptRef = useRef(false);
+  const mountedRef = useRef(true);
 
   // Debug logging helper
   const debugLog = useCallback((message: string, data?: any) => {
-    console.log(`🔍 [ZOOM-EMBEDDED] ${message}`, data || '');
+    console.log(`🔍 [ZOOM-STABLE] ${message}`, data || '');
   }, []);
 
-  // Load Zoom SDK scripts dynamically
+  // Stable token fetching function
+  const getTokens = useCallback(async (meetingNumber: string, role: number) => {
+    debugLog('Requesting tokens for meeting:', { meetingNumber, role });
+    
+    const { data: tokenData, error: tokenError } = await supabase.functions.invoke('get-zoom-token', {
+      body: {
+        meetingNumber,
+        role: role || 0,
+        expirationSeconds: 7200
+      }
+    });
+
+    if (tokenError) {
+      throw new Error(`Token error: ${tokenError.message}`);
+    }
+
+    // Get ZAK token for host role
+    let zakToken = null;
+    if (role === 1) {
+      const { data: zakData, error: zakError } = await supabase.functions.invoke('get-zoom-zak');
+      
+      if (zakError || !zakData?.zak) {
+        throw new Error('Host role requires ZAK token - please try again');
+      }
+      
+      zakToken = zakData.zak;
+    }
+
+    return { ...tokenData, zak: zakToken };
+  }, [debugLog]);
+
+  // Load Zoom SDK scripts
   const loadZoomSDK = useCallback(() => {
     return new Promise<void>((resolve, reject) => {
       if (window.ZoomMtgEmbedded) {
-        debugLog('Zoom SDK already loaded');
         resolve();
         return;
       }
@@ -63,86 +95,58 @@ export function ZoomComponentView({
 
       let loadedCount = 0;
       
-      scripts.forEach((src, index) => {
+      scripts.forEach((src) => {
         const script = document.createElement('script');
         script.src = src;
-        script.async = false; // Ensure order
+        script.async = false;
         
         script.onload = () => {
           loadedCount++;
-          debugLog(`Loaded script ${index + 1}/${scripts.length}: ${src}`);
-          
           if (loadedCount === scripts.length) {
-            debugLog('All Zoom SDK scripts loaded successfully');
             resolve();
           }
         };
         
         script.onerror = () => {
-          debugLog(`Failed to load script: ${src}`);
           reject(new Error(`Failed to load Zoom SDK script: ${src}`));
         };
         
         document.head.appendChild(script);
       });
     });
-  }, [debugLog]);
+  }, []);
 
-  // Get authentication tokens
-  const getTokens = useCallback(async (meetingNumber: string, role: number) => {
-    try {
-      debugLog('Requesting fresh tokens for meeting:', { meetingNumber, role });
-      
-      const { data: tokenData, error: tokenError } = await supabase.functions.invoke('get-zoom-token', {
-        body: {
-          meetingNumber,
-          role: role || 0,
-          expirationSeconds: 7200
-        }
+  // Initialize and join meeting - single stable function
+  const initializeAndJoin = useCallback(async () => {
+    if (!mountedRef.current || joinAttemptRef.current || joinState !== 'idle') {
+      debugLog('Skipping join - conditions not met', { 
+        mounted: mountedRef.current, 
+        attempting: joinAttemptRef.current, 
+        state: joinState 
       });
-
-      if (tokenError) {
-        debugLog('Token request failed:', tokenError);
-        throw new Error(`Token error: ${tokenError.message}`);
-      }
-
-      debugLog('Fresh tokens received');
-
-      // Get fresh ZAK token for host role
-      let zakToken = null;
-      if (role === 1) {
-        debugLog('Requesting fresh ZAK token for host role...');
-        const { data: zakData, error: zakError } = await supabase.functions.invoke('get-zoom-zak');
-        
-        if (zakError || !zakData?.zak) {
-          debugLog('ZAK token request failed:', zakError);
-          throw new Error('Host role requires fresh ZAK token - please try again or check your Zoom connection');
-        }
-        
-        zakToken = zakData.zak;
-        debugLog('Fresh ZAK token received for host authentication');
-      }
-
-      return { ...tokenData, zak: zakToken };
-    } catch (error) {
-      debugLog('Token fetch failed:', error);
-      throw error;
-    }
-  }, [debugLog]);
-
-  // Initialize Zoom client
-  const initializeZoomClient = useCallback(async () => {
-    if (!containerRef.current || !window.ZoomMtgEmbedded) {
-      throw new Error('Container or Zoom SDK not available');
+      return;
     }
 
-    debugLog('Creating Zoom embedded client...');
-    
+    joinAttemptRef.current = true;
+    setJoinState('loading');
+
     try {
+      // Load SDK
+      setCurrentStep('Loading Zoom SDK...');
+      await loadZoomSDK();
+      
+      if (!mountedRef.current) return;
+
+      // Initialize client
+      setCurrentStep('Initializing Zoom client...');
+      if (!containerRef.current) {
+        throw new Error('Container not available');
+      }
+
       const zoomClient = window.ZoomMtgEmbedded.createClient();
       
       await new Promise<void>((resolve, reject) => {
-        const initConfig = {
+        zoomClient.init({
           zoomAppRoot: containerRef.current,
           language: 'en-US',
           patchJsMedia: true,
@@ -155,28 +159,19 @@ export function ZoomComponentView({
             debugLog('Zoom client initialization failed:', error);
             reject(new Error(`Zoom init failed: ${error?.errorMessage || 'Unknown error'}`));
           }
-        };
-
-        zoomClient.init(initConfig);
+        });
       });
 
-      setClient(zoomClient);
-      return zoomClient;
-    } catch (error) {
-      debugLog('Failed to initialize Zoom client:', error);
-      throw error;
-    }
-  }, [debugLog]);
+      if (!mountedRef.current) return;
 
-  // Join meeting
-  const joinMeeting = useCallback(async (zoomClient: any) => {
-    if (!zoomClient) {
-      throw new Error('Zoom client not initialized');
-    }
+      clientRef.current = zoomClient;
+      setJoinState('joining');
 
-    try {
+      // Get tokens and join
       setCurrentStep('Getting authentication tokens...');
       const tokens = await getTokens(meetingNumber, role || 0);
+
+      if (!mountedRef.current) return;
 
       const joinConfig = {
         sdkKey: tokens.sdkKey,
@@ -188,7 +183,7 @@ export function ZoomComponentView({
         zak: tokens.zak || ''
       };
 
-      debugLog('Attempting to join meeting with config:', {
+      debugLog('Joining meeting with config:', {
         ...joinConfig,
         signature: '[REDACTED]',
         zak: joinConfig.zak ? '[PRESENT]' : '[EMPTY]'
@@ -201,9 +196,12 @@ export function ZoomComponentView({
           ...joinConfig,
           success: () => {
             debugLog('Successfully joined meeting');
-            setIsLoading(false);
-            setCurrentStep('Connected to meeting');
-            onMeetingJoined?.();
+            if (mountedRef.current) {
+              setJoinState('joined');
+              setIsLoading(false);
+              setCurrentStep('Connected to meeting');
+              onMeetingJoined?.();
+            }
             resolve();
           },
           error: (error: any) => {
@@ -211,12 +209,6 @@ export function ZoomComponentView({
             let errorMessage = error.message || 'Failed to join meeting';
             if (error?.errorCode === 200) {
               errorMessage = 'Meeting join failed - please refresh and try again';
-            } else if (error?.errorCode === 3712) {
-              errorMessage = 'Invalid signature - authentication failed';
-            } else if (error?.errorCode === 1) {
-              errorMessage = 'Meeting not found - verify meeting ID is correct';
-            } else if (error?.errorCode === 3000) {
-              errorMessage = 'Meeting password required or incorrect';
             }
             reject(new Error(errorMessage));
           }
@@ -224,68 +216,42 @@ export function ZoomComponentView({
       });
 
     } catch (error: any) {
-      debugLog('Join meeting process failed:', error);
-      throw error;
-    }
-  }, [getTokens, meetingNumber, role, providedUserName, user, meetingPassword, onMeetingJoined, debugLog]);
-
-  // Main initialization effect
-  useEffect(() => {
-    let isMounted = true;
-
-    const initializeAndJoin = async () => {
-      if (hasAttemptedJoin) return;
-
-      try {
-        setHasAttemptedJoin(true);
-        setCurrentStep('Loading Zoom SDK...');
-        
-        // Load SDK
-        await loadZoomSDK();
-        
-        if (!isMounted) return;
-        
-        setCurrentStep('Initializing Zoom client...');
-        
-        // Initialize client
-        const zoomClient = await initializeZoomClient();
-        
-        if (!isMounted) return;
-        
-        // Join meeting
-        await joinMeeting(zoomClient);
-        
-      } catch (error: any) {
-        if (!isMounted) return;
-        
-        debugLog('Initialization failed:', error);
+      debugLog('Join process failed:', error);
+      if (mountedRef.current) {
+        setJoinState('failed');
         setError(error.message);
         setIsLoading(false);
-        setHasAttemptedJoin(false);
         onMeetingError?.(error.message);
       }
-    };
+    } finally {
+      joinAttemptRef.current = false;
+    }
+  }, [loadZoomSDK, getTokens, meetingNumber, role, providedUserName, user, meetingPassword, onMeetingJoined, onMeetingError, joinState, debugLog]);
 
-    initializeAndJoin();
-
-    return () => {
-      isMounted = false;
-    };
-  }, [loadZoomSDK, initializeZoomClient, joinMeeting, hasAttemptedJoin, onMeetingError, debugLog]);
+  // Single effect to start the process
+  useEffect(() => {
+    if (joinState === 'idle') {
+      debugLog('Starting initialization and join process');
+      initializeAndJoin();
+    }
+  }, [joinState, initializeAndJoin, debugLog]);
 
   // Cleanup on unmount
   useEffect(() => {
+    mountedRef.current = true;
+    
     return () => {
-      if (client) {
+      mountedRef.current = false;
+      if (clientRef.current) {
         try {
-          client.leave?.();
+          clientRef.current.leave?.();
           debugLog('Left meeting during cleanup');
         } catch (error) {
           debugLog('Error during cleanup:', error);
         }
       }
     };
-  }, [client, debugLog]);
+  }, [debugLog]);
 
   const handleRetry = useCallback(() => {
     if (retryCount < maxRetries) {
@@ -293,34 +259,31 @@ export function ZoomComponentView({
       setRetryCount(prev => prev + 1);
       setError(null);
       setIsLoading(true);
-      setHasAttemptedJoin(false);
+      setJoinState('idle');
       setCurrentStep('Retrying...');
-      setClient(null);
       
-      // Clear container
+      // Clear container and client
       if (containerRef.current) {
         containerRef.current.innerHTML = '';
       }
-      
-      setTimeout(() => {
-        window.location.reload();
-      }, 1000);
+      clientRef.current = null;
+      joinAttemptRef.current = false;
     }
   }, [retryCount, maxRetries, debugLog]);
 
   const handleLeaveMeeting = useCallback(() => {
-    if (client) {
+    if (clientRef.current) {
       try {
-        client.leave();
+        clientRef.current.leave();
         debugLog('Left meeting');
       } catch (error) {
         debugLog('Error leaving meeting:', error);
       }
     }
     onMeetingLeft?.();
-  }, [client, onMeetingLeft, debugLog]);
+  }, [onMeetingLeft, debugLog]);
 
-  if (error) {
+  if (error && joinState === 'failed') {
     return (
       <ZoomErrorDisplay
         error={error}
@@ -342,7 +305,6 @@ export function ZoomComponentView({
         maxRetries={maxRetries}
       />
       
-      {/* Zoom embedded container */}
       <div 
         ref={containerRef}
         id="zoom-embedded-container"
