@@ -1,5 +1,5 @@
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -28,6 +28,7 @@ const Meeting = () => {
   const [error, setError] = useState<string | null>(null);
   const [meetingData, setMeetingData] = useState<ZoomMeetingData | null>(null);
   const [meetingPassword, setMeetingPassword] = useState<string>('');
+  const [isMeetingActive, setIsMeetingActive] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -60,7 +61,9 @@ const Meeting = () => {
           setMeetingPassword(meetingDetails.password);
         }
 
+        // Only set loading to false and activate meeting after all data is ready
         setIsLoading(false);
+        setIsMeetingActive(true);
       } catch (err: any) {
         console.error('Error loading meeting:', err);
         setError(err.message || 'Failed to load meeting');
@@ -72,8 +75,24 @@ const Meeting = () => {
   }, [id, user]);
 
   const handleMeetingEnd = () => {
+    setIsMeetingActive(false);
     navigate('/calendar');
   };
+
+  // Memoize meeting props to prevent unnecessary re-renders
+  const meetingProps = useMemo(() => {
+    if (!meetingData || !isMeetingActive) return null;
+    
+    const isHost = meetingData.user_id === user?.id;
+    
+    return {
+      meetingNumber: meetingData.meeting_id,
+      meetingPassword: meetingPassword,
+      userName: user?.email || 'Guest',
+      role: isHost ? 1 : 0,
+      onMeetingEnd: handleMeetingEnd
+    };
+  }, [meetingData, meetingPassword, user?.email, user?.id, isMeetingActive]);
 
   if (!user) {
     return (
@@ -112,12 +131,22 @@ const Meeting = () => {
     );
   }
 
-  const isHost = meetingData.user_id === user.id;
+  // Only render the meeting component when all conditions are met
+  if (!meetingProps) {
+    return (
+      <div className="flex items-center justify-center h-screen">
+        <div className="text-center">
+          <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4" />
+          <p className="text-lg">Preparing meeting...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col h-screen">
       {/* Header */}
-      <div className="flex items-center justify-between p-4 border-b bg-white">
+      <div className="flex items-center justify-between p-4 border-b bg-white flex-shrink-0">
         <div className="flex items-center gap-3">
           <Button 
             variant="ghost" 
@@ -138,14 +167,15 @@ const Meeting = () => {
         <div className="w-32"></div> {/* Spacer for centering */}
       </div>
 
-      {/* Meeting Content */}
-      <div className="flex-1 p-4 bg-gray-50">
+      {/* Meeting Content - Fixed container */}
+      <div className="flex-1 bg-gray-50" style={{ minHeight: '600px' }}>
         <ZoomMeeting
-          meetingNumber={meetingData.meeting_id}
-          meetingPassword={meetingPassword}
-          userName={user.email || 'Guest'}
-          role={isHost ? 1 : 0}
-          onMeetingEnd={handleMeetingEnd}
+          key={`meeting-${meetingData.id}-${isMeetingActive}`}
+          meetingNumber={meetingProps.meetingNumber}
+          meetingPassword={meetingProps.meetingPassword}
+          userName={meetingProps.userName}
+          role={meetingProps.role}
+          onMeetingEnd={meetingProps.onMeetingEnd}
         />
       </div>
     </div>
