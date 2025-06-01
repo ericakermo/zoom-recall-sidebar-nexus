@@ -1,7 +1,6 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '@/context/AuthContext';
-import { supabase } from '@/integrations/supabase/client';
 import ZoomMtgEmbedded from '@zoom/meetingsdk/embedded';
 
 interface ZoomComponentViewProps {
@@ -12,8 +11,6 @@ interface ZoomComponentViewProps {
   onMeetingJoined?: () => void;
   onMeetingError?: (error: string) => void;
   onMeetingLeft?: () => void;
-  sdkKey?: string;
-  signature?: string;
 }
 
 export function ZoomComponentView({
@@ -74,7 +71,7 @@ export function ZoomComponentView({
     }
 
     try {
-      debugLog('Requesting Zoom signature...');
+      debugLog('Requesting Zoom credentials...');
       
       const tokenData = localStorage.getItem('sb-qsxlvwwebbakmzpwjfbb-auth-token');
       if (!tokenData) {
@@ -105,49 +102,15 @@ export function ZoomComponentView({
       debugLog('Zoom credentials received:', { 
         hasAccessToken: !!data.accessToken,
         hasSdkKey: !!data.sdkKey,
-        meetingNumber: data.meetingNumber
+        hasSignature: !!data.signature,
+        meetingNumber: data.meetingNumber,
+        role: data.role
       });
       
       return data;
     } catch (error: any) {
       debugLog('Failed to get Zoom credentials:', error);
       throw new Error(`Failed to get Zoom credentials: ${error.message}`);
-    }
-  };
-
-  const getZakToken = async () => {
-    if (role !== 1) return null; // Only needed for host role
-    
-    try {
-      debugLog('Requesting ZAK token for host...');
-      
-      const tokenData = localStorage.getItem('sb-qsxlvwwebbakmzpwjfbb-auth-token');
-      if (!tokenData) {
-        throw new Error('Authentication token not found');
-      }
-      
-      const parsedToken = JSON.parse(tokenData);
-      const authToken = parsedToken?.access_token;
-      
-      const response = await fetch(`https://qsxlvwwebbakmzpwjfbb.supabase.co/functions/v1/get-zoom-zak`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${authToken}`,
-        }
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to get ZAK token');
-      }
-
-      const data = await response.json();
-      debugLog('ZAK token received');
-      return data.zak;
-    } catch (error: any) {
-      debugLog('Failed to get ZAK token:', error);
-      throw new Error(`Failed to get ZAK token: ${error.message}`);
     }
   };
 
@@ -163,9 +126,16 @@ export function ZoomComponentView({
     try {
       debugLog(`Attempt ${retryCount + 1}/${MAX_RETRIES} - Starting initialization and join...`);
 
-      // Get credentials
+      // Get credentials first
       const credentials = await getZoomCredentials();
-      const zakToken = await getZakToken();
+
+      // Validate required credentials
+      if (!credentials.sdkKey) {
+        throw new Error('SDK Key is missing from credentials');
+      }
+      if (!credentials.signature) {
+        throw new Error('Signature is missing from credentials');
+      }
 
       // Create client if not exists
       if (!clientRef.current) {
@@ -183,49 +153,61 @@ export function ZoomComponentView({
       debugLog('Initializing Zoom SDK...');
       
       // Initialize SDK
-      await clientRef.current.init({
-        zoomAppRoot: container,
-        language: 'en-US',
-        patchJsMedia: true,
-        leaveOnPageUnload: true,
-        success: () => {
-          debugLog('SDK initialized successfully');
-          setIsInitialized(true);
-        },
-        error: (error: any) => {
-          throw new Error(`SDK initialization failed: ${error?.errorMessage || 'Unknown error'}`);
-        }
+      await new Promise((resolve, reject) => {
+        clientRef.current.init({
+          zoomAppRoot: container,
+          language: 'en-US',
+          patchJsMedia: true,
+          leaveOnPageUnload: true,
+          success: () => {
+            debugLog('SDK initialized successfully');
+            setIsInitialized(true);
+            resolve(true);
+          },
+          error: (error: any) => {
+            reject(new Error(`SDK initialization failed: ${error?.errorMessage || 'Unknown error'}`));
+          }
+        });
       });
 
-      debugLog('Joining meeting with credentials...');
+      debugLog('Joining meeting with credentials...', {
+        sdkKey: credentials.sdkKey.substring(0, 10) + '...',
+        hasSignature: !!credentials.signature,
+        meetingNumber: String(meetingNumber),
+        userName: userName || user?.email || 'Guest',
+        role: role
+      });
       
       // Join meeting
-      const joinConfig = {
-        sdkKey: credentials.sdkKey,
-        signature: credentials.signature || credentials.accessToken,
-        meetingNumber: String(meetingNumber),
-        password: meetingPassword,
-        userName: userName || user?.email || 'Guest',
-        userEmail: user?.email || '',
-        zak: zakToken || '',
-        success: (success: any) => {
-          debugLog('Meeting joined successfully:', success);
-          setIsJoining(false);
-          onMeetingJoined?.();
-        },
-        error: (error: any) => {
-          debugLog('Join failed:', error);
-          throw new Error(`Failed to join meeting: ${error?.errorMessage || error?.message || 'Unknown join error'}`);
-        }
-      };
+      await new Promise((resolve, reject) => {
+        const joinConfig = {
+          sdkKey: credentials.sdkKey,
+          signature: credentials.signature,
+          meetingNumber: String(meetingNumber),
+          password: meetingPassword,
+          userName: userName || user?.email || 'Guest',
+          userEmail: user?.email || '',
+          role: Number(role),
+          success: (success: any) => {
+            debugLog('Meeting joined successfully:', success);
+            setIsJoining(false);
+            onMeetingJoined?.();
+            resolve(success);
+          },
+          error: (error: any) => {
+            debugLog('Join failed:', error);
+            reject(new Error(`Failed to join meeting: ${error?.errorMessage || error?.message || 'Unknown join error'}`));
+          }
+        };
 
-      debugLog('Calling client.join() with config:', {
-        ...joinConfig,
-        signature: '[REDACTED]',
-        zak: joinConfig.zak ? '[PRESENT]' : '[EMPTY]'
+        debugLog('Calling client.join() with config:', {
+          ...joinConfig,
+          signature: '[REDACTED]',
+          sdkKey: joinConfig.sdkKey.substring(0, 10) + '...'
+        });
+
+        clientRef.current.join(joinConfig);
       });
-
-      await clientRef.current.join(joinConfig);
 
     } catch (error: any) {
       debugLog('Join attempt failed:', error);
@@ -245,7 +227,12 @@ export function ZoomComponentView({
 
   useEffect(() => {
     if (containerRef.current && meetingNumber && !isInitialized && !isJoining) {
-      debugLog('Container ready, starting meeting join process...');
+      debugLog('Container ready, starting meeting join process...', {
+        meetingNumber,
+        userName,
+        role,
+        containerReady: !!containerRef.current
+      });
       initializeAndJoinMeeting();
     }
 
