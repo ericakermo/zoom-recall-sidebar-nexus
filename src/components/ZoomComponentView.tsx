@@ -34,7 +34,6 @@ export function ZoomComponentView({
   const [error, setError] = useState<string | null>(null);
   const [currentStep, setCurrentStep] = useState('Loading Zoom SDK...');
   const [retryCount, setRetryCount] = useState(0);
-  const [joinState, setJoinState] = useState<'idle' | 'loading' | 'joining' | 'joined' | 'failed'>('idle');
   const maxRetries = 2;
   
   const { user } = useAuth();
@@ -126,17 +125,15 @@ export function ZoomComponentView({
   // Initialize and join meeting - single execution with guards
   const initializeAndJoin = useCallback(async () => {
     // Prevent multiple executions
-    if (hasAttemptedJoinRef.current || !mountedRef.current || joinState !== 'idle') {
+    if (hasAttemptedJoinRef.current || !mountedRef.current) {
       debugLog('Skipping join - already attempted or not ready', { 
         attempted: hasAttemptedJoinRef.current, 
-        mounted: mountedRef.current, 
-        state: joinState 
+        mounted: mountedRef.current
       });
       return;
     }
 
     hasAttemptedJoinRef.current = true;
-    setJoinState('loading');
 
     try {
       // Load SDK
@@ -173,7 +170,6 @@ export function ZoomComponentView({
       if (!mountedRef.current) return;
 
       clientRef.current = zoomClient;
-      setJoinState('joining');
 
       // Get tokens and join
       setCurrentStep('Getting authentication tokens...');
@@ -205,7 +201,6 @@ export function ZoomComponentView({
           success: () => {
             debugLog('Successfully joined meeting');
             if (mountedRef.current) {
-              setJoinState('joined');
               setIsLoading(false);
               setCurrentStep('Connected to meeting');
               onMeetingJoined?.();
@@ -226,17 +221,16 @@ export function ZoomComponentView({
     } catch (error: any) {
       debugLog('Join process failed:', error);
       if (mountedRef.current) {
-        setJoinState('failed');
         setError(error.message);
         setIsLoading(false);
         onMeetingError?.(error.message);
       }
     }
-  }, [loadZoomSDK, getTokens, meetingNumber, role, providedUserName, user, meetingPassword, onMeetingJoined, onMeetingError, joinState, debugLog]);
+  }, [loadZoomSDK, getTokens, meetingNumber, role, providedUserName, user, meetingPassword, onMeetingJoined, onMeetingError, debugLog]);
 
   // Single effect to start the process ONLY ONCE
   useEffect(() => {
-    if (joinState === 'idle' && !hasAttemptedJoinRef.current) {
+    if (!hasAttemptedJoinRef.current) {
       debugLog('Starting one-time initialization and join process');
       initializeAndJoin();
     }
@@ -265,7 +259,6 @@ export function ZoomComponentView({
       setRetryCount(prev => prev + 1);
       setError(null);
       setIsLoading(true);
-      setJoinState('idle');
       setCurrentStep('Retrying...');
       
       // Reset attempt flag and clear container
@@ -290,7 +283,7 @@ export function ZoomComponentView({
     onMeetingLeft?.();
   }, [onMeetingLeft, debugLog]);
 
-  if (error && joinState === 'failed') {
+  if (error) {
     return (
       <ZoomErrorDisplay
         error={error}
