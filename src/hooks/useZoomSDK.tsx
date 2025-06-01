@@ -181,24 +181,30 @@ export function useZoomSDK({ onReady, onError }: UseZoomSDKProps = {}) {
           hasJoinedRef.current = true;
           setIsJoined(true);
           
-          // Set video dimensions after successful join
+          // Configure video to fill container properly
           setTimeout(() => {
-            if (clientRef.current && typeof clientRef.current.updateVideoOptions === 'function') {
+            if (clientRef.current && containerRef.current) {
               try {
-                clientRef.current.updateVideoOptions({
-                  viewSizes: {
-                    default: {
-                      width: 800,
-                      height: 450
+                const container = containerRef.current;
+                const rect = container.getBoundingClientRect();
+                
+                // Set video options to match container dimensions
+                if (typeof clientRef.current.updateVideoOptions === 'function') {
+                  clientRef.current.updateVideoOptions({
+                    viewSizes: {
+                      default: {
+                        width: rect.width,
+                        height: rect.height
+                      }
                     }
-                  }
-                });
-                debugLog('Video dimensions configured successfully');
+                  });
+                  debugLog('Video dimensions configured to fill container:', { width: rect.width, height: rect.height });
+                }
               } catch (error) {
                 debugLog('Failed to configure video dimensions:', error);
               }
             }
-          }, 2000);
+          }, 1500);
         },
         error: (error: any) => {
           debugLog('Join meeting error:', error);

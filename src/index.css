@@ -101,37 +101,71 @@
   }
 }
 
-/* Zoom meeting container styles - Following Zoom best practices */
+/* Zoom meeting container styles - Responsive design following Zoom best practices */
 .zoom-meeting-wrapper {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  height: 100%;
   width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
   overflow: hidden;
 }
 
 .zoom-container {
-  width: 800px !important;
-  height: 450px !important;
+  width: 100% !important;
+  height: 100% !important;
+  max-width: 100%;
+  max-height: 100%;
   position: relative;
   border-radius: 8px;
   overflow: hidden !important;
   box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-  flex-shrink: 0;
-  margin: 0 auto;
   background: #000;
+  display: flex;
+  flex-direction: column;
 }
 
-/* Let Zoom handle its own layout - minimal interference */
+/* Ensure Zoom content fills the container properly */
 .zoom-container > div {
+  width: 100% !important;
+  height: 100% !important;
+  flex: 1;
+  display: flex !important;
+  flex-direction: column !important;
+}
+
+/* Video container should fill available space */
+.zoom-container video,
+.zoom-container canvas {
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: cover !important;
+  border-radius: inherit;
+}
+
+/* Zoom video wrapper adjustments */
+.zoom-container [class*="video-"] {
   width: 100% !important;
   height: 100% !important;
 }
 
+/* Controls and toolbar positioning */
+.zoom-container [class*="toolbar"],
+.zoom-container [class*="control"] {
+  position: absolute !important;
+  bottom: 16px !important;
+  left: 50% !important;
+  transform: translateX(-50%) !important;
+  z-index: 1000 !important;
+}
+
 /* Prevent dragging while preserving functionality */
 .zoom-container .react-draggable {
-  pointer-events: none !important;
+  width: 100% !important;
+  height: 100% !important;
+  position: relative !important;
+  transform: none !important;
 }
 
 .zoom-container .react-draggable [class*="control"],
@@ -145,4 +179,11 @@
 /* Hide default Zoom meeting root if it exists */
 #zmmtg-root {
   display: none !important;
+}
+
+/* Responsive adjustments for different screen sizes */
+@media (max-width: 768px) {
+  .zoom-container {
+    border-radius: 0;
+  }
 }

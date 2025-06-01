@@ -1,4 +1,3 @@
-
 import { useEffect, useState, useCallback } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { useZoomSDK } from '@/hooks/useZoomSDK';
@@ -73,7 +72,6 @@ export function ZoomComponentView({
     const validation = {
       containerExists: !!container,
       dimensions: { width: rect.width, height: rect.height },
-      hasFixedDimensions: rect.width === 800 && rect.height === 450,
       isVisible: rect.width > 0 && rect.height > 0,
       computedStyles: {
         display: styles.display,
@@ -254,7 +252,7 @@ export function ZoomComponentView({
         maxRetries={maxRetries}
       />
 
-      {/* Zoom meeting container - 16:9 aspect ratio */}
+      {/* Zoom meeting container - fills parent completely */}
       <div className="zoom-meeting-wrapper">
         <div 
           ref={containerRef}
