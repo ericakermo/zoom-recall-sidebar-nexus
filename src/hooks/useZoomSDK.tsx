@@ -78,7 +78,7 @@ export function useZoomSDK({ onReady, onError }: UseZoomSDKProps = {}) {
       exists: !!containerRef.current,
       dimensions: { width: rect.width, height: rect.height },
       isVisible: rect.width > 0 && rect.height > 0,
-      hasFixedDimensions: rect.width === 900 && rect.height === 506
+      hasProperDimensions: rect.width === 800 && rect.height === 450
     };
 
     debugLog('Container validation:', validation);
@@ -181,19 +181,19 @@ export function useZoomSDK({ onReady, onError }: UseZoomSDKProps = {}) {
           hasJoinedRef.current = true;
           setIsJoined(true);
           
-          // Set responsive video options after successful join
+          // Set video dimensions after successful join
           setTimeout(() => {
             if (clientRef.current && typeof clientRef.current.updateVideoOptions === 'function') {
               try {
                 clientRef.current.updateVideoOptions({
                   viewSizes: {
                     default: {
-                      width: 900,
-                      height: 506
+                      width: 800,
+                      height: 450
                     }
                   }
                 });
-                debugLog('Responsive video dimensions configured successfully');
+                debugLog('Video dimensions configured successfully');
               } catch (error) {
                 debugLog('Failed to configure video dimensions:', error);
               }

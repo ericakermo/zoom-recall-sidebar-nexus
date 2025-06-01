@@ -1,4 +1,3 @@
-
 import { useEffect, useState, useCallback } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { useZoomSDK } from '@/hooks/useZoomSDK';
@@ -118,7 +117,7 @@ export function ZoomComponentView({
       let zakToken = null;
       if (role === 1) {
         debugLog('Requesting fresh ZAK token for host role...');
-        const { data: zakData, error: zakError } = await supabase.functions.invoke('get-zoom-zak');
+        const { data: zakData, error: zakError } } = await supabase.functions.invoke('get-zoom-zak');
         
         if (zakError || !zakData?.zak) {
           debugLog('ZAK token request failed:', zakError);
@@ -181,16 +180,6 @@ export function ZoomComponentView({
       setRetryCount(0);
       onMeetingJoined?.();
 
-      // Validate rendering after successful join
-      setTimeout(() => {
-        const renderingValidation = validateRenderingConditions();
-        debugLog('Post-join rendering validation:', renderingValidation);
-        
-        if (renderingValidation && typeof renderingValidation === 'object' && !renderingValidation.hasContent) {
-          debugLog('WARNING: Meeting joined but no content rendered in container');
-        }
-      }, 3000);
-
     } catch (error: any) {
       debugLog('Join failed:', error);
       setError(error.message);
@@ -198,9 +187,8 @@ export function ZoomComponentView({
       setHasAttemptedJoin(false); // Allow retry
       onMeetingError?.(error.message);
     }
-  }, [isReady, hasAttemptedJoin, isJoined, error, meetingNumber, role, providedUserName, user, meetingPassword, getTokens, joinMeeting, onMeetingJoined, onMeetingError, validateRenderingConditions, debugLog]);
+  }, [isReady, hasAttemptedJoin, isJoined, error, meetingNumber, role, providedUserName, user, meetingPassword, getTokens, joinMeeting, onMeetingJoined, onMeetingError, debugLog]);
 
-  // Update current step based on SDK status
   useEffect(() => {
     if (isJoined) {
       setCurrentStep('Connected to meeting');
@@ -233,10 +221,9 @@ export function ZoomComponentView({
       setRetryCount(prev => prev + 1);
       setError(null);
       setIsLoading(true);
-      setHasAttemptedJoin(false); // Reset join attempt flag
+      setHasAttemptedJoin(false);
       setCurrentStep('Retrying...');
       
-      // Clean up and retry
       cleanup();
       setTimeout(() => {
         window.location.reload();
@@ -266,17 +253,11 @@ export function ZoomComponentView({
         maxRetries={maxRetries}
       />
 
-      {/* Zoom meeting container - exact dimensions as per Zoom docs */}
+      {/* Zoom meeting container - 16:9 aspect ratio */}
       <div className="zoom-meeting-wrapper">
         <div 
           ref={containerRef}
           className="zoom-container"
-          style={{
-            width: '900px',
-            height: '506px',
-            backgroundColor: '#000',
-            border: '1px solid #ccc'
-          }}
         />
       </div>
     </div>
