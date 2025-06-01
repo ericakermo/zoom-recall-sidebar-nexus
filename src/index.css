@@ -36,12 +36,19 @@
     --radius: 0.5rem;
 
     --sidebar-background: 0 0% 98%;
+
     --sidebar-foreground: 240 5.3% 26.1%;
+
     --sidebar-primary: 240 5.9% 10%;
+
     --sidebar-primary-foreground: 0 0% 98%;
+
     --sidebar-accent: 240 4.8% 95.9%;
+
     --sidebar-accent-foreground: 240 5.9% 10%;
+
     --sidebar-border: 220 13% 91%;
+
     --sidebar-ring: 217.2 91.2% 59.8%;
   }
 
@@ -94,98 +101,35 @@
   }
 }
 
-/* Zoom Embedded Container - Following Zoom's official CDN pattern */
-.zoom-embedded-wrapper {
-  width: 100%;
+/* Zoom meeting container styles - Following Zoom documentation exactly */
+.zoom-meeting-wrapper {
+  display: flex;
+  justify-content: center;
+  align-items: center;
   height: 100%;
-  position: relative;
+  width: 100%;
   overflow: hidden;
-  background: #000;
 }
 
-.zoom-embedded-container {
-  width: 100% !important;
-  height: 100% !important;
-  position: absolute;
-  top: 0;
-  left: 0;
-  background: #000;
+.zoom-container {
+  width: 900px !important;
+  height: 506px !important;
+  position: relative;
+  border-radius: 8px;
+  overflow: hidden !important;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+  /* Ensure no layout conflicts */
+  flex-shrink: 0;
+  margin: 0 auto;
 }
 
-/* Zoom embedded app root - matches official pattern */
-.zoom-embedded-container > div {
-  width: 100% !important;
-  height: 100% !important;
-  position: relative !important;
-}
-
-/* Ensure Zoom content fills container completely */
-.zoom-embedded-container [id*="zoom"],
-.zoom-embedded-container [class*="zoom"],
-.zoom-embedded-container [class*="meeting"] {
-  width: 100% !important;
-  height: 100% !important;
-}
-
-/* Video elements should fill container */
-.zoom-embedded-container video,
-.zoom-embedded-container canvas {
-  width: 100% !important;
-  height: 100% !important;
-  object-fit: cover !important;
-}
-
-/* Toolbar and controls positioning */
-.zoom-embedded-container [class*="toolbar"],
-.zoom-embedded-container [class*="control-panel"],
-.zoom-embedded-container [class*="meeting-controls"] {
-  position: absolute !important;
-  bottom: 20px !important;
-  left: 50% !important;
-  transform: translateX(-50%) !important;
-  z-index: 1000 !important;
-  background: rgba(0, 0, 0, 0.8) !important;
-  border-radius: 8px !important;
-  padding: 8px !important;
-}
-
-/* Participant video containers */
-.zoom-embedded-container [class*="participant"],
-.zoom-embedded-container [class*="video-container"],
-.zoom-embedded-container [class*="video-wrapper"] {
-  width: 100% !important;
-  height: 100% !important;
-  position: relative !important;
-}
-
-/* Remove any default margins/padding from Zoom components */
-.zoom-embedded-container * {
-  box-sizing: border-box !important;
-}
-
-/* Disable dragging on main video area but keep controls functional */
-.zoom-embedded-container .react-draggable {
-  position: relative !important;
-  transform: none !important;
-}
-
-.zoom-embedded-container .react-draggable [role="button"],
-.zoom-embedded-container .react-draggable button,
-.zoom-embedded-container .react-draggable [class*="control"],
-.zoom-embedded-container .react-draggable [class*="button"] {
-  pointer-events: auto !important;
+/* Ensure Zoom SDK content is not restricted by parent containers */
+.zoom-container * {
+  max-width: none !important;
+  max-height: none !important;
 }
 
 /* Hide default Zoom meeting root if it exists */
 #zmmtg-root {
   display: none !important;
-}
-
-/* Responsive adjustments */
-@media (max-width: 768px) {
-  .zoom-embedded-container [class*="toolbar"],
-  .zoom-embedded-container [class*="control-panel"] {
-    bottom: 10px !important;
-    padding: 6px !important;
-  }
 }
