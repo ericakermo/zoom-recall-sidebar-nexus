@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import ZoomMtgEmbedded from "@zoom/meetingsdk/embedded";
+import { ZoomMeetingDebugger } from "@zoom/meetingsdk/embedded";
 
 interface ZoomMeetingProps {
   meetingNumber: string;
