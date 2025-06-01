@@ -1,95 +1,83 @@
-import { useState } from 'react';
-import { useForm } from 'react-hook-form';
+import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useForm, SubmitHandler } from 'react-hook-form';
+import { supabase } from '@/integrations/supabase/client';
+import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { ZoomMeeting } from '@/components/ZoomMeeting';
-import { useToast } from '@/hooks/use-toast';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Video, X } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
-import { Video, VideoOff, X } from 'lucide-react';
-import { supabase } from '@/integrations/supabase/client';
-import { loadZoomSDK, getZoomAccessToken } from '@/lib/zoom-config';
+import { ZoomMeeting } from '@/components/ZoomMeeting';
 
 interface MeetingFormData {
   meetingId: string;
 }
 
+interface ZoomCredentials {
+  meetingNumber: string;
+  accessToken: string;
+  tokenType: string;
+  sdkKey: string;
+  userName?: string;
+  userEmail?: string;
+  role: number;
+  password?: string;
+  zak?: string;
+}
+
 const Meetings = () => {
+  const { user } = useAuth();
+  const navigate = useNavigate();
+  const { toast } = useToast();
+  const { register, handleSubmit, formState: { errors } } = useForm<MeetingFormData>();
+
   const [activeMeeting, setActiveMeeting] = useState<string | null>(null);
   const [isHosting, setIsHosting] = useState(false);
-  const { register, handleSubmit, formState: { errors }, reset } = useForm<MeetingFormData>();
-  const { toast } = useToast();
-  const { user } = useAuth();
   const [isStartingMeeting, setIsStartingMeeting] = useState(false);
+  const [zoomCredentials, setZoomCredentials] = useState<ZoomCredentials | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [sdkLoaded, setSdkLoaded] = useState(false);
-  const [zoomCredentials, setZoomCredentials] = useState<any>(null);
 
-  // Load the Zoom SDK on component mount
-  useState(() => {
-    loadZoomSDK()
-      .then(() => {
-        console.log("Zoom SDK loaded successfully in Meetings.tsx");
-        setSdkLoaded(true);
-      })
-      .catch(err => {
-        console.error("Failed to load Zoom SDK:", err);
-        setError("Failed to load Zoom SDK. Please try refreshing the page.");
-      });
-  });
-
-  const joinMeeting = (data: MeetingFormData) => {
-    if (!user) {
-      toast({
-        title: "Authentication Required",
-        description: "You must be logged in to join a meeting",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    // Validate meeting ID format
-    const meetingId = data.meetingId.replace(/\s+/g, ''); // Remove any spaces
-    if (!/^\d{10,11}$/.test(meetingId)) {
-      toast({
-        title: "Invalid Meeting ID",
-        description: "Please enter a valid Zoom meeting ID (10-11 digits)",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    setActiveMeeting(meetingId);
+  const joinMeeting: SubmitHandler<MeetingFormData> = (data) => {
+    console.log('🎯 [Calendar] Starting meeting join process for meeting ID:', data.meetingId);
+    setActiveMeeting(data.meetingId);
     setIsHosting(false);
-    reset(); // Reset form
+    setZoomCredentials({
+        meetingNumber: data.meetingId,
+        accessToken: '',
+        tokenType: '',
+        sdkKey: '',
+        userName: user?.email || 'Guest',
+        userEmail: user?.email,
+        role: 0,
+        password: '',
+        zak: ''
+    });
+
+    toast({
+        title: "Joining Meeting",
+        description: `Attempting to join meeting ${data.meetingId}`,
+    });
   };
 
   const handleStartMeeting = async () => {
-    if (!user) {
-      toast({
-        title: "Authentication Required",
-        description: "You must be logged in to host a meeting",
-        variant: "destructive"
-      });
-      return;
-    }
-
     setIsStartingMeeting(true);
     setError(null);
-    
+    console.log('🎯 [Calendar] Attempting to start a new meeting...');
+
     try {
-      console.log("Creating new Zoom meeting...");
-      
-      const tokenData = localStorage.getItem('sb-qsxlvwwebbakmzpwjfbb-auth-token');
-      if (!tokenData) {
+      if (!user?.email) {
         throw new Error('Authentication required');
       }
       
-      const parsedToken = JSON.parse(tokenData);
-      const authToken = parsedToken?.access_token;
-      
-      // Create meeting first
+      const { data: tokenData, error: tokenError } = await supabase.auth.getSession();
+      if (tokenError || !tokenData.session) {
+         throw new Error('Authentication required to create meeting');
+      }
+      const authToken = tokenData.session.access_token;
+
+      console.log("Creating meeting via backend function...");
       const meetingResponse = await fetch(`https://qsxlvwwebbakmzpwjfbb.supabase.co/functions/v1/create-zoom-meeting`, {
         method: 'POST',
         headers: {
@@ -102,7 +90,7 @@ const Meetings = () => {
           settings: {
             host_video: true,
             participant_video: true,
-            join_before_host: true, // Changed to true for host role
+            join_before_host: true,
             mute_upon_entry: true,
             waiting_room: false
           }
@@ -117,34 +105,15 @@ const Meetings = () => {
       const meetingData = await meetingResponse.json();
       console.log("Meeting created successfully:", meetingData);
 
-      // Get ZAK token for host role
-      console.log("Getting ZAK token for host...");
-      const zakResponse = await fetch(`https://qsxlvwwebbakmzpwjfbb.supabase.co/functions/v1/get-zoom-zak`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${authToken}`,
-        }
-      });
-
-      if (!zakResponse.ok) {
-        const zakError = await zakResponse.json();
-        throw new Error(`Failed to get ZAK token: ${zakError.error}`);
-      }
-
-      const zakData = await zakResponse.json();
-      console.log("ZAK token retrieved successfully");
-      
       setZoomCredentials({
         meetingNumber: meetingData.meetingNumber,
         accessToken: meetingData.accessToken,
         tokenType: 'Bearer',
-        sdkKey: 'dkQMavedS2OWM2c73F6pLg', // Updated SDK Key
+        sdkKey: 'dkQMavedS2OWM2c73F6pLg',
         userName: user?.email || 'Host',
         userEmail: user?.email,
-        role: 1, // Host role
+        role: 1,
         password: meetingData.password || '',
-        zak: zakData.zak // Add ZAK token for host authentication
       });
       
       setActiveMeeting(meetingData.meetingNumber);
@@ -184,14 +153,14 @@ const Meetings = () => {
         Zoom Meetings
       </h1>
 
-      {activeMeeting ? (
+      {zoomCredentials ? (
         <div className="h-[80vh] relative border rounded-lg overflow-hidden">
           <div className="absolute top-4 right-4 z-10">
             <Button 
               variant="outline" 
               size="sm"
               className="bg-white/80 hover:bg-white/90 text-black"
-              onClick={() => handleMeetingEnd()}
+              onClick={handleMeetingEnd}
             >
               <X className="h-4 w-4 mr-1" />
               Exit
@@ -204,11 +173,11 @@ const Meetings = () => {
           </div>
           
           <ZoomMeeting 
-            meetingNumber={activeMeeting}
-            userName={user?.email || 'Guest'} 
-            role={isHosting ? 1 : 0} // 1 for host, 0 for attendee
+            meetingNumber={zoomCredentials.meetingNumber}
+            userName={zoomCredentials.userName}
+            role={zoomCredentials.role}
+            password={zoomCredentials.password}
             onMeetingEnd={handleMeetingEnd}
-            zak={zoomCredentials?.zak} // Pass ZAK token to ZoomMeeting component
           />
         </div>
       ) : (
@@ -231,7 +200,7 @@ const Meetings = () => {
                         value: /^\d{10,11}$/,
                         message: "Please enter a valid meeting ID"
                       }
-                    })} 
+                    })}
                   />
                   {errors.meetingId && (
                     <p className="text-sm text-red-500">{errors.meetingId.message}</p>
@@ -261,7 +230,7 @@ const Meetings = () => {
               )}
               <Button 
                 onClick={handleStartMeeting}
-                disabled={isStartingMeeting || !sdkLoaded}
+                disabled={isStartingMeeting}
                 className="w-full"
               >
                 {isStartingMeeting ? (
