@@ -1,5 +1,5 @@
 
-import React, { useEffect, useState, useMemo, useRef } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -28,39 +28,15 @@ const Meeting = () => {
   const [error, setError] = useState<string | null>(null);
   const [meetingData, setMeetingData] = useState<ZoomMeetingData | null>(null);
   const [meetingPassword, setMeetingPassword] = useState<string>('');
-  const [isMeetingLocked, setIsMeetingLocked] = useState(false);
   const { toast } = useToast();
-  
-  // Stable refs to prevent re-renders
-  const meetingContainerRef = useRef<HTMLDivElement>(null);
-  const stableMeetingPropsRef = useRef<any>(null);
-  const hasInitialized = useRef(false);
-
-  // Memoized stable meeting props to prevent prop changes
-  const stableMeetingProps = useMemo(() => {
-    if (!meetingData || !user || !meetingPassword) return null;
-    
-    const isHost = meetingData.user_id === user.id;
-    return {
-      meetingNumber: meetingData.meeting_id,
-      meetingPassword: meetingPassword || '',
-      userName: user.email || 'Guest',
-      role: isHost ? 1 : 0,
-      onMeetingEnd: () => {
-        setIsMeetingLocked(false);
-        navigate('/calendar');
-      }
-    };
-  }, [meetingData, user, meetingPassword, navigate]);
 
   useEffect(() => {
     const loadMeetingData = async () => {
-      if (!user || !id || hasInitialized.current) return;
+      if (!user || !id) return;
 
       try {
         setIsLoading(true);
         setError(null);
-        hasInitialized.current = true;
 
         // Get meeting details from database
         const { data: meeting, error: meetingError } = await supabase
@@ -85,12 +61,6 @@ const Meeting = () => {
         }
 
         setIsLoading(false);
-        
-        // Lock the meeting to prevent re-renders after short delay
-        setTimeout(() => {
-          setIsMeetingLocked(true);
-        }, 500);
-
       } catch (err: any) {
         console.error('Error loading meeting:', err);
         setError(err.message || 'Failed to load meeting');
@@ -101,15 +71,7 @@ const Meeting = () => {
     loadMeetingData();
   }, [id, user]);
 
-  // Store stable props reference
-  useEffect(() => {
-    if (stableMeetingProps && !stableMeetingPropsRef.current) {
-      stableMeetingPropsRef.current = stableMeetingProps;
-    }
-  }, [stableMeetingProps]);
-
   const handleMeetingEnd = () => {
-    setIsMeetingLocked(false);
     navigate('/calendar');
   };
 
@@ -150,22 +112,12 @@ const Meeting = () => {
     );
   }
 
-  // Show loading until all data is ready and meeting is locked for stability
-  if (!stableMeetingProps || !isMeetingLocked) {
-    return (
-      <div className="flex items-center justify-center h-screen">
-        <div className="text-center">
-          <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4" />
-          <p className="text-lg">Preparing meeting...</p>
-        </div>
-      </div>
-    );
-  }
+  const isHost = meetingData.user_id === user.id;
 
   return (
     <div className="flex flex-col h-screen">
       {/* Header */}
-      <div className="flex items-center justify-between p-4 border-b bg-white flex-shrink-0">
+      <div className="flex items-center justify-between p-4 border-b bg-white">
         <div className="flex items-center gap-3">
           <Button 
             variant="ghost" 
@@ -186,22 +138,15 @@ const Meeting = () => {
         <div className="w-32"></div> {/* Spacer for centering */}
       </div>
 
-      {/* Meeting Content - Stable container with lifecycle protection */}
-      <div 
-        ref={meetingContainerRef}
-        className="flex-1 bg-gray-50" 
-        style={{ minHeight: '600px' }}
-      >
-        {isMeetingLocked && stableMeetingProps && (
-          <ZoomMeeting
-            key={`stable-meeting-${meetingData.id}-${Date.now()}`}
-            meetingNumber={stableMeetingProps.meetingNumber}
-            meetingPassword={stableMeetingProps.meetingPassword}
-            userName={stableMeetingProps.userName}
-            role={stableMeetingProps.role}
-            onMeetingEnd={handleMeetingEnd}
-          />
-        )}
+      {/* Meeting Content */}
+      <div className="flex-1 p-4 bg-gray-50">
+        <ZoomMeeting
+          meetingNumber={meetingData.meeting_id}
+          meetingPassword={meetingPassword}
+          userName={user.email || 'Guest'}
+          role={isHost ? 1 : 0}
+          onMeetingEnd={handleMeetingEnd}
+        />
       </div>
     </div>
   );
