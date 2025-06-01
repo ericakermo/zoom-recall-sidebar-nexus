@@ -17,31 +17,42 @@ export function useZoomSDK({ onReady, onError }: UseZoomSDKProps = {}) {
   const isJoiningRef = useRef(false);
   const cleanupInProgressRef = useRef(false);
 
+  // Debug logging helper
+  const debugLog = useCallback((message: string, data?: any) => {
+    console.log(`🔍 [ZOOM-DEBUG] ${message}`, data || '');
+  }, []);
+
   const cleanup = useCallback(() => {
     if (cleanupInProgressRef.current) {
-      console.log('⏸️ Cleanup already in progress, skipping...');
+      debugLog('Cleanup already in progress, skipping...');
       return;
     }
 
     cleanupInProgressRef.current = true;
-    console.log('🧹 Starting Zoom SDK cleanup...');
+    debugLog('Starting Zoom SDK cleanup...');
     
     if (clientRef.current) {
       try {
         if (isJoined && typeof clientRef.current.leave === 'function') {
           clientRef.current.leave();
-          console.log('✅ Left meeting during cleanup');
+          debugLog('Left meeting during cleanup');
         }
         
         if (typeof clientRef.current.destroy === 'function') {
           clientRef.current.destroy();
-          console.log('✅ Destroyed Zoom client');
+          debugLog('Destroyed Zoom client');
         }
       } catch (error) {
-        console.warn('⚠️ Cleanup warning (non-critical):', error);
+        debugLog('Cleanup warning (non-critical):', error);
       }
       
       clientRef.current = null;
+    }
+
+    // Clean container following Zoom documentation
+    if (containerRef.current) {
+      containerRef.current.innerHTML = '';
+      debugLog('Container cleaned with innerHTML = ""');
     }
     
     setIsSDKLoaded(false);
@@ -51,44 +62,134 @@ export function useZoomSDK({ onReady, onError }: UseZoomSDKProps = {}) {
     isJoiningRef.current = false;
     cleanupInProgressRef.current = false;
     
-    console.log('✅ Zoom SDK cleanup completed');
-  }, [isJoined]);
+    debugLog('Zoom SDK cleanup completed');
+  }, [isJoined, debugLog]);
+
+  const validateContainer = useCallback(() => {
+    if (!containerRef.current) {
+      debugLog('Container ref is null');
+      return false;
+    }
+
+    const rect = containerRef.current.getBoundingClientRect();
+    const styles = window.getComputedStyle(containerRef.current);
+    
+    const validation = {
+      exists: !!containerRef.current,
+      dimensions: { width: rect.width, height: rect.height },
+      computedStyles: {
+        width: styles.width,
+        height: styles.height,
+        display: styles.display,
+        visibility: styles.visibility,
+        position: styles.position
+      },
+      isVisible: rect.width > 0 && rect.height > 0,
+      hasFixedDimensions: rect.width === 900 && rect.height === 506
+    };
+
+    debugLog('Container validation:', validation);
+    return validation.exists && validation.isVisible;
+  }, [debugLog]);
+
+  const setupSDKEventListeners = useCallback((client: any) => {
+    debugLog('Setting up SDK event listeners...');
+
+    // Connection events
+    client.on('connection-change', (payload: any) => {
+      debugLog('🔌 connection-change event:', payload);
+    });
+
+    client.on('media-sdk-change', (payload: any) => {
+      debugLog('📺 media-sdk-change event:', payload);
+    });
+
+    // Meeting events
+    client.on('meeting-status-changed', (payload: any) => {
+      debugLog('📋 meeting-status-changed event:', payload);
+    });
+
+    // Video events
+    client.on('video-active-change', (payload: any) => {
+      debugLog('🎥 video-active-change event:', payload);
+    });
+
+    client.on('peer-video-state-change', (payload: any) => {
+      debugLog('👥 peer-video-state-change event:', payload);
+    });
+
+    // Audio events
+    client.on('audio-change', (payload: any) => {
+      debugLog('🔊 audio-change event:', payload);
+    });
+
+    client.on('active-speaker', (payload: any) => {
+      debugLog('🗣️ active-speaker event:', payload);
+    });
+
+    // User events
+    client.on('user-added', (payload: any) => {
+      debugLog('👤 user-added event:', payload);
+    });
+
+    client.on('user-removed', (payload: any) => {
+      debugLog('👤 user-removed event:', payload);
+    });
+
+    debugLog('SDK event listeners configured');
+  }, [debugLog]);
 
   const initializeSDK = useCallback(async () => {
     if (initializationRef.current || !containerRef.current || cleanupInProgressRef.current) {
-      console.log('⏸️ SDK initialization skipped - already initialized, container not ready, or cleanup in progress');
+      debugLog('SDK initialization skipped - already initialized, container not ready, or cleanup in progress');
+      return false;
+    }
+
+    if (!validateContainer()) {
+      debugLog('Container validation failed');
       return false;
     }
 
     initializationRef.current = true;
+    debugLog('Starting SDK initialization following Zoom documentation...');
 
     try {
-      console.log('🔄 Creating new Zoom embedded client instance...');
-      console.log('📍 Container element:', containerRef.current);
-      
+      // Step 1: Create new client instance (following Zoom docs)
+      debugLog('Creating new ZoomMtgEmbedded client...');
       clientRef.current = ZoomMtgEmbedded.createClient();
       
-      console.log('🔄 Initializing Zoom embedded client with simple config...');
-      
-      await clientRef.current.init({
-        debug: true,
+      // Step 2: Setup event listeners before init
+      setupSDKEventListeners(clientRef.current);
+
+      // Step 3: Clean container with innerHTML = "" (following Zoom docs)
+      containerRef.current.innerHTML = '';
+      debugLog('Container cleaned before init');
+
+      // Step 4: Initialize with zoomAppRoot (following Zoom docs)
+      const initConfig = {
         zoomAppRoot: containerRef.current,
         language: 'en-US',
         patchJsMedia: true,
-        leaveOnPageUnload: true,
-        customize: {
-          video: {
-            isResizable: false,
-            viewSizes: {
-              default: { width: 900, height: 506 }
-            }
-          }
-        }
-      });
+        leaveOnPageUnload: true
+      };
+
+      debugLog('Calling client.init() with config:', initConfig);
+      
+      await clientRef.current.init(initConfig);
+
+      debugLog('client.init() completed successfully');
+      
+      // Validate post-init state
+      const postInitValidation = {
+        containerHasContent: containerRef.current.children.length > 0,
+        containerHTML: containerRef.current.innerHTML.length,
+        clientExists: !!clientRef.current
+      };
+
+      debugLog('Post-init validation:', postInitValidation);
 
       setIsSDKLoaded(true);
       setIsReady(true);
-      console.log('✅ Zoom embedded client initialized');
       
       if (!cleanupInProgressRef.current) {
         onReady?.();
@@ -96,70 +197,36 @@ export function useZoomSDK({ onReady, onError }: UseZoomSDKProps = {}) {
       
       return true;
     } catch (error: any) {
-      console.error('❌ Failed to initialize Zoom embedded client:', error);
+      debugLog('Failed to initialize Zoom SDK:', error);
       initializationRef.current = false;
       onError?.(error.message || 'Failed to initialize Zoom SDK');
       return false;
     }
-  }, [onReady, onError]);
-
-  const setupSpeakerView = useCallback(async () => {
-    console.log('🔄 setupSpeakerView called');
-
-    if (!clientRef.current || !isJoined || cleanupInProgressRef.current) {
-      console.log('⏸️ Cannot setup speaker view - conditions not met');
-      return;
-    }
-
-    try {
-      console.log('🔄 Setting up speaker view...');
-      
-      // Wait for meeting to load
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      
-      // Set speaker view
-      if (typeof clientRef.current.setGalleryView === 'function') {
-        await clientRef.current.setGalleryView(false);
-        console.log('✅ Speaker view enabled');
-      }
-
-      // Start video
-      const mediaStream = clientRef.current.getMediaStream();
-      if (mediaStream && typeof mediaStream.startVideo === 'function') {
-        await mediaStream.startVideo();
-        console.log('✅ Video started');
-      }
-      
-      console.log('✅ Speaker view setup completed');
-    } catch (error) {
-      console.error('❌ Speaker view setup error:', error);
-    }
-  }, [isJoined]);
+  }, [validateContainer, setupSDKEventListeners, onReady, onError, debugLog]);
 
   const joinMeeting = useCallback(async (joinConfig: any) => {
-    console.log('📍 joinMeeting called');
+    debugLog('joinMeeting called with config:', joinConfig);
 
     if (!isReady || !clientRef.current) {
-      throw new Error('Zoom SDK not ready');
+      throw new Error('Zoom SDK not ready - client.init() must complete first');
     }
 
     if (isJoiningRef.current || cleanupInProgressRef.current) {
-      console.log('⏸️ Join attempt already in progress or cleanup in progress');
+      debugLog('Join attempt already in progress or cleanup in progress');
       return;
     }
 
     isJoiningRef.current = true;
-
-    console.log('🔄 Joining meeting...');
+    debugLog('Starting join process...');
 
     const meetingNumberStr = String(joinConfig.meetingNumber).replace(/\s+/g, '');
     if (!/^\d{10,11}$/.test(meetingNumberStr)) {
       isJoiningRef.current = false;
       throw new Error(`Invalid meeting number format: ${joinConfig.meetingNumber}`);
     }
-    
+
     try {
-      const result = await clientRef.current.join({
+      const joinParams = {
         sdkKey: joinConfig.sdkKey,
         signature: joinConfig.signature,
         meetingNumber: meetingNumberStr,
@@ -167,19 +234,35 @@ export function useZoomSDK({ onReady, onError }: UseZoomSDKProps = {}) {
         userName: joinConfig.userName,
         userEmail: joinConfig.userEmail || '',
         zak: joinConfig.zak || ''
-      });
+      };
+
+      debugLog('Calling client.join() with params:', { ...joinParams, signature: '[REDACTED]', zak: joinParams.zak ? '[PRESENT]' : '[EMPTY]' });
       
-      console.log('✅ Successfully joined meeting');
+      const result = await clientRef.current.join(joinParams);
+      
+      debugLog('client.join() completed successfully:', result);
       setIsJoined(true);
-      
-      // Setup speaker view
-      setTimeout(async () => {
-        await setupSpeakerView();
-      }, 3000);
+
+      // Post-join validation
+      setTimeout(() => {
+        if (containerRef.current) {
+          const postJoinValidation = {
+            containerChildren: containerRef.current.children.length,
+            containerHTML: containerRef.current.innerHTML.length,
+            hasVideoCanvas: !!containerRef.current.querySelector('canvas'),
+            hasVideoElements: !!containerRef.current.querySelector('video'),
+            visibleElements: Array.from(containerRef.current.querySelectorAll('*')).filter(el => {
+              const rect = el.getBoundingClientRect();
+              return rect.width > 0 && rect.height > 0;
+            }).length
+          };
+          debugLog('Post-join container analysis:', postJoinValidation);
+        }
+      }, 2000);
       
       return result;
     } catch (error: any) {
-      console.error('❌ Failed to join meeting:', error);
+      debugLog('client.join() failed:', error);
       
       let errorMessage = error.message || 'Failed to join meeting';
       if (error?.errorCode === 200) {
@@ -196,36 +279,36 @@ export function useZoomSDK({ onReady, onError }: UseZoomSDKProps = {}) {
     } finally {
       isJoiningRef.current = false;
     }
-  }, [isReady, setupSpeakerView]);
+  }, [isReady, debugLog]);
 
   const leaveMeeting = useCallback(() => {
     if (clientRef.current && isJoined && !cleanupInProgressRef.current) {
-      console.log('🔄 Leaving meeting...');
+      debugLog('Leaving meeting...');
       try {
         if (typeof clientRef.current.leave === 'function') {
           clientRef.current.leave();
           setIsJoined(false);
-          console.log('✅ Left meeting successfully');
+          debugLog('Left meeting successfully');
         }
       } catch (error) {
-        console.error('❌ Error during meeting leave:', error);
+        debugLog('Error during meeting leave:', error);
       }
     }
-  }, [isJoined]);
+  }, [isJoined, debugLog]);
 
   useEffect(() => {
     if (containerRef.current && !initializationRef.current && !cleanupInProgressRef.current) {
-      console.log('🎯 Container is ready, initializing SDK...');
+      debugLog('Container is ready, initializing SDK...');
       initializeSDK();
     }
-  }, []);
+  }, [initializeSDK, debugLog]);
 
   useEffect(() => {
     return () => {
-      console.log('🔄 Component unmounting, cleaning up...');
+      debugLog('Component unmounting, cleaning up...');
       cleanup();
     };
-  }, [cleanup]);
+  }, [cleanup, debugLog]);
 
   return {
     containerRef,
