@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -109,7 +108,7 @@ export function ZoomMeeting({
       </div>
       
       {/* Meeting content - fixed positioned container */}
-      <div className="relative flex-1">
+      <div className="relative flex-1 min-h-[400px]">
         <ZoomComponentView
           meetingNumber={meetingNumber}
           meetingPassword={meetingPassword}
