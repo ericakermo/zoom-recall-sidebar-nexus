@@ -181,21 +181,21 @@ export function useZoomSDK({ onReady, onError }: UseZoomSDKProps = {}) {
           hasJoinedRef.current = true;
           setIsJoined(true);
           
-          // Set speaker view after successful join
+          // Set responsive video options after successful join
           setTimeout(() => {
             if (clientRef.current && typeof clientRef.current.updateVideoOptions === 'function') {
               try {
                 clientRef.current.updateVideoOptions({
                   viewSizes: {
                     default: {
-                      width: 500,
-                      height: 300
+                      width: 900,
+                      height: 506
                     }
                   }
                 });
-                debugLog('Speaker view configured successfully');
+                debugLog('Responsive video dimensions configured successfully');
               } catch (error) {
-                debugLog('Failed to configure speaker view:', error);
+                debugLog('Failed to configure video dimensions:', error);
               }
             }
           }, 2000);

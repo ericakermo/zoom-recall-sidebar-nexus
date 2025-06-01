@@ -1,4 +1,3 @@
-
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -122,44 +121,61 @@
   margin: 0 auto;
 }
 
-/* Ensure Zoom SDK content is not restricted by parent containers */
-.zoom-container * {
+/* Force Zoom video container to fill available space */
+.zoom-container [class*="css-1op03nt"],
+.zoom-container [width="250"][height="274"],
+.zoom-container > div:first-child {
+  width: 100% !important;
+  height: 100% !important;
   max-width: none !important;
   max-height: none !important;
+}
+
+/* Make video elements responsive */
+.zoom-container video {
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: cover !important;
+}
+
+/* Ensure video wrapper divs fill container */
+.zoom-container [class*="css-1hyfx7x"],
+.zoom-container [class*="css-cwho2j"] {
+  width: 100% !important;
+  height: 100% !important;
+}
+
+/* Position toolbar at bottom */
+.zoom-container [class*="css-woj72k"],
+.zoom-container [class*="css-15yt4jb"] {
+  position: absolute !important;
+  bottom: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  width: 100% !important;
+  z-index: 100 !important;
+}
+
+/* Ensure toolbar maintains proper styling */
+.zoom-container [class*="css-1mctt5q"] {
+  width: 100% !important;
+  justify-content: center !important;
+}
+
+/* Prevent dragging while allowing controls */
+.zoom-container .react-draggable {
+  pointer-events: none !important;
+}
+
+.zoom-container .react-draggable [class*="control"],
+.zoom-container .react-draggable [class*="button"],
+.zoom-container .react-draggable [class*="toolbar"],
+.zoom-container .react-draggable [role="button"],
+.zoom-container .react-draggable button {
+  pointer-events: auto !important;
 }
 
 /* Hide default Zoom meeting root if it exists */
 #zmmtg-root {
   display: none !important;
-}
-
-/* Only prevent dragging - don't interfere with layout */
-.zoom-container video,
-.zoom-container canvas {
-  pointer-events: none !important;
-  user-select: none !important;
-  -webkit-user-drag: none !important;
-  -moz-user-select: none !important;
-  -ms-user-select: none !important;
-  -webkit-user-select: none !important;
-}
-
-/* Allow controls to remain interactive */
-.zoom-container [class*="control"],
-.zoom-container [class*="button"],
-.zoom-container [class*="toolbar"],
-.zoom-container [role="button"],
-.zoom-container button,
-.zoom-container [class*="footer"],
-.zoom-container [class*="header"] {
-  pointer-events: auto !important;
-  user-select: auto !important;
-  -webkit-user-drag: auto !important;
-}
-
-/* Ensure the container fills properly but let Zoom handle internal layout */
-.zoom-container > div:first-child {
-  width: 100% !important;
-  height: 100% !important;
-  position: relative !important;
 }
