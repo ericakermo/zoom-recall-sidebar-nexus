@@ -101,57 +101,28 @@
   }
 }
 
-/* Zoom meeting container styles - FORCED sizing to prevent overflow */
+/* Zoom meeting container - let Zoom handle its own sizing */
 .zoom-meeting-wrapper {
   display: flex;
   justify-content: center;
   align-items: center;
   height: 100%;
   width: 100%;
-  overflow: hidden;
+  background-color: #1f1f1f;
 }
 
 .zoom-fixed-container {
-  width: 900px !important;
-  height: 506px !important;
-  max-width: 95vw;
-  max-height: 85vh;
+  width: 900px;
+  height: 506px;
   position: relative;
   border-radius: 8px;
-  overflow: hidden !important;
-  background-color: black;
+  overflow: hidden;
+  background-color: #1f1f1f;
   box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
 }
 
-/* Force ALL Zoom SDK internal elements to respect our container size */
-.zoom-fixed-container > div,
-.zoom-fixed-container div,
-.zoom-fixed-container canvas,
-.zoom-fixed-container video {
-  max-width: 900px !important;
-  max-height: 506px !important;
-}
-
-/* Specific overrides for problematic Zoom elements */
-.zoom-fixed-container [role="tabpanel"] {
-  width: 900px !important;
-  height: 506px !important;
-}
-
-.zoom-fixed-container .css-1yrfxyc,
-.zoom-fixed-container .css-bfildn {
-  width: 900px !important;
-  height: 506px !important;
-}
-
-.zoom-fixed-container #zoom-sdk-video-canvas,
-.zoom-fixed-container #ZOOM_WEB_SDK_SELF_VIDEO {
-  width: 900px !important;
-  height: 506px !important;
-}
-
-/* Force list items (participant views) to fit properly */
-.zoom-fixed-container ul li {
-  max-width: 892px !important;
-  max-height: 498px !important;
+/* Let Zoom SDK handle internal rendering with minimal interference */
+.zoom-fixed-container > div {
+  width: 100% !important;
+  height: 100% !important;
 }
