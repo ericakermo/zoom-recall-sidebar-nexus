@@ -97,7 +97,7 @@ export function ZoomComponentView({
 
   const getTokens = useCallback(async (meetingNumber: string, role: number) => {
     try {
-      debugLog('Requesting fresh tokens for meeting:', meetingNumber, 'role:', role);
+      debugLog('Requesting fresh tokens for meeting:', { meetingNumber, role });
       
       const { data: tokenData, error: tokenError } = await supabase.functions.invoke('get-zoom-token', {
         body: {
@@ -186,7 +186,7 @@ export function ZoomComponentView({
         const renderingValidation = validateRenderingConditions();
         debugLog('Post-join rendering validation:', renderingValidation);
         
-        if (!renderingValidation.hasContent) {
+        if (renderingValidation && typeof renderingValidation === 'object' && !renderingValidation.hasContent) {
           debugLog('WARNING: Meeting joined but no content rendered in container');
         }
       }, 3000);
