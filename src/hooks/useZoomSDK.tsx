@@ -72,14 +72,11 @@ export function useZoomSDK({ onReady, onError }: UseZoomSDKProps = {}) {
       
       clientRef.current = ZoomMtgEmbedded.createClient();
       
-      console.log('🔄 Initializing Zoom SDK with proper embedded settings...');
+      console.log('🔄 Initializing Zoom SDK with corrected embedded settings...');
       
       await clientRef.current.init({
-        debug: false,
         zoomAppRoot: containerRef.current,
         language: 'en-US',
-        patchJsMedia: true,
-        leaveOnPageUnload: true,
         customize: {
           video: {
             isResizable: false,
@@ -89,36 +86,13 @@ export function useZoomSDK({ onReady, onError }: UseZoomSDKProps = {}) {
                 height: 506
               }
             }
-          },
-          meetingInfo: {
-            topic: false,
-            host: false,
-            mn: false,
-            pwd: false,
-            telPwd: false,
-            invite: false,
-            participant: false,
-            dc: false,
-            enctype: false,
-            report: false
-          },
-          toolbar: {
-            buttons: [
-              {
-                text: 'Mute',
-                className: 'CustomMuteButton',
-                onClick: () => {
-                  console.log('Custom mute clicked');
-                }
-              }
-            ]
           }
         }
       });
 
       setIsSDKLoaded(true);
       setIsReady(true);
-      console.log('✅ Zoom SDK initialized successfully with embedded settings');
+      console.log('✅ Zoom SDK initialized successfully with corrected settings');
       
       if (!cleanupInProgressRef.current) {
         onReady?.();
@@ -134,7 +108,7 @@ export function useZoomSDK({ onReady, onError }: UseZoomSDKProps = {}) {
   }, [onReady, onError]);
 
   const joinMeeting = useCallback(async (joinConfig: any) => {
-    console.log('📍 Joining meeting with embedded SDK...');
+    console.log('📍 Joining meeting with corrected embedded SDK...');
 
     if (!isReady || !clientRef.current) {
       throw new Error('Zoom SDK not ready');
@@ -147,6 +121,7 @@ export function useZoomSDK({ onReady, onError }: UseZoomSDKProps = {}) {
 
     isJoiningRef.current = true;
 
+    // Ensure meeting number is a clean string
     const meetingNumberStr = String(joinConfig.meetingNumber).replace(/\s+/g, '');
     if (!/^\d{10,11}$/.test(meetingNumberStr)) {
       isJoiningRef.current = false;
@@ -154,28 +129,29 @@ export function useZoomSDK({ onReady, onError }: UseZoomSDKProps = {}) {
     }
     
     try {
-      console.log('🔄 Joining with embedded config:', {
+      console.log('🔄 Joining with corrected config format:', {
         meetingNumber: meetingNumberStr,
         userName: joinConfig.userName,
         role: joinConfig.role
       });
       
-      const result = await clientRef.current.join({
-        sdkKey: joinConfig.sdkKey,
-        signature: joinConfig.signature,
+      // Use the exact format expected by the embedded SDK
+      const correctedJoinConfig = {
+        sdkKey: String(joinConfig.sdkKey || ''),
+        signature: String(joinConfig.signature || ''),
         meetingNumber: meetingNumberStr,
-        password: joinConfig.passWord || '',
-        userName: joinConfig.userName,
-        userEmail: joinConfig.userEmail || '',
-        zak: joinConfig.zak || ''
-      });
+        password: String(joinConfig.passWord || joinConfig.password || ''),
+        userName: String(joinConfig.userName || 'Guest'),
+        userEmail: String(joinConfig.userEmail || ''),
+        tk: String(joinConfig.zak || '')  // Use 'tk' instead of 'zak' for embedded SDK
+      };
       
-      console.log('✅ Successfully joined meeting with embedded SDK');
+      console.log('🔧 Corrected join config prepared');
+      
+      const result = await clientRef.current.join(correctedJoinConfig);
+      
+      console.log('✅ Successfully joined meeting with corrected embedded SDK');
       setIsJoined(true);
-      
-      // For embedded SDK, the video/audio should start automatically
-      // No need for manual media stream setup as it's handled internally
-      console.log('🎥 Embedded SDK will handle video/audio automatically');
       
       return result;
     } catch (error: any) {
