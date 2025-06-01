@@ -16,6 +16,7 @@ export function useZoomSDK({ onReady, onError }: UseZoomSDKProps = {}) {
   const initializationRef = useRef(false);
   const isJoiningRef = useRef(false);
   const cleanupInProgressRef = useRef(false);
+  const sessionId = useRef(Date.now().toString());
 
   // Debug logging helper
   const debugLog = useCallback((message: string, data?: any) => {
@@ -92,53 +93,6 @@ export function useZoomSDK({ onReady, onError }: UseZoomSDKProps = {}) {
     return validation.exists && validation.isVisible;
   }, [debugLog]);
 
-  const setupSDKEventListeners = useCallback((client: any) => {
-    debugLog('Setting up SDK event listeners...');
-
-    // Connection events
-    client.on('connection-change', (payload: any) => {
-      debugLog('🔌 connection-change event:', payload);
-    });
-
-    client.on('media-sdk-change', (payload: any) => {
-      debugLog('📺 media-sdk-change event:', payload);
-    });
-
-    // Meeting events
-    client.on('meeting-status-changed', (payload: any) => {
-      debugLog('📋 meeting-status-changed event:', payload);
-    });
-
-    // Video events
-    client.on('video-active-change', (payload: any) => {
-      debugLog('🎥 video-active-change event:', payload);
-    });
-
-    client.on('peer-video-state-change', (payload: any) => {
-      debugLog('👥 peer-video-state-change event:', payload);
-    });
-
-    // Audio events
-    client.on('audio-change', (payload: any) => {
-      debugLog('🔊 audio-change event:', payload);
-    });
-
-    client.on('active-speaker', (payload: any) => {
-      debugLog('🗣️ active-speaker event:', payload);
-    });
-
-    // User events
-    client.on('user-added', (payload: any) => {
-      debugLog('👤 user-added event:', payload);
-    });
-
-    client.on('user-removed', (payload: any) => {
-      debugLog('👤 user-removed event:', payload);
-    });
-
-    debugLog('SDK event listeners configured');
-  }, [debugLog]);
-
   const initializeSDK = useCallback(async () => {
     if (initializationRef.current || !containerRef.current || cleanupInProgressRef.current) {
       debugLog('SDK initialization skipped - already initialized, container not ready, or cleanup in progress');
@@ -158,22 +112,34 @@ export function useZoomSDK({ onReady, onError }: UseZoomSDKProps = {}) {
       debugLog('Creating new ZoomMtgEmbedded client...');
       clientRef.current = ZoomMtgEmbedded.createClient();
       
-      // Step 2: Setup event listeners before init
-      setupSDKEventListeners(clientRef.current);
+      if (!clientRef.current) {
+        throw new Error('Failed to create Zoom client');
+      }
 
-      // Step 3: Clean container with innerHTML = "" (following Zoom docs)
+      // Step 2: Clean container with innerHTML = "" (following Zoom docs)
       containerRef.current.innerHTML = '';
       debugLog('Container cleaned before init');
 
-      // Step 4: Initialize with zoomAppRoot (following Zoom docs)
+      // Step 3: Initialize with zoomAppRoot (following Zoom docs)
       const initConfig = {
         zoomAppRoot: containerRef.current,
         language: 'en-US',
         patchJsMedia: true,
-        leaveOnPageUnload: true
+        leaveOnPageUnload: true,
+        disablePreview: false,
+        success: (event: any) => {
+          debugLog('Zoom client initialized successfully', event);
+        },
+        error: (event: any) => {
+          debugLog('Zoom client initialization error', event);
+          throw new Error(`Zoom init failed: ${event?.errorMessage || 'Unknown error'}`);
+        }
       };
 
-      debugLog('Calling client.init() with config:', initConfig);
+      debugLog('Calling client.init() with config:', { 
+        ...initConfig, 
+        zoomAppRoot: 'DOM Element'
+      });
       
       await clientRef.current.init(initConfig);
 
@@ -183,7 +149,8 @@ export function useZoomSDK({ onReady, onError }: UseZoomSDKProps = {}) {
       const postInitValidation = {
         containerHasContent: containerRef.current.children.length > 0,
         containerHTML: containerRef.current.innerHTML.length,
-        clientExists: !!clientRef.current
+        clientExists: !!clientRef.current,
+        sessionId: sessionId.current
       };
 
       debugLog('Post-init validation:', postInitValidation);
@@ -202,7 +169,7 @@ export function useZoomSDK({ onReady, onError }: UseZoomSDKProps = {}) {
       onError?.(error.message || 'Failed to initialize Zoom SDK');
       return false;
     }
-  }, [validateContainer, setupSDKEventListeners, onReady, onError, debugLog]);
+  }, [validateContainer, onReady, onError, debugLog]);
 
   const joinMeeting = useCallback(async (joinConfig: any) => {
     debugLog('joinMeeting called with config:', joinConfig);
@@ -233,51 +200,59 @@ export function useZoomSDK({ onReady, onError }: UseZoomSDKProps = {}) {
         password: joinConfig.passWord || '',
         userName: joinConfig.userName,
         userEmail: joinConfig.userEmail || '',
-        zak: joinConfig.zak || ''
+        zak: joinConfig.zak || '',
+        success: (success: any) => {
+          debugLog('Join meeting success:', success);
+          setIsJoined(true);
+          
+          // Post-join validation
+          setTimeout(() => {
+            if (containerRef.current) {
+              const postJoinValidation = {
+                containerChildren: containerRef.current.children.length,
+                containerHTML: containerRef.current.innerHTML.length,
+                hasVideoCanvas: !!containerRef.current.querySelector('canvas'),
+                hasVideoElements: !!containerRef.current.querySelector('video'),
+                sessionId: sessionId.current
+              };
+              debugLog('Post-join container analysis:', postJoinValidation);
+            }
+          }, 2000);
+        },
+        error: (error: any) => {
+          debugLog('Join meeting error:', error);
+          isJoiningRef.current = false;
+          
+          let errorMessage = error.message || 'Failed to join meeting';
+          if (error?.errorCode === 200) {
+            errorMessage = 'Meeting join failed - please refresh and try again';
+          } else if (error?.errorCode === 3712) {
+            errorMessage = 'Invalid signature - authentication failed';
+          } else if (error?.errorCode === 1) {
+            errorMessage = 'Meeting not found - verify meeting ID is correct';
+          } else if (error?.errorCode === 3000) {
+            errorMessage = 'Meeting password required or incorrect';
+          }
+          
+          throw new Error(errorMessage);
+        }
       };
 
-      debugLog('Calling client.join() with params:', { ...joinParams, signature: '[REDACTED]', zak: joinParams.zak ? '[PRESENT]' : '[EMPTY]' });
+      debugLog('Calling client.join() with params:', { 
+        ...joinParams, 
+        signature: '[REDACTED]', 
+        zak: joinParams.zak ? '[PRESENT]' : '[EMPTY]',
+        success: '[FUNCTION]',
+        error: '[FUNCTION]'
+      });
       
-      const result = await clientRef.current.join(joinParams);
+      await clientRef.current.join(joinParams);
       
-      debugLog('client.join() completed successfully:', result);
-      setIsJoined(true);
-
-      // Post-join validation
-      setTimeout(() => {
-        if (containerRef.current) {
-          const postJoinValidation = {
-            containerChildren: containerRef.current.children.length,
-            containerHTML: containerRef.current.innerHTML.length,
-            hasVideoCanvas: !!containerRef.current.querySelector('canvas'),
-            hasVideoElements: !!containerRef.current.querySelector('video'),
-            visibleElements: Array.from(containerRef.current.querySelectorAll('*')).filter(el => {
-              const rect = el.getBoundingClientRect();
-              return rect.width > 0 && rect.height > 0;
-            }).length
-          };
-          debugLog('Post-join container analysis:', postJoinValidation);
-        }
-      }, 2000);
-      
-      return result;
+      return true;
     } catch (error: any) {
       debugLog('client.join() failed:', error);
-      
-      let errorMessage = error.message || 'Failed to join meeting';
-      if (error?.errorCode === 200) {
-        errorMessage = 'Meeting join failed - please refresh and try again';
-      } else if (error?.errorCode === 3712) {
-        errorMessage = 'Invalid signature - authentication failed';
-      } else if (error?.errorCode === 1) {
-        errorMessage = 'Meeting not found - verify meeting ID is correct';
-      } else if (error?.errorCode === 3000) {
-        errorMessage = 'Meeting password required or incorrect';
-      }
-      
-      throw new Error(errorMessage);
-    } finally {
       isJoiningRef.current = false;
+      throw error;
     }
   }, [isReady, debugLog]);
 
