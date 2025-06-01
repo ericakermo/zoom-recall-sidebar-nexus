@@ -1,8 +1,8 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
-import { ZoomComponentView } from './ZoomComponentView';
+import ZoomMtgEmbedded from "@zoomus/websdk/embedded";
 
 interface ZoomMeetingProps {
   meetingNumber: string;
@@ -25,6 +25,48 @@ export function ZoomMeeting({
   const [isConnected, setIsConnected] = useState(false);
   const navigate = useNavigate();
   const { toast } = useToast();
+  const zoomContainerRef = useRef(null);
+  const clientRef = useRef(null);
+
+  useEffect(() => {
+    if (!zoomContainerRef.current) return;
+
+    // Create client only once
+    if (!clientRef.current) {
+      clientRef.current = ZoomMtgEmbedded.createClient();
+    }
+
+    // Ensure container is visible and has size
+    const container = zoomContainerRef.current;
+    container.style.width = "100%";
+    container.style.height = "100%";
+    container.style.minHeight = "600px"; // or whatever is appropriate
+
+    // Initialize SDK
+    clientRef.current.init({
+      zoomAppRoot: container,
+      language: "en-US",
+      patchJsMedia: true,
+      leaveOnPageUnload: true,
+    });
+
+    // Join meeting
+    clientRef.current.join({
+      zak,
+      meetingNumber,
+      password: meetingPassword,
+      userName,
+    });
+
+    // Cleanup on unmount
+    return () => {
+      try {
+        clientRef.current.leave();
+        clientRef.current.destroy();
+      } catch {}
+      container.innerHTML = "";
+    };
+  }, [zak, meetingNumber, meetingPassword, userName]);
 
   const handleMeetingJoined = () => {
     setIsConnected(true);
@@ -109,14 +151,9 @@ export function ZoomMeeting({
       
       {/* Meeting content - fixed positioned container */}
       <div className="relative flex-1 min-h-[400px]">
-        <ZoomComponentView
-          meetingNumber={meetingNumber}
-          meetingPassword={meetingPassword}
-          userName={userName}
-          role={role}
-          onMeetingJoined={handleMeetingJoined}
-          onMeetingError={handleMeetingError}
-          onMeetingLeft={handleMeetingLeft}
+        <div
+          ref={zoomContainerRef}
+          style={{ width: "100%", height: "100%", minHeight: "600px", background: "#000" }}
         />
       </div>
     </div>
