@@ -50,7 +50,6 @@ export function useZoomSDK({ sessionId, onReady, onError }: UseZoomSDKProps = {}
     if (containerRef.current) {
       try {
         const container = containerRef.current;
-        // Clear innerHTML instead of removing children one by one
         container.innerHTML = '';
         console.log('✅ [DEBUG] Container cleared safely');
       } catch (error) {
@@ -84,45 +83,47 @@ export function useZoomSDK({ sessionId, onReady, onError }: UseZoomSDKProps = {}
     try {
       console.log('🔄 [DEBUG] Creating Zoom embedded client...', sessionId);
       
-      // Wait for DOM to be stable
-      await new Promise(resolve => setTimeout(resolve, 200));
+      // Create client first
+      clientRef.current = ZoomMtgEmbedded.createClient();
       
-      // Verify container exists and has dimensions
+      if (!clientRef.current) {
+        throw new Error('Failed to create Zoom client');
+      }
+
+      // Validate container exists and has proper ID
       if (!containerRef.current) {
         throw new Error('Container not available for SDK initialization');
       }
 
-      const containerRect = containerRef.current.getBoundingClientRect();
+      // Ensure container has the required ID
+      if (!containerRef.current.id) {
+        containerRef.current.id = 'meetingSDKElement';
+      }
+
       console.log('🔧 [DEBUG] Container validation:', {
         exists: !!containerRef.current,
-        dimensions: {
-          width: containerRect.width,
-          height: containerRect.height
-        },
-        clientWidth: containerRef.current.clientWidth,
-        clientHeight: containerRef.current.clientHeight,
+        id: containerRef.current.id,
+        width: containerRef.current.offsetWidth,
+        height: containerRef.current.offsetHeight,
         sessionId
       });
 
-      if (containerRect.width === 0 || containerRect.height === 0) {
-        throw new Error('Container has no dimensions - check CSS');
-      }
-
-      clientRef.current = ZoomMtgEmbedded.createClient();
+      console.log('🔄 [DEBUG] Initializing Zoom SDK with working config pattern...');
       
-      console.log('🔄 [DEBUG] Initializing Zoom SDK with proper config...');
-      
-      // Simple init config based on working example
+      // Use the exact same config as the working example
       const initConfig = {
         zoomAppRoot: containerRef.current,
-        language: 'en-US',
+        language: "en-US",
         patchJsMedia: true,
         leaveOnPageUnload: true
       };
 
       console.log('🔧 [DEBUG] SDK init config:', {
         hasZoomAppRoot: !!initConfig.zoomAppRoot,
-        containerElement: containerRef.current.tagName,
+        containerElementId: containerRef.current.id,
+        language: initConfig.language,
+        patchJsMedia: initConfig.patchJsMedia,
+        leaveOnPageUnload: initConfig.leaveOnPageUnload,
         sessionId
       });
 
@@ -189,7 +190,7 @@ export function useZoomSDK({ sessionId, onReady, onError }: UseZoomSDKProps = {}
         sessionId
       });
       
-      // Simple join config based on working example
+      // Use the exact same join config format as the working example
       const finalJoinConfig = {
         signature: String(joinConfig.signature || ''),
         sdkKey: String(joinConfig.sdkKey || ''),
@@ -197,14 +198,15 @@ export function useZoomSDK({ sessionId, onReady, onError }: UseZoomSDKProps = {}
         password: String(joinConfig.passWord || joinConfig.password || ''),
         userName: String(joinConfig.userName || 'Guest'),
         userEmail: String(joinConfig.userEmail || ''),
-        tk: String(joinConfig.zak || ''), // ZAK token for host
-        zak: String(joinConfig.zak || '') // Alternative field name
+        tk: String(joinConfig.zak || ''), // ZAK token for host (registrant token)
+        zak: String(joinConfig.zak || '') // ZAK token for host
       };
       
-      console.log('🔧 [DEBUG] Final join config prepared:', {
+      console.log('🔧 [DEBUG] Final join config prepared (working example format):', {
         ...finalJoinConfig,
         signature: finalJoinConfig.signature.substring(0, 20) + '...',
-        tk: finalJoinConfig.tk ? 'present' : 'missing'
+        tk: finalJoinConfig.tk ? 'present' : 'missing',
+        zak: finalJoinConfig.zak ? 'present' : 'missing'
       });
       
       const result = await clientRef.current.join(finalJoinConfig);
@@ -212,12 +214,12 @@ export function useZoomSDK({ sessionId, onReady, onError }: UseZoomSDKProps = {}
       console.log('✅ [DEBUG] Join method completed successfully');
       setIsJoined(true);
       
-      // Debug container content after join
+      // Debug container content after join with delay
       setTimeout(() => {
         console.log('🔍 [DEBUG] Post-join container analysis:', {
           containerChildren: containerRef.current?.children.length,
           containerHTML: containerRef.current?.innerHTML.length,
-          visibleElements: containerRef.current?.querySelectorAll('video, canvas').length,
+          visibleElements: containerRef.current?.querySelectorAll('video, canvas, iframe').length,
           sessionId
         });
       }, 2000);
@@ -269,15 +271,15 @@ export function useZoomSDK({ sessionId, onReady, onError }: UseZoomSDKProps = {}
     if (containerRef.current && !initializationRef.current && !cleanupInProgressRef.current) {
       console.log('🎯 [DEBUG] Container ready, initializing SDK...', {
         containerExists: !!containerRef.current,
+        containerDimensions: {
+          width: containerRef.current.offsetWidth,
+          height: containerRef.current.offsetHeight
+        },
         sessionId
       });
       
-      // Small delay to ensure container is fully rendered
-      const timer = setTimeout(() => {
-        initializeSDK();
-      }, 100);
-      
-      return () => clearTimeout(timer);
+      // Immediate initialization for working example pattern
+      initializeSDK();
     }
   }, [initializeSDK, sessionId]);
 

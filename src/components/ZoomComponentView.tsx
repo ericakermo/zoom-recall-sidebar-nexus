@@ -114,7 +114,7 @@ export function ZoomComponentView({
     }
   }, [sessionId]);
 
-  // Join meeting handler
+  // Join meeting handler - simplified to match working example
   const handleJoinMeeting = useCallback(async () => {
     console.log('📍 [DEBUG] handleJoinMeeting called:', {
       sessionId,
@@ -135,9 +135,6 @@ export function ZoomComponentView({
     try {
       setCurrentStep('Getting authentication tokens...');
       
-      // Wait to ensure SDK is fully ready
-      await new Promise(resolve => setTimeout(resolve, 500));
-      
       const forceRefresh = retryCount > 0;
       const tokens = await getTokens(meetingNumber, role || 0, forceRefresh);
 
@@ -149,11 +146,10 @@ export function ZoomComponentView({
         userEmail: user?.email || '',
         passWord: meetingPassword || '',
         role: role || 0,
-        zak: tokens.zak || '',
-        sessionId
+        zak: tokens.zak || ''
       };
 
-      console.log('🔄 [DEBUG] Attempting to join meeting with config...', {
+      console.log('🔄 [DEBUG] Attempting to join meeting with working config...', {
         meetingNumber,
         role: joinConfig.role,
         hasZAK: !!joinConfig.zak,
@@ -175,7 +171,7 @@ export function ZoomComponentView({
         console.log('🔍 [DEBUG] Post-join verification:', {
           containerExists: !!containerRef.current,
           containerVisible: containerRef.current?.offsetWidth > 0,
-          hasContent: containerRef.current?.children.length > 0,
+          hasContent: (containerRef.current?.children.length || 0) > 0,
           sessionId
         });
       }, 3000);
@@ -279,20 +275,16 @@ export function ZoomComponentView({
         maxRetries={maxRetries}
       />
 
-      {/* Zoom meeting container with proper dimensions */}
-      <div className="zoom-meeting-wrapper w-full h-full flex items-center justify-center">
+      {/* Zoom meeting container - simple div like working example */}
+      <div className="zoom-meeting-wrapper w-full h-full">
         <div 
           ref={containerRef}
           id="meetingSDKElement"
-          className="zoom-container"
           style={{
-            width: '900px',
-            height: '506px',
-            backgroundColor: '#1f1f1f',
-            border: '1px solid #333',
-            borderRadius: '8px',
-            overflow: 'hidden',
-            position: 'relative'
+            width: '100%',
+            height: '100%',
+            minWidth: '900px',
+            minHeight: '506px'
           }}
         />
       </div>
