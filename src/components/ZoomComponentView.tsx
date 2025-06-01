@@ -1,3 +1,4 @@
+
 import { useEffect, useState, useCallback } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { useZoomSDK } from '@/hooks/useZoomSDK';
@@ -72,7 +73,7 @@ export function ZoomComponentView({
     const validation = {
       containerExists: !!container,
       dimensions: { width: rect.width, height: rect.height },
-      hasFixedDimensions: rect.width === 900 && rect.height === 506,
+      hasFixedDimensions: rect.width === 800 && rect.height === 450,
       isVisible: rect.width > 0 && rect.height > 0,
       computedStyles: {
         display: styles.display,
@@ -117,7 +118,7 @@ export function ZoomComponentView({
       let zakToken = null;
       if (role === 1) {
         debugLog('Requesting fresh ZAK token for host role...');
-        const { data: zakData, error: zakError } } = await supabase.functions.invoke('get-zoom-zak');
+        const { data: zakData, error: zakError } = await supabase.functions.invoke('get-zoom-zak');
         
         if (zakError || !zakData?.zak) {
           debugLog('ZAK token request failed:', zakError);
