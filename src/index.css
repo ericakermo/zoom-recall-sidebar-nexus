@@ -134,107 +134,33 @@
   display: none !important;
 }
 
-/* Fix for Zoom SDK video rendering and positioning */
-.zoom-container video-player-container {
-  width: 100% !important;
-  height: 100% !important;
-  display: flex !important;
-  justify-content: center !important;
-  align-items: center !important;
-}
-
-.zoom-container video-player {
-  width: 100% !important;
-  height: 100% !important;
-  object-fit: cover !important;
-  aspect-ratio: 16/9 !important;
-  pointer-events: none !important; /* Prevent dragging */
-  user-select: none !important; /* Prevent selection */
-  -webkit-user-drag: none !important; /* Prevent dragging in webkit */
-  -moz-user-select: none !important; /* Prevent selection in firefox */
-  -ms-user-select: none !important; /* Prevent selection in IE */
-}
-
-/* Target Zoom SDK internal video elements to prevent dragging and ensure proper sizing */
-.zoom-container [data-testid*="video"],
-.zoom-container [class*="video"],
+/* Minimal CSS to prevent dragging while preserving Zoom's layout */
 .zoom-container video,
 .zoom-container canvas {
-  width: 100% !important;
-  height: 100% !important;
-  object-fit: cover !important;
   pointer-events: none !important;
   user-select: none !important;
   -webkit-user-drag: none !important;
   -moz-user-select: none !important;
   -ms-user-select: none !important;
-  position: relative !important;
-  top: 0 !important;
-  left: 0 !important;
-  transform: none !important;
-  margin: 0 !important;
-  padding: 0 !important;
+  -webkit-user-select: none !important;
 }
 
-/* Target Zoom's main video container */
-.zoom-container [class*="main-video"],
-.zoom-container [class*="video-main"],
-.zoom-container [class*="active-video"],
-.zoom-container [id*="video-container"] {
-  width: 100% !important;
-  height: 100% !important;
-  display: flex !important;
-  justify-content: center !important;
-  align-items: center !important;
-  position: relative !important;
-}
-
-/* Ensure video elements fill their containers */
-.zoom-container [class*="main-video"] video,
-.zoom-container [class*="video-main"] video,
-.zoom-container [class*="active-video"] video,
-.zoom-container [id*="video-container"] video,
-.zoom-container [class*="main-video"] canvas,
-.zoom-container [class*="video-main"] canvas,
-.zoom-container [class*="active-video"] canvas,
-.zoom-container [id*="video-container"] canvas {
-  width: 100% !important;
-  height: 100% !important;
-  object-fit: cover !important;
-  position: absolute !important;
-  top: 0 !important;
-  left: 0 !important;
-  right: 0 !important;
-  bottom: 0 !important;
-}
-
-/* Prevent any transform or positioning that could make video draggable */
-.zoom-container * {
-  -webkit-transform: none !important;
-  -moz-transform: none !important;
-  -ms-transform: none !important;
-  transform: none !important;
-  -webkit-user-drag: none !important;
-  -moz-user-select: none !important;
-  -ms-user-select: none !important;
-  user-select: none !important;
-}
-
-/* Allow only control buttons to be interactive */
+/* Allow controls to remain interactive */
 .zoom-container [class*="control"],
 .zoom-container [class*="button"],
 .zoom-container [class*="toolbar"],
 .zoom-container [role="button"],
-.zoom-container button {
+.zoom-container button,
+.zoom-container [class*="footer"],
+.zoom-container [class*="header"] {
   pointer-events: auto !important;
   user-select: auto !important;
   -webkit-user-drag: auto !important;
 }
 
-/* Ensure the video fills the entire container properly */
+/* Ensure the container fills properly but let Zoom handle internal layout */
 .zoom-container > div:first-child {
   width: 100% !important;
   height: 100% !important;
   position: relative !important;
-  overflow: hidden !important;
 }
