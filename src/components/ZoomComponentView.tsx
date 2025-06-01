@@ -1,7 +1,8 @@
+
 import { useEffect, useRef, useState, useCallback } from 'react';
 import ZoomMtgEmbedded from '@zoom/meetingsdk/embedded';
 import { supabase } from '@/integrations/supabase/client';
-import { useAuth } from '@/context/AuthContext'; // Assuming AuthContext is needed for user email
+import { useAuth } from '@/context/AuthContext';
 
 interface ZoomComponentViewProps {
   meetingNumber: string;
@@ -24,31 +25,53 @@ export function ZoomComponentView({
 }: ZoomComponentViewProps) {
   const zoomContainerRef = useRef<HTMLDivElement>(null);
   const clientRef = useRef<any>(null);
+  const [isContainerReady, setIsContainerReady] = useState(false);
   const [isSDKReady, setIsSDKReady] = useState(false);
   const [isMeetingJoined, setIsMeetingJoined] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const { user } = useAuth(); // To get user email if not provided
+  const { user } = useAuth();
 
   // Debug logging helper
   const debugLog = useCallback((message: string, data?: any) => {
     console.log(`🔍 [COMPONENT-VIEW] ${message}`, data || '');
   }, []);
 
-  // Effect to initialize the SDK
+  // Effect to check when container ref becomes available
   useEffect(() => {
-    const container = zoomContainerRef.current;
-    if (!container) {
-      debugLog('Container ref not available for SDK initialization');
+    const checkContainer = () => {
+      if (zoomContainerRef.current) {
+        debugLog('Container ref is now available, marking as ready');
+        setIsContainerReady(true);
+      } else {
+        debugLog('Container ref not yet available, will retry');
+        // Retry after a short delay
+        setTimeout(checkContainer, 50);
+      }
+    };
+
+    checkContainer();
+  }, [debugLog]);
+
+  // Effect to initialize SDK once container is ready
+  useEffect(() => {
+    if (!isContainerReady || isSDKReady || error) {
+      debugLog('Skipping SDK init:', { isContainerReady, isSDKReady, hasError: !!error });
       return;
     }
 
-    debugLog('Initializing Zoom SDK...');
+    const container = zoomContainerRef.current;
+    if (!container) {
+      debugLog('Container ref lost after being ready - this should not happen');
+      return;
+    }
+
+    debugLog('Initializing Zoom SDK with ready container...');
 
     // Create client only once
     if (!clientRef.current) {
       try {
         clientRef.current = ZoomMtgEmbedded.createClient();
-        debugLog('Zoom client created');
+        debugLog('Zoom client created successfully');
       } catch (e: any) {
         debugLog('Failed to create Zoom client:', e);
         setError(e?.message || 'Failed to create Zoom client');
@@ -57,12 +80,13 @@ export function ZoomComponentView({
       }
     }
 
-    // Ensure container is visible and has size before init
+    // Ensure container has proper dimensions
     container.style.width = '100%';
     container.style.height = '100%';
-    container.style.minHeight = '600px'; // Minimum height to ensure visibility
+    container.style.minHeight = '600px';
     container.style.background = '#000';
 
+    // Initialize the SDK
     clientRef.current.init({
       zoomAppRoot: container,
       language: 'en-US',
@@ -79,15 +103,14 @@ export function ZoomComponentView({
       }
     });
 
-    // Cleanup init effect
+    // Cleanup function
     return () => {
-      debugLog('Init effect cleanup...');
+      debugLog('SDK init effect cleanup...');
       setIsSDKReady(false);
-      // Client destruction handled in join effect cleanup or parent unmount
     };
-  }, [debugLog, onMeetingError]); // Depend on debugLog and onMeetingError
+  }, [isContainerReady, isSDKReady, error, debugLog, onMeetingError]);
 
-  // Effect to join the meeting after SDK is ready
+  // Effect to join meeting once SDK is ready
   useEffect(() => {
     if (!isSDKReady || isMeetingJoined || error) {
       debugLog('Skipping join effect:', { isSDKReady, isMeetingJoined, error: !!error });
@@ -193,15 +216,12 @@ export function ZoomComponentView({
     };
   }, [debugLog]);
 
-
   // Render loading/error states or the container
   if (error) {
-    // You can use a dedicated Error component here if needed
     return <div className="text-red-500">Error: {error}</div>;
   }
 
-  if (!isSDKReady) {
-    // You can use a dedicated Loading component here if needed
+  if (!isContainerReady || !isSDKReady) {
     return <div className="text-gray-500">Loading Zoom SDK...</div>;
   }
 
