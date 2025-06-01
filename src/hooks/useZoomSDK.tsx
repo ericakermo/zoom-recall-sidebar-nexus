@@ -24,7 +24,7 @@ export function useZoomSDK({ onReady, onError }: UseZoomSDKProps = {}) {
     }
 
     cleanupInProgressRef.current = true;
-    console.log('🧹 Starting Zoom SDK cleanup...');
+    console.log('🧹 Starting comprehensive Zoom SDK cleanup...');
     
     if (clientRef.current) {
       try {
@@ -44,6 +44,11 @@ export function useZoomSDK({ onReady, onError }: UseZoomSDKProps = {}) {
       clientRef.current = null;
     }
     
+    // Clear the container to prevent DOM conflicts
+    if (containerRef.current) {
+      containerRef.current.innerHTML = '';
+    }
+    
     setIsSDKLoaded(false);
     setIsReady(false);
     setIsJoined(false);
@@ -51,13 +56,18 @@ export function useZoomSDK({ onReady, onError }: UseZoomSDKProps = {}) {
     isJoiningRef.current = false;
     cleanupInProgressRef.current = false;
     
-    console.log('✅ Zoom SDK cleanup completed');
+    console.log('✅ Comprehensive Zoom SDK cleanup completed');
   }, [isJoined]);
 
   const initializeSDK = useCallback(async () => {
     if (initializationRef.current || !containerRef.current || cleanupInProgressRef.current) {
       console.log('⏸️ SDK initialization skipped - already initialized, container not ready, or cleanup in progress');
       return false;
+    }
+
+    // Ensure container is clean before initialization
+    if (containerRef.current) {
+      containerRef.current.innerHTML = '';
     }
 
     initializationRef.current = true;
@@ -68,7 +78,7 @@ export function useZoomSDK({ onReady, onError }: UseZoomSDKProps = {}) {
       
       clientRef.current = ZoomMtgEmbedded.createClient();
       
-      console.log('🔄 Initializing Zoom embedded client with simple config...');
+      console.log('🔄 Initializing Zoom embedded client...');
       
       await clientRef.current.init({
         debug: true,
@@ -88,7 +98,7 @@ export function useZoomSDK({ onReady, onError }: UseZoomSDKProps = {}) {
 
       setIsSDKLoaded(true);
       setIsReady(true);
-      console.log('✅ Zoom embedded client initialized');
+      console.log('✅ Zoom embedded client initialized successfully');
       
       if (!cleanupInProgressRef.current) {
         onReady?.();
@@ -103,41 +113,12 @@ export function useZoomSDK({ onReady, onError }: UseZoomSDKProps = {}) {
     }
   }, [onReady, onError]);
 
-  const setupSpeakerView = useCallback(async () => {
-    console.log('🔄 setupSpeakerView called');
-
-    if (!clientRef.current || !isJoined || cleanupInProgressRef.current) {
-      console.log('⏸️ Cannot setup speaker view - conditions not met');
-      return;
-    }
-
-    try {
-      console.log('🔄 Setting up speaker view...');
-      
-      // Wait for meeting to load
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      
-      // Set speaker view
-      if (typeof clientRef.current.setGalleryView === 'function') {
-        await clientRef.current.setGalleryView(false);
-        console.log('✅ Speaker view enabled');
-      }
-
-      // Start video
-      const mediaStream = clientRef.current.getMediaStream();
-      if (mediaStream && typeof mediaStream.startVideo === 'function') {
-        await mediaStream.startVideo();
-        console.log('✅ Video started');
-      }
-      
-      console.log('✅ Speaker view setup completed');
-    } catch (error) {
-      console.error('❌ Speaker view setup error:', error);
-    }
-  }, [isJoined]);
-
   const joinMeeting = useCallback(async (joinConfig: any) => {
-    console.log('📍 joinMeeting called');
+    console.log('📍 joinMeeting called with config:', {
+      meetingNumber: joinConfig.meetingNumber,
+      userName: joinConfig.userName,
+      role: joinConfig.role
+    });
 
     if (!isReady || !clientRef.current) {
       throw new Error('Zoom SDK not ready');
@@ -159,6 +140,16 @@ export function useZoomSDK({ onReady, onError }: UseZoomSDKProps = {}) {
     }
     
     try {
+      console.log('🔄 Attempting to join with fresh session...');
+      console.log('📋 Join config details:', {
+        meetingNumber: meetingNumberStr,
+        userName: joinConfig.userName,
+        role: joinConfig.role,
+        sdkKey: joinConfig.sdkKey ? 'present' : 'missing',
+        signature: joinConfig.signature ? 'present' : 'missing',
+        zak: joinConfig.zak ? 'present' : 'missing'
+      });
+      
       const result = await clientRef.current.join({
         sdkKey: joinConfig.sdkKey,
         signature: joinConfig.signature,
@@ -172,18 +163,39 @@ export function useZoomSDK({ onReady, onError }: UseZoomSDKProps = {}) {
       console.log('✅ Successfully joined meeting');
       setIsJoined(true);
       
-      // Setup speaker view
+      // Simple speaker view setup with delay
       setTimeout(async () => {
-        await setupSpeakerView();
+        try {
+          if (clientRef.current && !cleanupInProgressRef.current) {
+            console.log('🔄 Setting up speaker view...');
+            
+            // Set speaker view
+            if (typeof clientRef.current.setGalleryView === 'function') {
+              await clientRef.current.setGalleryView(false);
+              console.log('✅ Speaker view enabled');
+            }
+
+            // Start video
+            const mediaStream = clientRef.current.getMediaStream();
+            if (mediaStream && typeof mediaStream.startVideo === 'function') {
+              await mediaStream.startVideo();
+              console.log('✅ Video started');
+            }
+          }
+        } catch (error) {
+          console.warn('⚠️ Speaker view setup warning:', error);
+        }
       }, 3000);
       
       return result;
     } catch (error: any) {
       console.error('❌ Failed to join meeting:', error);
+      console.log('🔍 Zoom Error Code:', error?.errorCode);
+      console.log('📝 Zoom Error Reason:', error?.reason);
       
       let errorMessage = error.message || 'Failed to join meeting';
       if (error?.errorCode === 200) {
-        errorMessage = 'Meeting join failed - please refresh and try again';
+        errorMessage = 'Host join failed - this usually means there is an active session conflict. Please refresh the page and try again, or the ZAK token may be expired.';
       } else if (error?.errorCode === 3712) {
         errorMessage = 'Invalid signature - authentication failed';
       } else if (error?.errorCode === 1) {
@@ -192,11 +204,12 @@ export function useZoomSDK({ onReady, onError }: UseZoomSDKProps = {}) {
         errorMessage = 'Meeting password required or incorrect';
       }
       
+      console.log('❌ Join failed:', new Error(errorMessage));
       throw new Error(errorMessage);
     } finally {
       isJoiningRef.current = false;
     }
-  }, [isReady, setupSpeakerView]);
+  }, [isReady]);
 
   const leaveMeeting = useCallback(() => {
     if (clientRef.current && isJoined && !cleanupInProgressRef.current) {
@@ -218,7 +231,7 @@ export function useZoomSDK({ onReady, onError }: UseZoomSDKProps = {}) {
       console.log('🎯 Container is ready, initializing SDK...');
       initializeSDK();
     }
-  }, []);
+  }, [initializeSDK]);
 
   useEffect(() => {
     return () => {

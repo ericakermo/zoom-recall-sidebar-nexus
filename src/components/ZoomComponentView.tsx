@@ -34,6 +34,21 @@ export function ZoomComponentView({
   
   const { user } = useAuth();
 
+  // Force cleanup on mount to prevent session conflicts
+  useEffect(() => {
+    console.log('🔄 Component mounting - forcing cleanup to prevent session conflicts...');
+    
+    // Clear any existing Zoom containers in the DOM
+    const existingContainers = document.querySelectorAll('[class*="zoom"]');
+    existingContainers.forEach(container => {
+      if (container.parentNode) {
+        container.parentNode.removeChild(container);
+      }
+    });
+    
+    console.log('✅ Pre-mount cleanup completed');
+  }, []);
+
   const {
     containerRef,
     isSDKLoaded,
@@ -126,7 +141,7 @@ export function ZoomComponentView({
         zak: tokens.zak || ''
       };
 
-      console.log('🔄 Attempting to join meeting...');
+      console.log('🔄 Attempting to join meeting with fresh config...');
       setCurrentStep('Joining meeting...');
       
       await joinMeeting(joinConfig);
