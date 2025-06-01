@@ -1,4 +1,3 @@
-
 import { useEffect, useState, useCallback } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { useZoomSDK } from '@/hooks/useZoomSDK';
@@ -155,6 +154,12 @@ export function ZoomComponentView({
       setCurrentStep('Getting fresh authentication tokens...');
       const tokens = await getTokens(meetingNumber, role || 0);
 
+      // Debug: log container size before join
+      if (containerRef.current) {
+        const rect = containerRef.current.getBoundingClientRect();
+        debugLog('Container size before join:', { width: rect.width, height: rect.height });
+      }
+
       const joinConfig = {
         sdkKey: tokens.sdkKey,
         signature: tokens.signature,
@@ -195,7 +200,7 @@ export function ZoomComponentView({
       debugLog('Join failed:', error);
       setError(error.message);
       setIsLoading(false);
-      setHasAttemptedJoin(false); // Allow retry
+      // Do NOT reset hasAttemptedJoin here to prevent join loop
       onMeetingError?.(error.message);
     }
   }, [isReady, hasAttemptedJoin, isJoined, error, meetingNumber, role, providedUserName, user, meetingPassword, getTokens, joinMeeting, onMeetingJoined, onMeetingError, validateRenderingConditions, debugLog]);
@@ -233,7 +238,7 @@ export function ZoomComponentView({
       setRetryCount(prev => prev + 1);
       setError(null);
       setIsLoading(true);
-      setHasAttemptedJoin(false); // Reset join attempt flag
+      setHasAttemptedJoin(false); // Only reset here, on explicit retry
       setCurrentStep('Retrying...');
       
       // Clean up and retry
@@ -266,19 +271,15 @@ export function ZoomComponentView({
         maxRetries={maxRetries}
       />
 
-      {/* Zoom meeting container - exact dimensions as per Zoom docs */}
-      <div className="zoom-meeting-wrapper">
-        <div 
-          ref={containerRef}
-          className="zoom-container"
-          style={{
-            width: '900px',
-            height: '506px',
-            backgroundColor: '#000',
-            border: '1px solid #ccc'
-          }}
-        />
-      </div>
+      {/* Zoom meeting container - fill parent, no fixed size */}
+      <div
+        ref={containerRef}
+        className="zoom-container w-full h-full"
+        style={{
+          backgroundColor: '#000',
+          border: '1px solid #ccc'
+        }}
+      />
     </div>
   );
 }
