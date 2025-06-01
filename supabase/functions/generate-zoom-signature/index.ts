@@ -1,20 +1,19 @@
-
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
-import { create, getNumericDate } from 'https://deno.land/x/djwt@v2.4/mod.ts'
 
-// Configure CORS headers
+// Configure CORS headers to allow requests from any origin
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
   'Access-Control-Allow-Methods': 'POST, OPTIONS'
 }
 
-// Zoom OAuth credentials
+// Set the Zoom OAuth credentials (Server-to-Server OAuth)
 const ZOOM_ACCOUNT_ID = Deno.env.get('ZOOM_ACCOUNT_ID') || '';
 const ZOOM_CLIENT_ID = Deno.env.get('ZOOM_CLIENT_ID') || '';
 const ZOOM_CLIENT_SECRET = Deno.env.get('ZOOM_CLIENT_SECRET') || '';
 
+// Validate required environment variables
 if (!ZOOM_ACCOUNT_ID || !ZOOM_CLIENT_ID || !ZOOM_CLIENT_SECRET) {
   console.error("Missing required Zoom environment variables");
   throw new Error("Missing required Zoom environment variables");
@@ -23,6 +22,7 @@ if (!ZOOM_ACCOUNT_ID || !ZOOM_CLIENT_ID || !ZOOM_CLIENT_SECRET) {
 serve(async (req) => {
   console.log("Function called with method:", req.method);
   
+  // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     console.log("Handling OPTIONS preflight request");
     return new Response(null, { 
@@ -42,6 +42,7 @@ serve(async (req) => {
       }
     );
 
+    // Get the JWT from the authorization header
     const authHeader = req.headers.get('Authorization');
     if (!authHeader) {
       console.error("No authorization header provided");
@@ -51,7 +52,10 @@ serve(async (req) => {
       );
     }
 
+    // Get the JWT from the authorization header
     const token = authHeader.replace('Bearer ', '');
+    
+    // Verify the JWT to get the user
     const { data: { user }, error: userError } = await supabaseClient.auth.getUser(token);
     
     if (userError || !user) {
@@ -62,6 +66,7 @@ serve(async (req) => {
       );
     }
 
+    // Parse the request body
     let requestData;
     try {
       requestData = await req.json();
@@ -84,6 +89,7 @@ serve(async (req) => {
       );
     }
 
+    // Get OAuth access token using Server-to-Server OAuth
     console.log("Getting OAuth access token for Zoom");
     
     const tokenResponse = await fetch('https://zoom.us/oauth/token', {
@@ -109,35 +115,12 @@ serve(async (req) => {
 
     const tokenData = await tokenResponse.json();
     console.log("Successfully obtained OAuth access token");
-
-    // Generate JWT signature for SDK authentication
-    const now = Math.floor(Date.now() / 1000);
-    const payload = {
-      iss: ZOOM_CLIENT_ID,
-      aud: 'zoom',
-      iat: now,
-      exp: now + (60 * 60), // 1 hour expiration
-      alg: 'HS256',
-      appKey: ZOOM_CLIENT_ID,
-      tokenExp: now + (60 * 60),
-      meetingNumber: String(meetingNumber),
-      role: Number(role)
-    };
-
-    const signature = await create(
-      { alg: 'HS256', typ: 'JWT' },
-      payload,
-      ZOOM_CLIENT_SECRET
-    );
-
-    console.log("Generated signature for meeting:", meetingNumber);
     
     return new Response(
       JSON.stringify({ 
         accessToken: tokenData.access_token,
         tokenType: tokenData.token_type || 'Bearer',
         sdkKey: ZOOM_CLIENT_ID,
-        signature: signature,
         meetingNumber: String(meetingNumber),
         role: Number(role) || 0
       }),
