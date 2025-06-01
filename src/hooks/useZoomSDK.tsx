@@ -16,7 +16,7 @@ export function useZoomSDK({ onReady, onError }: UseZoomSDKProps = {}) {
   const initializationRef = useRef(false);
   const isJoiningRef = useRef(false);
   const cleanupInProgressRef = useRef(false);
-  const sessionId = useRef(Date.now().toString());
+  const hasJoinedRef = useRef(false);
 
   // Debug logging helper
   const debugLog = useCallback((message: string, data?: any) => {
@@ -50,10 +50,9 @@ export function useZoomSDK({ onReady, onError }: UseZoomSDKProps = {}) {
       clientRef.current = null;
     }
 
-    // Clean container following Zoom documentation
     if (containerRef.current) {
       containerRef.current.innerHTML = '';
-      debugLog('Container cleaned with innerHTML = ""');
+      debugLog('Container cleaned');
     }
     
     setIsSDKLoaded(false);
@@ -61,6 +60,7 @@ export function useZoomSDK({ onReady, onError }: UseZoomSDKProps = {}) {
     setIsJoined(false);
     initializationRef.current = false;
     isJoiningRef.current = false;
+    hasJoinedRef.current = false;
     cleanupInProgressRef.current = false;
     
     debugLog('Zoom SDK cleanup completed');
@@ -73,18 +73,10 @@ export function useZoomSDK({ onReady, onError }: UseZoomSDKProps = {}) {
     }
 
     const rect = containerRef.current.getBoundingClientRect();
-    const styles = window.getComputedStyle(containerRef.current);
     
     const validation = {
       exists: !!containerRef.current,
       dimensions: { width: rect.width, height: rect.height },
-      computedStyles: {
-        width: styles.width,
-        height: styles.height,
-        display: styles.display,
-        visibility: styles.visibility,
-        position: styles.position
-      },
       isVisible: rect.width > 0 && rect.height > 0,
       hasFixedDimensions: rect.width === 900 && rect.height === 506
     };
@@ -105,10 +97,9 @@ export function useZoomSDK({ onReady, onError }: UseZoomSDKProps = {}) {
     }
 
     initializationRef.current = true;
-    debugLog('Starting SDK initialization following Zoom documentation...');
+    debugLog('Starting SDK initialization...');
 
     try {
-      // Step 1: Create new client instance (following Zoom docs)
       debugLog('Creating new ZoomMtgEmbedded client...');
       clientRef.current = ZoomMtgEmbedded.createClient();
       
@@ -116,11 +107,9 @@ export function useZoomSDK({ onReady, onError }: UseZoomSDKProps = {}) {
         throw new Error('Failed to create Zoom client');
       }
 
-      // Step 2: Clean container with innerHTML = "" (following Zoom docs)
       containerRef.current.innerHTML = '';
       debugLog('Container cleaned before init');
 
-      // Step 3: Initialize with zoomAppRoot (following Zoom docs)
       const initConfig = {
         zoomAppRoot: containerRef.current,
         language: 'en-US',
@@ -136,25 +125,11 @@ export function useZoomSDK({ onReady, onError }: UseZoomSDKProps = {}) {
         }
       };
 
-      debugLog('Calling client.init() with config:', { 
-        ...initConfig, 
-        zoomAppRoot: 'DOM Element'
-      });
-      
+      debugLog('Calling client.init()...');
       await clientRef.current.init(initConfig);
 
       debugLog('client.init() completed successfully');
       
-      // Validate post-init state
-      const postInitValidation = {
-        containerHasContent: containerRef.current.children.length > 0,
-        containerHTML: containerRef.current.innerHTML.length,
-        clientExists: !!clientRef.current,
-        sessionId: sessionId.current
-      };
-
-      debugLog('Post-init validation:', postInitValidation);
-
       setIsSDKLoaded(true);
       setIsReady(true);
       
@@ -172,14 +147,14 @@ export function useZoomSDK({ onReady, onError }: UseZoomSDKProps = {}) {
   }, [validateContainer, onReady, onError, debugLog]);
 
   const joinMeeting = useCallback(async (joinConfig: any) => {
-    debugLog('joinMeeting called with config:', joinConfig);
+    debugLog('joinMeeting called');
 
     if (!isReady || !clientRef.current) {
       throw new Error('Zoom SDK not ready - client.init() must complete first');
     }
 
-    if (isJoiningRef.current || cleanupInProgressRef.current) {
-      debugLog('Join attempt already in progress or cleanup in progress');
+    if (isJoiningRef.current || hasJoinedRef.current || cleanupInProgressRef.current) {
+      debugLog('Join attempt blocked - already joining/joined or cleanup in progress');
       return;
     }
 
@@ -203,19 +178,25 @@ export function useZoomSDK({ onReady, onError }: UseZoomSDKProps = {}) {
         zak: joinConfig.zak || '',
         success: (success: any) => {
           debugLog('Join meeting success:', success);
+          hasJoinedRef.current = true;
           setIsJoined(true);
           
-          // Post-join validation
+          // Set speaker view after successful join
           setTimeout(() => {
-            if (containerRef.current) {
-              const postJoinValidation = {
-                containerChildren: containerRef.current.children.length,
-                containerHTML: containerRef.current.innerHTML.length,
-                hasVideoCanvas: !!containerRef.current.querySelector('canvas'),
-                hasVideoElements: !!containerRef.current.querySelector('video'),
-                sessionId: sessionId.current
-              };
-              debugLog('Post-join container analysis:', postJoinValidation);
+            if (clientRef.current && typeof clientRef.current.updateVideoOptions === 'function') {
+              try {
+                clientRef.current.updateVideoOptions({
+                  viewSizes: {
+                    default: {
+                      width: 500,
+                      height: 300
+                    }
+                  }
+                });
+                debugLog('Speaker view configured successfully');
+              } catch (error) {
+                debugLog('Failed to configure speaker view:', error);
+              }
             }
           }, 2000);
         },
@@ -238,14 +219,7 @@ export function useZoomSDK({ onReady, onError }: UseZoomSDKProps = {}) {
         }
       };
 
-      debugLog('Calling client.join() with params:', { 
-        ...joinParams, 
-        signature: '[REDACTED]', 
-        zak: joinParams.zak ? '[PRESENT]' : '[EMPTY]',
-        success: '[FUNCTION]',
-        error: '[FUNCTION]'
-      });
-      
+      debugLog('Calling client.join()...');
       await clientRef.current.join(joinParams);
       
       return true;
@@ -263,6 +237,7 @@ export function useZoomSDK({ onReady, onError }: UseZoomSDKProps = {}) {
         if (typeof clientRef.current.leave === 'function') {
           clientRef.current.leave();
           setIsJoined(false);
+          hasJoinedRef.current = false;
           debugLog('Left meeting successfully');
         }
       } catch (error) {
