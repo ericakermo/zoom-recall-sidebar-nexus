@@ -72,7 +72,7 @@ export function useZoomSDK({ onReady, onError }: UseZoomSDKProps = {}) {
       
       clientRef.current = ZoomMtgEmbedded.createClient();
       
-      console.log('🔄 Initializing Zoom SDK with native settings...');
+      console.log('🔄 Initializing Zoom SDK with proper embedded settings...');
       
       await clientRef.current.init({
         debug: false,
@@ -90,6 +90,18 @@ export function useZoomSDK({ onReady, onError }: UseZoomSDKProps = {}) {
               }
             }
           },
+          meetingInfo: {
+            topic: false,
+            host: false,
+            mn: false,
+            pwd: false,
+            telPwd: false,
+            invite: false,
+            participant: false,
+            dc: false,
+            enctype: false,
+            report: false
+          },
           toolbar: {
             buttons: [
               {
@@ -106,7 +118,7 @@ export function useZoomSDK({ onReady, onError }: UseZoomSDKProps = {}) {
 
       setIsSDKLoaded(true);
       setIsReady(true);
-      console.log('✅ Zoom SDK initialized successfully');
+      console.log('✅ Zoom SDK initialized successfully with embedded settings');
       
       if (!cleanupInProgressRef.current) {
         onReady?.();
@@ -122,7 +134,7 @@ export function useZoomSDK({ onReady, onError }: UseZoomSDKProps = {}) {
   }, [onReady, onError]);
 
   const joinMeeting = useCallback(async (joinConfig: any) => {
-    console.log('📍 Joining meeting...');
+    console.log('📍 Joining meeting with embedded SDK...');
 
     if (!isReady || !clientRef.current) {
       throw new Error('Zoom SDK not ready');
@@ -142,7 +154,7 @@ export function useZoomSDK({ onReady, onError }: UseZoomSDKProps = {}) {
     }
     
     try {
-      console.log('🔄 Joining with config:', {
+      console.log('🔄 Joining with embedded config:', {
         meetingNumber: meetingNumberStr,
         userName: joinConfig.userName,
         role: joinConfig.role
@@ -158,41 +170,12 @@ export function useZoomSDK({ onReady, onError }: UseZoomSDKProps = {}) {
         zak: joinConfig.zak || ''
       });
       
-      console.log('✅ Successfully joined meeting');
+      console.log('✅ Successfully joined meeting with embedded SDK');
       setIsJoined(true);
       
-      // Set up the meeting view after successful join
-      setTimeout(async () => {
-        try {
-          if (clientRef.current && !cleanupInProgressRef.current) {
-            console.log('🔄 Setting up meeting view...');
-            
-            // Make sure we're in the right view mode
-            const stream = clientRef.current.getMediaStream();
-            if (stream) {
-              // Start video if available
-              if (typeof stream.startVideo === 'function') {
-                await stream.startVideo();
-                console.log('✅ Video stream started');
-              }
-              
-              // Start audio
-              if (typeof stream.startAudio === 'function') {
-                await stream.startAudio();
-                console.log('✅ Audio stream started');
-              }
-            }
-            
-            // Set gallery view for better experience
-            if (typeof clientRef.current.getCurrentUser === 'function') {
-              const currentUser = clientRef.current.getCurrentUser();
-              console.log('📍 Current user:', currentUser);
-            }
-          }
-        } catch (error) {
-          console.warn('⚠️ View setup warning:', error);
-        }
-      }, 2000);
+      // For embedded SDK, the video/audio should start automatically
+      // No need for manual media stream setup as it's handled internally
+      console.log('🎥 Embedded SDK will handle video/audio automatically');
       
       return result;
     } catch (error: any) {

@@ -101,7 +101,7 @@
   }
 }
 
-/* Zoom meeting container - let Zoom handle its own sizing */
+/* Zoom meeting container - optimized for embedded SDK */
 .zoom-meeting-wrapper {
   display: flex;
   justify-content: center;
@@ -121,8 +121,24 @@
   box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
 }
 
-/* Let Zoom SDK handle internal rendering with minimal interference */
+/* Allow Zoom embedded SDK to render properly */
 .zoom-fixed-container > div {
-  width: 100% !important;
-  height: 100% !important;
+  width: 100%;
+  height: 100%;
+}
+
+/* Ensure Zoom embedded content fills the container properly */
+.zoom-fixed-container [role="tabpanel"],
+.zoom-fixed-container [id*="zoom"],
+.zoom-fixed-container [class*="zoom-MuiBox-root"] {
+  max-width: 900px;
+  max-height: 506px;
+}
+
+/* Video and canvas elements should fit within bounds */
+.zoom-fixed-container video,
+.zoom-fixed-container canvas {
+  max-width: 900px;
+  max-height: 506px;
+  object-fit: contain;
 }
