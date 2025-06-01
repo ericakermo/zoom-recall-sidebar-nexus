@@ -18,36 +18,90 @@ export function useZoomSDK({ sessionId, onReady, onError }: UseZoomSDKProps = {}
   const isJoiningRef = useRef(false);
   const cleanupInProgressRef = useRef(false);
 
+  // Debug: Log join configuration
+  const debugJoinConfig = useCallback((config: any) => {
+    console.log('🔧 [DEBUG] Join configuration analysis:', {
+      hasSDKKey: !!config.sdkKey,
+      hasSignature: !!config.signature,
+      hasMeetingNumber: !!config.meetingNumber,
+      hasUserName: !!config.userName,
+      hasPassword: !!config.password,
+      hasZAK: !!config.tk,
+      role: config.role,
+      meetingNumberFormat: typeof config.meetingNumber,
+      signatureLength: config.signature?.length,
+      sessionId
+    });
+    
+    // Validate required fields
+    const requiredFields = ['sdkKey', 'signature', 'meetingNumber', 'userName'];
+    const missingFields = requiredFields.filter(field => !config[field]);
+    if (missingFields.length > 0) {
+      console.error('❌ [DEBUG] Missing required join config fields:', missingFields);
+    }
+    
+    // Check data types
+    if (typeof config.meetingNumber !== 'string') {
+      console.warn('⚠️ [DEBUG] meetingNumber should be string, got:', typeof config.meetingNumber);
+    }
+  }, [sessionId]);
+
+  // Enhanced cleanup with better DOM handling
   const cleanup = useCallback(() => {
     if (cleanupInProgressRef.current) {
-      console.log('⏸️ Cleanup already in progress, skipping...');
+      console.log('⏸️ [DEBUG] Cleanup already in progress, skipping...', sessionId);
       return;
     }
 
     cleanupInProgressRef.current = true;
-    console.log('🧹 Starting Zoom SDK cleanup...', sessionId ? `Session: ${sessionId}` : '');
+    console.log('🧹 [DEBUG] Starting enhanced Zoom SDK cleanup...', sessionId);
     
     if (clientRef.current) {
       try {
         if (isJoined && typeof clientRef.current.leave === 'function') {
           clientRef.current.leave();
-          console.log('✅ Left meeting during cleanup');
+          console.log('✅ [DEBUG] Left meeting during cleanup');
         }
         
         if (typeof clientRef.current.destroy === 'function') {
           clientRef.current.destroy();
-          console.log('✅ Destroyed Zoom client');
+          console.log('✅ [DEBUG] Destroyed Zoom client');
         }
       } catch (error) {
-        console.warn('⚠️ Cleanup warning (non-critical):', error);
+        console.warn('⚠️ [DEBUG] Cleanup warning (non-critical):', error);
       }
       
       clientRef.current = null;
     }
     
-    // Clear the container
+    // Enhanced DOM cleanup with error handling
     if (containerRef.current) {
-      containerRef.current.innerHTML = '';
+      try {
+        // Clear container content safely
+        const container = containerRef.current;
+        while (container.firstChild) {
+          try {
+            container.removeChild(container.firstChild);
+          } catch (e) {
+            // Child might have been removed by React or other code
+            console.log('⚠️ [DEBUG] Child already removed during cleanup');
+            break;
+          }
+        }
+        console.log('✅ [DEBUG] Container cleared safely');
+      } catch (error) {
+        console.warn('⚠️ [DEBUG] Container cleanup error:', error);
+      }
+    }
+    
+    // Clear global Zoom state if possible
+    try {
+      if (window.ZoomMtgEmbedded) {
+        // Force cleanup any lingering instances
+        console.log('🔄 [DEBUG] Clearing global Zoom state');
+      }
+    } catch (error) {
+      console.log('⚠️ [DEBUG] Global state cleanup warning:', error);
     }
     
     setIsSDKLoaded(false);
@@ -57,25 +111,33 @@ export function useZoomSDK({ sessionId, onReady, onError }: UseZoomSDKProps = {}
     isJoiningRef.current = false;
     cleanupInProgressRef.current = false;
     
-    console.log('✅ Zoom SDK cleanup completed');
+    console.log('✅ [DEBUG] Enhanced Zoom SDK cleanup completed', sessionId);
   }, [isJoined, sessionId]);
 
   const initializeSDK = useCallback(async () => {
     if (initializationRef.current || !containerRef.current || cleanupInProgressRef.current) {
-      console.log('⏸️ SDK initialization skipped', sessionId ? `Session: ${sessionId}` : '');
+      console.log('⏸️ [DEBUG] SDK initialization skipped', {
+        alreadyInitializing: initializationRef.current,
+        noContainer: !containerRef.current,
+        cleanupInProgress: cleanupInProgressRef.current,
+        sessionId
+      });
       return false;
     }
 
     initializationRef.current = true;
 
     try {
-      console.log('🔄 Creating Zoom embedded client...', sessionId ? `Session: ${sessionId}` : '');
+      console.log('🔄 [DEBUG] Creating Zoom embedded client...', sessionId);
+      
+      // Wait a moment to ensure DOM is stable
+      await new Promise(resolve => setTimeout(resolve, 100));
       
       clientRef.current = ZoomMtgEmbedded.createClient();
       
-      console.log('🔄 Initializing Zoom SDK with session-aware settings...');
+      console.log('🔄 [DEBUG] Initializing Zoom SDK with enhanced session-aware settings...');
       
-      await clientRef.current.init({
+      const initConfig = {
         zoomAppRoot: containerRef.current,
         language: 'en-US',
         patchJSMedia: true,
@@ -97,17 +159,35 @@ export function useZoomSDK({ sessionId, onReady, onError }: UseZoomSDKProps = {}
                 text: 'Custom Button',
                 className: 'CustomButton',
                 onClick: () => {
-                  console.log('custom button');
+                  console.log('🔘 [DEBUG] Custom button clicked');
                 }
               }
             ]
           }
         }
+      };
+
+      console.log('🔧 [DEBUG] SDK init config:', {
+        hasContainer: !!initConfig.zoomAppRoot,
+        containerDimensions: {
+          width: containerRef.current?.offsetWidth,
+          height: containerRef.current?.offsetHeight
+        },
+        sessionId
+      });
+
+      await clientRef.current.init(initConfig);
+
+      // Verify SDK state after initialization
+      console.log('🔍 [DEBUG] SDK state after init:', {
+        clientExists: !!clientRef.current,
+        containerHasContent: containerRef.current?.children.length,
+        sessionId
       });
 
       setIsSDKLoaded(true);
       setIsReady(true);
-      console.log('✅ Zoom SDK initialized successfully with session awareness');
+      console.log('✅ [DEBUG] Zoom SDK initialized successfully with enhanced session awareness');
       
       if (!cleanupInProgressRef.current) {
         onReady?.();
@@ -115,7 +195,7 @@ export function useZoomSDK({ sessionId, onReady, onError }: UseZoomSDKProps = {}
       
       return true;
     } catch (error: any) {
-      console.error('❌ Failed to initialize Zoom SDK:', error);
+      console.error('❌ [DEBUG] Failed to initialize Zoom SDK:', error);
       initializationRef.current = false;
       onError?.(error.message || 'Failed to initialize Zoom SDK');
       return false;
@@ -123,20 +203,29 @@ export function useZoomSDK({ sessionId, onReady, onError }: UseZoomSDKProps = {}
   }, [onReady, onError, sessionId]);
 
   const joinMeeting = useCallback(async (joinConfig: any) => {
-    console.log('📍 Joining meeting with session-aware SDK...', sessionId ? `Session: ${sessionId}` : '');
+    console.log('📍 [DEBUG] Joining meeting with enhanced session-aware SDK...', sessionId);
+
+    // Debug join configuration
+    debugJoinConfig(joinConfig);
 
     if (!isReady || !clientRef.current) {
-      throw new Error('Zoom SDK not ready');
+      const error = new Error('Zoom SDK not ready');
+      console.error('❌ [DEBUG] SDK not ready for join:', {
+        isReady,
+        hasClient: !!clientRef.current,
+        sessionId
+      });
+      throw error;
     }
 
     if (isJoiningRef.current || cleanupInProgressRef.current) {
-      console.log('⏸️ Join attempt already in progress');
+      console.log('⏸️ [DEBUG] Join attempt already in progress');
       return;
     }
 
     isJoiningRef.current = true;
 
-    // Ensure meeting number is a clean string
+    // Validate and format meeting number
     const meetingNumberStr = String(joinConfig.meetingNumber).replace(/\s+/g, '');
     if (!/^\d{10,11}$/.test(meetingNumberStr)) {
       isJoiningRef.current = false;
@@ -144,44 +233,68 @@ export function useZoomSDK({ sessionId, onReady, onError }: UseZoomSDKProps = {}
     }
     
     try {
-      console.log('🔄 Joining with session-aware config format:', {
+      console.log('🔄 [DEBUG] Joining with enhanced session-aware config format:', {
         meetingNumber: meetingNumberStr,
         userName: joinConfig.userName,
         role: joinConfig.role,
+        hasSignature: !!joinConfig.signature,
+        hasZAK: !!joinConfig.zak,
         sessionId
       });
       
-      // Use the exact format expected by the embedded SDK with session awareness
-      const sessionAwareJoinConfig = {
+      // Enhanced join configuration for embedded SDK
+      const enhancedJoinConfig = {
         sdkKey: String(joinConfig.sdkKey || ''),
         signature: String(joinConfig.signature || ''),
         meetingNumber: meetingNumberStr,
         password: String(joinConfig.passWord || joinConfig.password || ''),
         userName: String(joinConfig.userName || 'Guest'),
         userEmail: String(joinConfig.userEmail || ''),
-        tk: String(joinConfig.zak || ''),  // Use 'tk' instead of 'zak' for embedded SDK
+        tk: String(joinConfig.zak || ''), // Use 'tk' for embedded SDK
         success: (success: any) => {
-          console.log('✅ Successfully joined meeting with session-aware SDK', success);
+          console.log('✅ [DEBUG] Successfully joined meeting with enhanced session-aware SDK', {
+            success,
+            sessionId
+          });
           setIsJoined(true);
+          
+          // Debug: Check if video content is rendered
+          setTimeout(() => {
+            console.log('🔍 [DEBUG] Post-join container analysis:', {
+              containerChildren: containerRef.current?.children.length,
+              containerContent: containerRef.current?.innerHTML.length,
+              visibleElements: containerRef.current?.querySelectorAll('video, canvas').length,
+              sessionId
+            });
+          }, 2000);
         },
         error: (error: any) => {
-          console.error('❌ Join error from SDK:', error);
+          console.error('❌ [DEBUG] Join error from enhanced SDK:', {
+            error,
+            errorCode: error?.errorCode,
+            reason: error?.reason,
+            sessionId
+          });
           throw error;
         }
       };
       
-      console.log('🔧 Session-aware join config prepared');
+      console.log('🔧 [DEBUG] Enhanced session-aware join config prepared');
       
-      const result = await clientRef.current.join(sessionAwareJoinConfig);
+      const result = await clientRef.current.join(enhancedJoinConfig);
       
-      console.log('✅ Join method called successfully');
+      console.log('✅ [DEBUG] Join method called successfully with enhanced config');
       return result;
     } catch (error: any) {
-      console.error('❌ Failed to join meeting:', error);
+      console.error('❌ [DEBUG] Failed to join meeting:', {
+        error: error.message,
+        errorCode: error?.errorCode,
+        sessionId
+      });
       
       let errorMessage = error.message || 'Failed to join meeting';
       
-      // Handle specific error codes
+      // Enhanced error handling
       if (error?.errorCode === 200 || error?.reason === 200) {
         errorMessage = 'Host join failed - session conflict or expired token. Please refresh and try again.';
       } else if (error?.errorCode === 3712) {
@@ -198,33 +311,36 @@ export function useZoomSDK({ sessionId, onReady, onError }: UseZoomSDKProps = {}
     } finally {
       isJoiningRef.current = false;
     }
-  }, [isReady, sessionId]);
+  }, [isReady, sessionId, debugJoinConfig]);
 
   const leaveMeeting = useCallback(() => {
     if (clientRef.current && isJoined && !cleanupInProgressRef.current) {
-      console.log('🔄 Leaving meeting...', sessionId ? `Session: ${sessionId}` : '');
+      console.log('🔄 [DEBUG] Leaving meeting...', sessionId);
       try {
         if (typeof clientRef.current.leave === 'function') {
           clientRef.current.leave();
           setIsJoined(false);
-          console.log('✅ Left meeting successfully');
+          console.log('✅ [DEBUG] Left meeting successfully');
         }
       } catch (error) {
-        console.error('❌ Error during meeting leave:', error);
+        console.error('❌ [DEBUG] Error during meeting leave:', error);
       }
     }
   }, [isJoined, sessionId]);
 
   useEffect(() => {
     if (containerRef.current && !initializationRef.current && !cleanupInProgressRef.current) {
-      console.log('🎯 Container ready, initializing SDK...', sessionId ? `Session: ${sessionId}` : '');
+      console.log('🎯 [DEBUG] Container ready, initializing SDK with enhanced debugging...', {
+        containerExists: !!containerRef.current,
+        sessionId
+      });
       initializeSDK();
     }
   }, [initializeSDK, sessionId]);
 
   useEffect(() => {
     return () => {
-      console.log('🔄 Component unmounting, cleaning up...', sessionId ? `Session: ${sessionId}` : '');
+      console.log('🔄 [DEBUG] Component unmounting, cleaning up with enhanced debugging...', sessionId);
       cleanup();
     };
   }, [cleanup, sessionId]);

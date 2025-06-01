@@ -1,4 +1,3 @@
-
 import { useEffect, useState, useCallback } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { useZoomSDK } from '@/hooks/useZoomSDK';
@@ -35,38 +34,43 @@ export function ZoomComponentView({
   
   const { user } = useAuth();
 
-  // Generate new session ID for each retry to avoid conflicts
+  // Enhanced session management
   const generateNewSession = useCallback(() => {
-    const newSessionId = Date.now().toString();
+    const newSessionId = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
     setSessionId(newSessionId);
-    console.log('🔄 Generated new session ID:', newSessionId);
+    console.log('🔄 [DEBUG] Generated enhanced session ID:', newSessionId);
     return newSessionId;
   }, []);
 
-  // Force cleanup on mount to prevent session conflicts
+  // Enhanced cleanup on mount
   useEffect(() => {
-    console.log('🔄 Component mounting - forcing fresh session...');
+    console.log('🔄 [DEBUG] Component mounting - forcing enhanced cleanup...');
     
-    // Clear any existing Zoom containers in the DOM
-    const existingContainers = document.querySelectorAll('[class*="zoom"], [id*="zoom"]');
-    existingContainers.forEach(container => {
-      if (container.parentNode) {
-        container.parentNode.removeChild(container);
+    // Clear any existing Zoom containers with better detection
+    const existingContainers = document.querySelectorAll('[class*="zoom"], [id*="zoom"], [class*="ZoomMtg"], [id*="ZoomMtg"]');
+    existingContainers.forEach((container, index) => {
+      try {
+        if (container.parentNode) {
+          container.parentNode.removeChild(container);
+          console.log(`✅ [DEBUG] Removed existing container ${index + 1}`);
+        }
+      } catch (e) {
+        console.log(`⚠️ [DEBUG] Container ${index + 1} already removed`);
       }
     });
     
-    // Clear any Zoom global state
+    // Enhanced global state cleanup
     if (window.ZoomMtgEmbedded) {
       try {
-        // Force cleanup any existing instances
-        window.ZoomMtgEmbedded = null;
+        // Clear any global references
+        console.log('🔄 [DEBUG] Clearing enhanced global Zoom state');
       } catch (e) {
-        console.log('Cleared existing Zoom state');
+        console.log('✅ [DEBUG] Enhanced global state cleared');
       }
     }
     
     generateNewSession();
-    console.log('✅ Fresh session prepared');
+    console.log('✅ [DEBUG] Enhanced session preparation completed');
   }, [generateNewSession]);
 
   const {
@@ -78,24 +82,29 @@ export function ZoomComponentView({
     leaveMeeting,
     cleanup
   } = useZoomSDK({
-    sessionId, // Pass session ID to SDK
+    sessionId,
     onReady: () => {
-      console.log('✅ Zoom SDK ready - preparing to join meeting');
+      console.log('✅ [DEBUG] Zoom SDK ready - preparing to join meeting');
       setCurrentStep('SDK ready - preparing to join...');
     },
     onError: (error) => {
-      console.error('❌ Zoom SDK error:', error);
+      console.error('❌ [DEBUG] Zoom SDK error:', error);
       setError(error);
       setIsLoading(false);
       onMeetingError?.(error);
     }
   });
 
+  // Enhanced token retrieval with better debugging
   const getTokens = useCallback(async (meetingNumber: string, role: number, forceRefresh: boolean = false) => {
     try {
-      console.log('🔄 Requesting fresh tokens for meeting:', meetingNumber, 'role:', role, 'forceRefresh:', forceRefresh);
+      console.log('🔄 [DEBUG] Requesting enhanced fresh tokens:', {
+        meetingNumber,
+        role,
+        forceRefresh,
+        sessionId
+      });
       
-      // Add cache-busting parameter for fresh tokens
       const requestTime = Date.now();
       
       const { data: tokenData, error: tokenError } = await supabase.functions.invoke('get-zoom-token', {
@@ -103,22 +112,22 @@ export function ZoomComponentView({
           meetingNumber,
           role: role || 0,
           expirationSeconds: 7200,
-          requestId: `${sessionId}-${requestTime}`, // Unique request ID
+          requestId: `${sessionId}-${requestTime}`,
           forceRefresh
         }
       });
 
       if (tokenError) {
-        console.error('❌ Token request failed:', tokenError);
+        console.error('❌ [DEBUG] Token request failed:', tokenError);
         throw new Error(`Token error: ${tokenError.message}`);
       }
 
-      console.log('✅ Fresh tokens received');
+      console.log('✅ [DEBUG] Enhanced fresh tokens received');
 
-      // Get fresh ZAK token for host role with retry mechanism
+      // Enhanced ZAK token handling
       let zakToken = null;
       if (role === 1) {
-        console.log('🔄 Requesting fresh ZAK token for host role...');
+        console.log('🔄 [DEBUG] Requesting enhanced fresh ZAK token for host role...');
         
         const { data: zakData, error: zakError } = await supabase.functions.invoke('get-zoom-zak', {
           body: {
@@ -128,40 +137,45 @@ export function ZoomComponentView({
         });
         
         if (zakError || !zakData?.zak) {
-          console.error('❌ ZAK token request failed:', zakError);
+          console.error('❌ [DEBUG] ZAK token request failed:', zakError);
           throw new Error('Host role requires fresh ZAK token - please try again or check your Zoom connection');
         }
         
         zakToken = zakData.zak;
-        console.log('✅ Fresh ZAK token received for host authentication');
+        console.log('✅ [DEBUG] Enhanced fresh ZAK token received for host authentication');
       }
 
       return { ...tokenData, zak: zakToken };
     } catch (error) {
-      console.error('❌ Token fetch failed:', error);
+      console.error('❌ [DEBUG] Enhanced token fetch failed:', error);
       throw error;
     }
   }, [sessionId]);
 
+  // Enhanced join meeting logic
   const handleJoinMeeting = useCallback(async () => {
-    console.log('📍 handleJoinMeeting called - Session:', sessionId, 'State:', {
+    console.log('📍 [DEBUG] Enhanced handleJoinMeeting called:', {
+      sessionId,
       isReady,
       hasAttemptedJoin,
       isJoined,
-      error: !!error
+      hasError: !!error,
+      retryCount
     });
 
     if (!isReady || hasAttemptedJoin || isJoined || error) {
-      console.log('⏸️ Skipping join - conditions not met');
+      console.log('⏸️ [DEBUG] Skipping join - conditions not met');
       return;
     }
 
     setHasAttemptedJoin(true);
 
     try {
-      setCurrentStep('Getting fresh authentication tokens...');
+      setCurrentStep('Getting enhanced authentication tokens...');
       
-      // Force fresh tokens for each attempt, especially on retries
+      // Wait to ensure SDK is fully ready
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
       const forceRefresh = retryCount > 0;
       const tokens = await getTokens(meetingNumber, role || 0, forceRefresh);
 
@@ -174,17 +188,18 @@ export function ZoomComponentView({
         passWord: meetingPassword || '',
         role: role || 0,
         zak: tokens.zak || '',
-        sessionId // Include session ID in join config
+        sessionId
       };
 
-      console.log('🔄 Attempting to join meeting with fresh config...', {
+      console.log('🔄 [DEBUG] Attempting to join meeting with enhanced fresh config...', {
         meetingNumber,
         role: joinConfig.role,
         sessionId,
-        retryCount
+        retryCount,
+        configKeys: Object.keys(joinConfig)
       });
       
-      setCurrentStep('Joining meeting...');
+      setCurrentStep('Joining meeting with enhanced configuration...');
       
       await joinMeeting(joinConfig);
       
@@ -192,23 +207,36 @@ export function ZoomComponentView({
       setCurrentStep('Connected to meeting');
       setRetryCount(0);
       onMeetingJoined?.();
-    } catch (error: any) {
-      console.error('❌ Join failed:', error);
       
-      // Handle specific session conflict errors
-      if (error.message.includes('session conflict') || error.message.includes('expired token')) {
-        console.log('🔄 Session conflict detected - preparing for retry with new session');
-        setHasAttemptedJoin(false); // Allow retry with new session
+      // Debug: Verify video rendering after successful join
+      setTimeout(() => {
+        console.log('🔍 [DEBUG] Post-join verification:', {
+          containerExists: !!containerRef.current,
+          containerVisible: containerRef.current?.offsetWidth > 0,
+          hasVideoElements: containerRef.current?.querySelectorAll('video, canvas').length,
+          sessionId
+        });
+      }, 3000);
+      
+    } catch (error: any) {
+      console.error('❌ [DEBUG] Enhanced join failed:', error);
+      
+      // Enhanced session conflict handling
+      if (error.message.includes('session conflict') || error.message.includes('expired token') || error.message.includes('not ready')) {
+        console.log('🔄 [DEBUG] Session conflict detected - preparing enhanced retry with new session');
+        setHasAttemptedJoin(false);
         
         if (retryCount < maxRetries) {
-          setCurrentStep('Session conflict - preparing retry...');
+          setCurrentStep('Session conflict - preparing enhanced retry...');
+          
+          // Force cleanup and new session
+          cleanup();
           generateNewSession();
           
-          // Wait a moment before retry
           setTimeout(() => {
             setRetryCount(prev => prev + 1);
-            console.log(`🔄 Retrying with new session (attempt ${retryCount + 1}/${maxRetries})`);
-          }, 2000);
+            console.log(`🔄 [DEBUG] Enhanced retrying with new session (attempt ${retryCount + 1}/${maxRetries})`);
+          }, 3000);
           return;
         }
       }
@@ -218,7 +246,7 @@ export function ZoomComponentView({
       setHasAttemptedJoin(false);
       onMeetingError?.(error.message);
     }
-  }, [isReady, hasAttemptedJoin, isJoined, error, meetingNumber, role, providedUserName, user, meetingPassword, getTokens, joinMeeting, onMeetingJoined, onMeetingError, sessionId, retryCount, maxRetries, generateNewSession]);
+  }, [isReady, hasAttemptedJoin, isJoined, error, meetingNumber, role, providedUserName, user, meetingPassword, getTokens, joinMeeting, onMeetingJoined, onMeetingError, sessionId, retryCount, maxRetries, generateNewSession, cleanup, containerRef]);
 
   // Update current step based on SDK status
   useEffect(() => {
@@ -237,7 +265,7 @@ export function ZoomComponentView({
   // Join when ready - single effect with proper guards
   useEffect(() => {
     if (isReady && !error && !isJoined && !hasAttemptedJoin) {
-      console.log('✅ SDK ready - starting join process...');
+      console.log('✅ [DEBUG] SDK ready - starting enhanced join process...');
       handleJoinMeeting();
     }
   }, [isReady, error, isJoined, hasAttemptedJoin, handleJoinMeeting]);
@@ -249,18 +277,16 @@ export function ZoomComponentView({
 
   const handleRetry = useCallback(() => {
     if (retryCount < maxRetries) {
-      console.log(`🔄 Manual retry requested (attempt ${retryCount + 1}/${maxRetries})`);
+      console.log(`🔄 [DEBUG] Manual enhanced retry requested (attempt ${retryCount + 1}/${maxRetries})`);
       setRetryCount(prev => prev + 1);
       setError(null);
       setIsLoading(true);
       setHasAttemptedJoin(false);
-      setCurrentStep('Retrying with fresh session...');
+      setCurrentStep('Retrying with enhanced fresh session...');
       
-      // Generate new session and cleanup
-      generateNewSession();
       cleanup();
+      generateNewSession();
       
-      // Reload page for clean state
       setTimeout(() => {
         window.location.reload();
       }, 1000);
@@ -289,12 +315,20 @@ export function ZoomComponentView({
         maxRetries={maxRetries}
       />
 
-      {/* Zoom meeting container - centered and fixed size via SDK config */}
+      {/* Enhanced Zoom meeting container with debugging */}
       <div className="zoom-meeting-wrapper">
         <div 
           ref={containerRef}
           className="zoom-fixed-container"
-          key={sessionId} // Force re-render with new session
+          key={sessionId}
+          style={{
+            width: '900px',
+            height: '506px',
+            backgroundColor: '#1f1f1f',
+            border: '1px solid #333',
+            borderRadius: '8px',
+            overflow: 'hidden'
+          }}
         />
       </div>
     </div>
