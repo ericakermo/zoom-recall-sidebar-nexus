@@ -25,25 +25,28 @@ export function useZoomSDK({ containerRef, shouldInitialize = true, onReady, onE
   }, []);
 
   const cleanup = useCallback(() => {
-    console.log('🔍 [ZOOM-SDK] Starting cleanup...');
+    console.log('🧹 [ZOOM-SDK-DEBUG] Starting cleanup...');
     
     if (clientRef.current) {
       try {
         if (isMeetingJoined && typeof clientRef.current.leave === 'function') {
+          console.log('🧹 [ZOOM-SDK-DEBUG] Leaving meeting...');
           clientRef.current.leave();
         }
         
         if (typeof clientRef.current.destroy === 'function') {
+          console.log('🧹 [ZOOM-SDK-DEBUG] Destroying client...');
           clientRef.current.destroy();
         }
       } catch (error) {
-        console.warn('🔍 [ZOOM-SDK] Cleanup warning:', error);
+        console.warn('🧹 [ZOOM-SDK-DEBUG] Cleanup warning:', error);
       }
       
       clientRef.current = null;
     }
 
     if (containerRef.current) {
+      console.log('🧹 [ZOOM-SDK-DEBUG] Clearing container HTML...');
       containerRef.current.innerHTML = '';
     }
     
@@ -52,53 +55,85 @@ export function useZoomSDK({ containerRef, shouldInitialize = true, onReady, onE
     initAttemptedRef.current = false;
     isJoiningRef.current = false;
     
-    console.log('🔍 [ZOOM-SDK] Cleanup completed');
+    console.log('🧹 [ZOOM-SDK-DEBUG] Cleanup completed');
   }, [isMeetingJoined, containerRef]);
 
   const validateContainer = useCallback(() => {
+    console.log('🔍 [ZOOM-SDK-DEBUG] Starting container validation...');
+    
     if (!containerRef.current) {
-      console.log('🔍 [ZOOM-SDK] Container ref not available');
+      console.log('❌ [ZOOM-SDK-DEBUG] Container ref is null');
       return false;
     }
 
-    const rect = containerRef.current.getBoundingClientRect();
-    const isValid = rect.width > 0 && rect.height > 0;
-    console.log('🔍 [ZOOM-SDK] Container validation:', { 
-      width: rect.width, 
-      height: rect.height, 
-      isValid 
+    const element = containerRef.current;
+    const rect = element.getBoundingClientRect();
+    const computedStyle = window.getComputedStyle(element);
+    const isInDOM = document.contains(element);
+    
+    console.log('🔍 [ZOOM-SDK-DEBUG] Container validation details:', {
+      element: element,
+      id: element.id,
+      className: element.className,
+      rect: {
+        width: rect.width,
+        height: rect.height,
+        top: rect.top,
+        left: rect.left
+      },
+      computedStyle: {
+        display: computedStyle.display,
+        visibility: computedStyle.visibility,
+        position: computedStyle.position
+      },
+      isInDOM,
+      parentElement: element.parentElement?.tagName,
+      childElementCount: element.childElementCount
     });
+    
+    const isValid = rect.width > 0 && rect.height > 0 && isInDOM;
+    console.log(`🔍 [ZOOM-SDK-DEBUG] Container validation result: ${isValid ? '✅ VALID' : '❌ INVALID'}`);
+    
     return isValid;
   }, [containerRef]);
 
   const initializeSDK = useCallback(async () => {
+    console.log('🚀 [ZOOM-SDK-DEBUG] initializeSDK called with conditions:', {
+      initAttempted: initAttemptedRef.current,
+      hasContainer: !!containerRef.current,
+      shouldInitialize,
+      mounted: mountedRef.current
+    });
+
     if (initAttemptedRef.current || !containerRef.current || !shouldInitialize || !mountedRef.current) {
-      console.log('🔍 [ZOOM-SDK] Skipping init - conditions not met:', {
-        attempted: initAttemptedRef.current,
-        hasContainer: !!containerRef.current,
-        shouldInit: shouldInitialize,
-        mounted: mountedRef.current
-      });
+      console.log('⏭️ [ZOOM-SDK-DEBUG] Skipping init - conditions not met');
       return false;
     }
 
     if (!validateContainer()) {
-      console.warn('🔍 [ZOOM-SDK] Container validation failed');
+      console.warn('❌ [ZOOM-SDK-DEBUG] Container validation failed');
       return false;
     }
 
     initAttemptedRef.current = true;
-    console.log('🔍 [ZOOM-SDK] Starting initialization...');
+    console.log('🚀 [ZOOM-SDK-DEBUG] Starting SDK initialization...');
 
     try {
+      // Create Zoom client
+      console.log('🔧 [ZOOM-SDK-DEBUG] Creating ZoomMtgEmbedded client...');
       clientRef.current = ZoomMtgEmbedded.createClient();
       
       if (!clientRef.current) {
-        throw new Error('Failed to create Zoom client');
+        throw new Error('Failed to create Zoom client - ZoomMtgEmbedded.createClient() returned null');
       }
+      
+      console.log('✅ [ZOOM-SDK-DEBUG] Zoom client created successfully:', clientRef.current);
 
+      // Clear container
+      console.log('🧹 [ZOOM-SDK-DEBUG] Clearing container before init...');
       containerRef.current.innerHTML = '';
 
+      // Prepare init config
       const initConfig = {
         zoomAppRoot: containerRef.current,
         language: 'en-US',
@@ -107,27 +142,41 @@ export function useZoomSDK({ containerRef, shouldInitialize = true, onReady, onE
         disablePreview: false,
         success: () => {
           if (mountedRef.current) {
-            console.log('🔍 [ZOOM-SDK] Initialization successful');
+            console.log('🎉 [ZOOM-SDK-DEBUG] SDK initialization SUCCESS callback fired');
             setIsSDKReady(true);
             onReady?.();
+          } else {
+            console.log('⚠️ [ZOOM-SDK-DEBUG] Component unmounted before success callback');
           }
         },
         error: (event: any) => {
           if (mountedRef.current) {
-            console.error('🔍 [ZOOM-SDK] Initialization failed:', event);
+            console.error('💥 [ZOOM-SDK-DEBUG] SDK initialization ERROR callback fired:', event);
             const errorMsg = event?.errorMessage || 'SDK initialization failed';
             initAttemptedRef.current = false;
             onError?.(errorMsg);
+          } else {
+            console.log('⚠️ [ZOOM-SDK-DEBUG] Component unmounted before error callback');
           }
         }
       };
 
+      console.log('🔧 [ZOOM-SDK-DEBUG] Calling client.init() with config:', {
+        zoomAppRoot: initConfig.zoomAppRoot?.tagName,
+        language: initConfig.language,
+        patchJsMedia: initConfig.patchJsMedia,
+        leaveOnPageUnload: initConfig.leaveOnPageUnload,
+        disablePreview: initConfig.disablePreview
+      });
+
       await clientRef.current.init(initConfig);
+      
+      console.log('✅ [ZOOM-SDK-DEBUG] client.init() completed successfully');
       return true;
 
     } catch (error: any) {
       if (mountedRef.current) {
-        console.error('🔍 [ZOOM-SDK] Init error:', error);
+        console.error('💥 [ZOOM-SDK-DEBUG] Init error caught:', error);
         initAttemptedRef.current = false;
         onError?.(error.message || 'Failed to initialize Zoom SDK');
       }
@@ -136,17 +185,28 @@ export function useZoomSDK({ containerRef, shouldInitialize = true, onReady, onE
   }, [containerRef, shouldInitialize, validateContainer, onReady, onError]);
 
   const joinMeeting = useCallback(async (joinConfig: any) => {
+    console.log('🎯 [ZOOM-SDK-DEBUG] joinMeeting called with state:', {
+      isSDKReady,
+      hasClient: !!clientRef.current,
+      isJoining: isJoiningRef.current,
+      mounted: mountedRef.current
+    });
+
     if (!isSDKReady || !clientRef.current || isJoiningRef.current || !mountedRef.current) {
-      throw new Error('SDK not ready for join operation');
+      const errorMsg = `SDK not ready for join operation - isSDKReady: ${isSDKReady}, hasClient: ${!!clientRef.current}, isJoining: ${isJoiningRef.current}, mounted: ${mountedRef.current}`;
+      console.error('❌ [ZOOM-SDK-DEBUG]', errorMsg);
+      throw new Error(errorMsg);
     }
 
     isJoiningRef.current = true;
-    console.log('🔍 [ZOOM-SDK] Starting join process...');
+    console.log('🎯 [ZOOM-SDK-DEBUG] Starting join process...');
 
     const meetingNumberStr = String(joinConfig.meetingNumber).replace(/\s+/g, '');
     if (!/^\d{10,11}$/.test(meetingNumberStr)) {
       isJoiningRef.current = false;
-      throw new Error(`Invalid meeting number: ${joinConfig.meetingNumber}`);
+      const errorMsg = `Invalid meeting number format: ${joinConfig.meetingNumber}`;
+      console.error('❌ [ZOOM-SDK-DEBUG]', errorMsg);
+      throw new Error(errorMsg);
     }
 
     try {
@@ -160,14 +220,14 @@ export function useZoomSDK({ containerRef, shouldInitialize = true, onReady, onE
         zak: joinConfig.zak || '',
         success: (success: any) => {
           if (mountedRef.current) {
-            console.log('🔍 [ZOOM-SDK] Join successful:', success);
+            console.log('🎉 [ZOOM-SDK-DEBUG] Join SUCCESS callback fired:', success);
             setIsMeetingJoined(true);
             isJoiningRef.current = false;
           }
         },
         error: (error: any) => {
           if (mountedRef.current) {
-            console.error('🔍 [ZOOM-SDK] Join failed:', error);
+            console.error('💥 [ZOOM-SDK-DEBUG] Join ERROR callback fired:', error);
             isJoiningRef.current = false;
             
             let errorMessage = 'Failed to join meeting';
@@ -189,67 +249,106 @@ export function useZoomSDK({ containerRef, shouldInitialize = true, onReady, onE
         }
       };
 
+      console.log('🔧 [ZOOM-SDK-DEBUG] Calling client.join() with params:', {
+        sdkKey: joinParams.sdkKey?.substring(0, 8) + '...',
+        signature: joinParams.signature ? '[SIGNATURE_PROVIDED]' : '[NO_SIGNATURE]',
+        meetingNumber: joinParams.meetingNumber,
+        userName: joinParams.userName,
+        userEmail: joinParams.userEmail,
+        hasZak: !!joinParams.zak,
+        password: joinParams.password ? '[PASSWORD_PROVIDED]' : '[NO_PASSWORD]'
+      });
+
       await clientRef.current.join(joinParams);
+      
+      console.log('✅ [ZOOM-SDK-DEBUG] client.join() completed successfully');
       return true;
 
     } catch (error: any) {
       if (mountedRef.current) {
         isJoiningRef.current = false;
+        console.error('💥 [ZOOM-SDK-DEBUG] Join process failed:', error);
         throw error;
       }
     }
   }, [isSDKReady]);
 
   const leaveMeeting = useCallback(() => {
+    console.log('👋 [ZOOM-SDK-DEBUG] leaveMeeting called with state:', {
+      hasClient: !!clientRef.current,
+      isMeetingJoined,
+      mounted: mountedRef.current
+    });
+
     if (clientRef.current && isMeetingJoined && mountedRef.current) {
-      console.log('🔍 [ZOOM-SDK] Leaving meeting...');
+      console.log('👋 [ZOOM-SDK-DEBUG] Executing leave...');
       try {
         clientRef.current.leave();
         setIsMeetingJoined(false);
+        console.log('✅ [ZOOM-SDK-DEBUG] Leave completed successfully');
       } catch (error) {
-        console.error('🔍 [ZOOM-SDK] Leave error:', error);
+        console.error('💥 [ZOOM-SDK-DEBUG] Leave error:', error);
       }
+    } else {
+      console.log('⏭️ [ZOOM-SDK-DEBUG] Leave skipped - conditions not met');
     }
   }, [isMeetingJoined]);
 
-  // Initialize when conditions are right
+  // Initialize when conditions are right with improved timing
   useEffect(() => {
+    console.log('⚡ [ZOOM-SDK-DEBUG] Init effect triggered with state:', {
+      hasContainer: !!containerRef.current,
+      shouldInitialize,
+      initAttempted: initAttemptedRef.current,
+      mounted: mountedRef.current
+    });
+
     const initWhenReady = () => {
       if (containerRef.current && shouldInitialize && !initAttemptedRef.current && mountedRef.current) {
-        // Use multiple checks to ensure container is truly ready
-        const checkContainer = () => {
+        console.log('⚡ [ZOOM-SDK-DEBUG] Conditions met, starting init sequence...');
+        
+        // Multiple validation checks with delays to ensure DOM is stable
+        const checkAndInit = (attempt: number = 1) => {
+          console.log(`🔍 [ZOOM-SDK-DEBUG] Container check attempt ${attempt}/3`);
+          
           if (validateContainer()) {
-            console.log('🔍 [ZOOM-SDK] Container ready, initializing...');
+            console.log('✅ [ZOOM-SDK-DEBUG] Container validation passed, initializing SDK...');
             initializeSDK();
+          } else if (attempt < 3) {
+            console.log(`⏳ [ZOOM-SDK-DEBUG] Container not ready, retrying in ${attempt * 100}ms...`);
+            setTimeout(() => checkAndInit(attempt + 1), attempt * 100);
           } else {
-            // Retry after a short delay
-            setTimeout(checkContainer, 200);
+            console.error('❌ [ZOOM-SDK-DEBUG] Container validation failed after 3 attempts');
+            onError?.('Container not ready for Zoom SDK initialization');
           }
         };
         
-        checkContainer();
+        // Small delay to ensure DOM is fully rendered
+        setTimeout(() => checkAndInit(), 50);
+      } else {
+        console.log('⏭️ [ZOOM-SDK-DEBUG] Init conditions not met, skipping');
       }
     };
 
     // Initial check
-    if (containerRef.current) {
-      initWhenReady();
-    }
+    initWhenReady();
 
-    // Also check on resize in case container becomes available
+    // Backup check on resize
     const handleResize = () => {
       if (!isSDKReady && containerRef.current && !initAttemptedRef.current) {
+        console.log('📐 [ZOOM-SDK-DEBUG] Resize triggered, checking init...');
         initWhenReady();
       }
     };
 
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
-  }, [containerRef, shouldInitialize, initializeSDK, validateContainer, isSDKReady]);
+  }, [containerRef, shouldInitialize, initializeSDK, validateContainer, isSDKReady, onError]);
 
   // Cleanup on unmount
   useEffect(() => {
     return () => {
+      console.log('🔚 [ZOOM-SDK-DEBUG] Component unmounting, running cleanup...');
       cleanup();
     };
   }, [cleanup]);
