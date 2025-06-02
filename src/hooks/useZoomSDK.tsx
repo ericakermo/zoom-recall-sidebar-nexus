@@ -58,6 +58,14 @@ export function useZoomSDK({ onReady, onError }: UseZoomSDKProps = {}) {
       return;
     }
 
+    // Log container dimensions for debugging
+    const rect = meetingSDKElement.getBoundingClientRect();
+    console.log('📐 [ZOOM-SDK] Container dimensions:', {
+      width: rect.width,
+      height: rect.height,
+      aspectRatio: (rect.width / rect.height).toFixed(2)
+    });
+
     initializationRef.current = true;
 
     try {
@@ -65,19 +73,29 @@ export function useZoomSDK({ onReady, onError }: UseZoomSDKProps = {}) {
       
       clientRef.current = ZoomMtgEmbedded.createClient();
       
-      console.log('🔄 Initializing Zoom embedded client with recommended configuration...');
+      console.log('🔄 Initializing Zoom embedded client with controlled sizing...');
       
-      // Following Zoom's recommended initialization
+      // Calculate dimensions to maintain 16:9 ratio within container
+      const containerWidth = Math.min(rect.width, 1000);
+      const containerHeight = Math.min(rect.height, containerWidth * (9/16));
+      const finalWidth = Math.min(containerWidth, containerHeight * (16/9));
+      const finalHeight = finalWidth * (9/16);
+
+      console.log('📏 [ZOOM-SDK] Calculated dimensions:', {
+        finalWidth: Math.round(finalWidth),
+        finalHeight: Math.round(finalHeight)
+      });
+
       await clientRef.current.init({
         zoomAppRoot: meetingSDKElement,
         language: 'en-US',
         customize: {
           video: {
-            isResizable: false, // Make it non-resizable as requested
+            isResizable: false,
             viewSizes: {
               default: {
-                width: 1000,
-                height: 600
+                width: Math.round(finalWidth),
+                height: Math.round(finalHeight)
               }
             }
           }
@@ -89,7 +107,7 @@ export function useZoomSDK({ onReady, onError }: UseZoomSDKProps = {}) {
       setIsSDKLoaded(true);
       setIsReady(true);
       onReady?.();
-      console.log('✅ Zoom embedded client initialized successfully with recommended config');
+      console.log('✅ Zoom embedded client initialized with controlled sizing');
     } catch (error: any) {
       console.error('❌ Failed to initialize Zoom embedded client:', error);
       initializationRef.current = false;
@@ -194,7 +212,10 @@ export function useZoomSDK({ onReady, onError }: UseZoomSDKProps = {}) {
     const checkForElement = () => {
       const meetingSDKElement = document.getElementById('meetingSDKElement');
       if (meetingSDKElement && !initializationRef.current) {
-        initializeSDK();
+        // Add a small delay to ensure container is fully rendered
+        setTimeout(() => {
+          initializeSDK();
+        }, 100);
       } else if (!meetingSDKElement) {
         // Keep checking for the element
         setTimeout(checkForElement, 100);
