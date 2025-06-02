@@ -127,26 +127,26 @@ export function useZoomSDK({ containerRef, shouldInitialize = true, onReady, onE
       console.log('❌ [ZOOM-SDK] Container not ready');
       setHasError(true);
       setIsLoading(false);
-      onError?.('Container not ready for SDK initialization');
+      onError?.('Zoom container not ready - please ensure the page has fully loaded');
       return;
     }
 
-    console.log('🚀 [ZOOM-SDK] Initializing SDK');
+    console.log('🚀 [ZOOM-SDK] Initializing Zoom Meeting SDK v3.13.2');
     setIsLoading(true);
     setHasError(false);
 
     try {
-      // Clear container before init
+      // Clear container
       containerRef.current!.innerHTML = '';
       
-      // Create client
+      // Create client using latest SDK standards
       clientRef.current = ZoomMtgEmbedded.createClient();
       
       if (!clientRef.current) {
-        throw new Error('Failed to create Zoom client');
+        throw new Error('Failed to create Zoom Meeting SDK client');
       }
 
-      // Simplified, reliable configuration
+      // Standard Zoom SDK configuration following v3.13.2 guidelines
       const initConfig = {
         zoomAppRoot: containerRef.current!,
         language: 'en-US',
@@ -165,34 +165,59 @@ export function useZoomSDK({ containerRef, shouldInitialize = true, onReady, onE
             console.error('❌ [ZOOM-SDK] Init failed:', error);
             setHasError(true);
             setIsLoading(false);
-            const errorMsg = error?.errorMessage || error?.reason || 'SDK initialization failed';
-            onError?.(errorMsg);
+            
+            // Enhanced error mapping for user-friendly messages
+            let userMessage = 'Failed to initialize Zoom SDK';
+            if (error?.errorMessage?.includes('network')) {
+              userMessage = 'Network connection issue - please check your internet';
+            } else if (error?.errorMessage?.includes('browser')) {
+              userMessage = 'Browser compatibility issue - try using Chrome or Firefox';
+            } else if (error?.reason) {
+              userMessage = `Zoom SDK Error: ${error.reason}`;
+            }
+            
+            onError?.(userMessage);
           }
         }
       };
+
+      console.log('🔧 [ZOOM-SDK] Initializing with config:', {
+        hasContainer: !!initConfig.zoomAppRoot,
+        language: initConfig.language,
+        patchJsMedia: initConfig.patchJsMedia
+      });
 
       await clientRef.current.init(initConfig);
 
     } catch (error: any) {
       if (mountedRef.current) {
-        console.error('❌ [ZOOM-SDK] Init error:', error);
+        console.error('❌ [ZOOM-SDK] Critical init error:', error);
         setHasError(true);
         setIsLoading(false);
-        onError?.(error.message || 'Failed to initialize Zoom SDK');
+        onError?.(`Zoom SDK initialization failed: ${error.message}`);
       }
     }
   }, [containerRef, shouldInitialize, validateContainer, onReady, onError]);
 
   const joinMeeting = useCallback(async (joinConfig: any) => {
-    console.log('🎯 [ZOOM-SDK] Joining meeting');
+    console.log('🎯 [ZOOM-SDK] Starting meeting join process');
 
     if (!isReady || !clientRef.current || !mountedRef.current) {
-      const errorMsg = `Cannot join meeting - SDK not ready`;
+      const errorMsg = `Cannot join meeting - SDK not ready (ready: ${isReady}, client: ${!!clientRef.current})`;
       console.error('❌ [ZOOM-SDK]', errorMsg);
-      throw new Error(errorMsg);
+      throw new Error('Zoom SDK not ready - please wait for initialization');
     }
 
+    console.log('📋 [ZOOM-SDK] Join config validation:', {
+      meetingNumber: joinConfig.meetingNumber,
+      userName: joinConfig.userName,
+      role: joinConfig.role,
+      hasSDKKey: !!joinConfig.sdkKey,
+      hasSignature: !!joinConfig.signature
+    });
+
     try {
+      // Standard Zoom SDK join parameters following v3.13.2 documentation
       const joinParams = {
         sdkKey: joinConfig.sdkKey,
         signature: joinConfig.signature,
@@ -203,7 +228,7 @@ export function useZoomSDK({ containerRef, shouldInitialize = true, onReady, onE
         zak: joinConfig.zak || '',
         success: (result: any) => {
           if (mountedRef.current) {
-            console.log('✅ [ZOOM-SDK] Successfully joined meeting');
+            console.log('✅ [ZOOM-SDK] Successfully joined meeting:', result);
             setIsJoined(true);
           }
         },
@@ -211,23 +236,51 @@ export function useZoomSDK({ containerRef, shouldInitialize = true, onReady, onE
           if (mountedRef.current) {
             console.error('❌ [ZOOM-SDK] Join failed:', error);
             
-            // Map common Zoom error codes to user-friendly messages
+            // Enhanced error mapping with Zoom error codes
             let errorMessage = 'Failed to join meeting';
-            if (error?.errorCode === 200) {
-              errorMessage = 'Invalid meeting credentials';
-            } else if (error?.errorCode === 3712) {
-              errorMessage = 'Authentication failed - invalid signature';
-            } else if (error?.errorCode === 3000) {
-              errorMessage = 'Meeting not found or has ended';
-            } else if (error?.reason) {
-              errorMessage = error.reason;
+            switch (error?.errorCode) {
+              case 200:
+                errorMessage = 'Invalid meeting credentials - check meeting ID and password';
+                break;
+              case 3712:
+                errorMessage = 'Authentication failed - invalid meeting signature';
+                break;
+              case 3000:
+                errorMessage = 'Meeting not found or has ended';
+                break;
+              case 1001:
+                errorMessage = 'User rejected to give permission of camera or microphone';
+                break;
+              case 3001:
+                errorMessage = 'Meeting locked by host';
+                break;
+              case 3002:
+                errorMessage = 'Meeting restricted';
+                break;
+              case 3003:
+                errorMessage = 'Meeting has reached maximum capacity';
+                break;
+              case 3004:
+                errorMessage = 'Meeting does not exist';
+                break;
+              case 3005:
+                errorMessage = 'Feature disabled by host';
+                break;
+              default:
+                if (error?.reason) {
+                  errorMessage = error.reason;
+                } else if (error?.errorMessage) {
+                  errorMessage = error.errorMessage;
+                }
             }
             
+            console.log('🔍 [ZOOM-SDK] Mapped error:', { code: error?.errorCode, message: errorMessage });
             throw new Error(errorMessage);
           }
         }
       };
 
+      console.log('🔗 [ZOOM-SDK] Calling join with sanitized params');
       await clientRef.current.join(joinParams);
 
     } catch (error: any) {
@@ -255,7 +308,7 @@ export function useZoomSDK({ containerRef, shouldInitialize = true, onReady, onE
   // Initialize when container is ready
   useLayoutEffect(() => {
     if (containerRef.current && shouldInitialize && mountedRef.current) {
-      // Wait for container to be fully rendered
+      // Allow DOM to settle before validation
       const timer = setTimeout(() => {
         if (mountedRef.current && validateContainer()) {
           initializeSDK();

@@ -80,7 +80,7 @@ export function ZoomComponentView({
         throw new Error(`Authentication failed: ${tokenError.message}`);
       }
 
-      // Get ZAK token for hosts
+      // Get ZAK token for hosts (role 1)
       let zakToken = null;
       if (userRole === 1) {
         console.log('👑 [COMPONENT-VIEW] Getting ZAK token for host');
@@ -93,7 +93,7 @@ export function ZoomComponentView({
         zakToken = zakData.zak;
       }
 
-      console.log('✅ [COMPONENT-VIEW] Authentication tokens obtained');
+      console.log('✅ [COMPONENT-VIEW] Authentication tokens obtained successfully');
       return { ...tokenData, zak: zakToken };
     } catch (error: any) {
       console.error('❌ [COMPONENT-VIEW] Token request failed:', error);
@@ -115,16 +115,24 @@ export function ZoomComponentView({
 
       if (!mountedRef.current) return;
 
+      // Standard join configuration following Zoom SDK best practices
       const joinConfig = {
         sdkKey: tokens.sdkKey,
         signature: tokens.signature,
         meetingNumber,
-        userName: providedUserName || user?.email || 'Guest',
+        userName: providedUserName || user?.email || 'Guest User',
         userEmail: user?.email || '',
         passWord: meetingPassword || '',
         role: role || 0,
         zak: tokens.zak || ''
       };
+
+      console.log('📝 [COMPONENT-VIEW] Join configuration prepared:', {
+        meetingNumber: joinConfig.meetingNumber,
+        userName: joinConfig.userName,
+        role: joinConfig.role,
+        hasZAK: !!joinConfig.zak
+      });
 
       setCurrentStep('Joining meeting...');
       
