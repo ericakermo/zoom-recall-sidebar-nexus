@@ -3,15 +3,16 @@ import { useState, useRef, useCallback, useEffect } from 'react';
 import ZoomMtgEmbedded from '@zoom/meetingsdk/embedded';
 
 interface UseZoomSDKProps {
+  containerRef: React.RefObject<HTMLDivElement>;
+  shouldInitialize?: boolean;
   onReady?: () => void;
   onError?: (error: string) => void;
 }
 
-export function useZoomSDK({ onReady, onError }: UseZoomSDKProps = {}) {
+export function useZoomSDK({ containerRef, shouldInitialize = true, onReady, onError }: UseZoomSDKProps) {
   const [isSDKLoaded, setIsSDKLoaded] = useState(false);
   const [isReady, setIsReady] = useState(false);
   const [isJoined, setIsJoined] = useState(false);
-  const containerRef = useRef<HTMLDivElement>(null);
   const clientRef = useRef<any>(null);
   const initializationRef = useRef(false);
   const isJoiningRef = useRef(false);
@@ -64,7 +65,7 @@ export function useZoomSDK({ onReady, onError }: UseZoomSDKProps = {}) {
     cleanupInProgressRef.current = false;
     
     debugLog('Zoom SDK cleanup completed');
-  }, [isJoined, debugLog]);
+  }, [isJoined, containerRef, debugLog]);
 
   const validateContainer = useCallback(() => {
     if (!containerRef.current) {
@@ -91,11 +92,11 @@ export function useZoomSDK({ onReady, onError }: UseZoomSDKProps = {}) {
 
     debugLog('Container validation:', validation);
     return validation.exists && validation.isVisible;
-  }, [debugLog]);
+  }, [containerRef, debugLog]);
 
   const initializeSDK = useCallback(async () => {
-    if (initializationRef.current || !containerRef.current || cleanupInProgressRef.current) {
-      debugLog('SDK initialization skipped - already initialized, container not ready, or cleanup in progress');
+    if (initializationRef.current || !containerRef.current || cleanupInProgressRef.current || !shouldInitialize) {
+      debugLog('SDK initialization skipped - already initialized, container not ready, cleanup in progress, or not allowed to initialize');
       return false;
     }
 
@@ -169,7 +170,7 @@ export function useZoomSDK({ onReady, onError }: UseZoomSDKProps = {}) {
       onError?.(error.message || 'Failed to initialize Zoom SDK');
       return false;
     }
-  }, [validateContainer, onReady, onError, debugLog]);
+  }, [containerRef, shouldInitialize, validateContainer, onReady, onError, debugLog]);
 
   const joinMeeting = useCallback(async (joinConfig: any) => {
     debugLog('joinMeeting called with config:', joinConfig);
@@ -254,7 +255,7 @@ export function useZoomSDK({ onReady, onError }: UseZoomSDKProps = {}) {
       isJoiningRef.current = false;
       throw error;
     }
-  }, [isReady, debugLog]);
+  }, [isReady, containerRef, debugLog]);
 
   const leaveMeeting = useCallback(() => {
     if (clientRef.current && isJoined && !cleanupInProgressRef.current) {
@@ -272,11 +273,11 @@ export function useZoomSDK({ onReady, onError }: UseZoomSDKProps = {}) {
   }, [isJoined, debugLog]);
 
   useEffect(() => {
-    if (containerRef.current && !initializationRef.current && !cleanupInProgressRef.current) {
-      debugLog('Container is ready, initializing SDK...');
+    if (containerRef.current && shouldInitialize && !initializationRef.current && !cleanupInProgressRef.current) {
+      debugLog('Container and conditions ready, initializing SDK...');
       initializeSDK();
     }
-  }, [initializeSDK, debugLog]);
+  }, [containerRef, shouldInitialize, initializeSDK, debugLog]);
 
   useEffect(() => {
     return () => {
@@ -286,7 +287,6 @@ export function useZoomSDK({ onReady, onError }: UseZoomSDKProps = {}) {
   }, [cleanup, debugLog]);
 
   return {
-    containerRef,
     isSDKLoaded,
     isReady,
     isJoined,

@@ -1,5 +1,5 @@
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { useZoomSDK } from '@/hooks/useZoomSDK';
 import { ZoomLoadingOverlay } from '@/components/zoom/ZoomLoadingOverlay';
@@ -27,20 +27,37 @@ export function ZoomComponentView({
 }: ZoomComponentViewProps) {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [currentStep, setCurrentStep] = useState('Initializing Zoom SDK...');
+  const [currentStep, setCurrentStep] = useState('Preparing container...');
   const [retryCount, setRetryCount] = useState(0);
   const [hasAttemptedJoin, setHasAttemptedJoin] = useState(false);
+  const [containerReady, setContainerReady] = useState(false);
   const maxRetries = 2;
   
   const { user } = useAuth();
+  const containerRef = useRef<HTMLDivElement>(null);
 
   // Debug logging helper
   const debugLog = useCallback((message: string, data?: any) => {
     console.log(`🔍 [COMPONENT-DEBUG] ${message}`, data || '');
   }, []);
 
+  // Ensure container is ready before initializing SDK
+  useEffect(() => {
+    const checkContainer = () => {
+      if (containerRef.current) {
+        debugLog('Container is ready, setting containerReady to true');
+        setContainerReady(true);
+        setCurrentStep('Container ready, initializing Zoom SDK...');
+      } else {
+        debugLog('Container not ready yet, retrying...');
+        setTimeout(checkContainer, 100);
+      }
+    };
+
+    checkContainer();
+  }, [debugLog]);
+
   const {
-    containerRef,
     isSDKLoaded,
     isReady,
     isJoined,
@@ -48,6 +65,8 @@ export function ZoomComponentView({
     leaveMeeting,
     cleanup
   } = useZoomSDK({
+    containerRef,
+    shouldInitialize: containerReady,
     onReady: () => {
       debugLog('Zoom SDK ready - preparing to join meeting');
       setCurrentStep('Preparing to join meeting...');
@@ -59,41 +78,6 @@ export function ZoomComponentView({
       onMeetingError?.(error);
     }
   });
-
-  const validateRenderingConditions = useCallback(() => {
-    if (!containerRef.current) {
-      debugLog('Rendering validation failed - no container');
-      return false;
-    }
-
-    const container = containerRef.current;
-    const rect = container.getBoundingClientRect();
-    const styles = window.getComputedStyle(container);
-
-    const validation = {
-      containerExists: !!container,
-      dimensions: { width: rect.width, height: rect.height },
-      hasFixedDimensions: rect.width === 900 && rect.height === 506,
-      isVisible: rect.width > 0 && rect.height > 0,
-      computedStyles: {
-        display: styles.display,
-        visibility: styles.visibility,
-        overflow: styles.overflow,
-        position: styles.position
-      },
-      hasContent: container.children.length > 0,
-      contentDetails: {
-        childCount: container.children.length,
-        htmlLength: container.innerHTML.length,
-        hasCanvas: !!container.querySelector('canvas'),
-        hasVideo: !!container.querySelector('video'),
-        hasZoomElements: !!container.querySelector('[class*="zoom"]')
-      }
-    };
-
-    debugLog('Rendering conditions validation:', validation);
-    return validation;
-  }, [debugLog]);
 
   const getTokens = useCallback(async (meetingNumber: string, role: number) => {
     try {
@@ -139,12 +123,13 @@ export function ZoomComponentView({
   const handleJoinMeeting = useCallback(async () => {
     debugLog('handleJoinMeeting called - Current state:', {
       isReady,
+      containerReady,
       hasAttemptedJoin,
       isJoined,
       error: !!error
     });
 
-    if (!isReady || hasAttemptedJoin || isJoined || error) {
+    if (!isReady || !containerReady || hasAttemptedJoin || isJoined || error) {
       debugLog('Skipping join - conditions not met');
       return;
     }
@@ -181,16 +166,6 @@ export function ZoomComponentView({
       setRetryCount(0);
       onMeetingJoined?.();
 
-      // Validate rendering after successful join
-      setTimeout(() => {
-        const renderingValidation = validateRenderingConditions();
-        debugLog('Post-join rendering validation:', renderingValidation);
-        
-        if (renderingValidation && typeof renderingValidation === 'object' && !renderingValidation.hasContent) {
-          debugLog('WARNING: Meeting joined but no content rendered in container');
-        }
-      }, 3000);
-
     } catch (error: any) {
       debugLog('Join failed:', error);
       setError(error.message);
@@ -198,29 +173,31 @@ export function ZoomComponentView({
       setHasAttemptedJoin(false); // Allow retry
       onMeetingError?.(error.message);
     }
-  }, [isReady, hasAttemptedJoin, isJoined, error, meetingNumber, role, providedUserName, user, meetingPassword, getTokens, joinMeeting, onMeetingJoined, onMeetingError, validateRenderingConditions, debugLog]);
+  }, [isReady, containerReady, hasAttemptedJoin, isJoined, error, meetingNumber, role, providedUserName, user, meetingPassword, getTokens, joinMeeting, onMeetingJoined, onMeetingError, debugLog]);
 
   // Update current step based on SDK status
   useEffect(() => {
     if (isJoined) {
       setCurrentStep('Connected to meeting');
       setIsLoading(false);
-    } else if (isReady && !hasAttemptedJoin) {
+    } else if (isReady && containerReady && !hasAttemptedJoin) {
       setCurrentStep('Ready to join meeting');
-    } else if (isSDKLoaded) {
+    } else if (isSDKLoaded && containerReady) {
       setCurrentStep('Initializing Zoom SDK...');
-    } else {
+    } else if (containerReady) {
       setCurrentStep('Loading Zoom SDK...');
+    } else {
+      setCurrentStep('Preparing container...');
     }
-  }, [isSDKLoaded, isReady, isJoined, hasAttemptedJoin]);
+  }, [isSDKLoaded, isReady, isJoined, hasAttemptedJoin, containerReady]);
 
   // Join when ready - single effect with proper guards
   useEffect(() => {
-    if (isReady && !error && !isJoined && !hasAttemptedJoin) {
-      debugLog('SDK ready - starting join process...');
+    if (isReady && containerReady && !error && !isJoined && !hasAttemptedJoin) {
+      debugLog('All conditions met - starting join process...');
       handleJoinMeeting();
     }
-  }, [isReady, error, isJoined, hasAttemptedJoin, handleJoinMeeting, debugLog]);
+  }, [isReady, containerReady, error, isJoined, hasAttemptedJoin, handleJoinMeeting, debugLog]);
 
   const handleLeaveMeeting = useCallback(() => {
     leaveMeeting();
@@ -233,7 +210,8 @@ export function ZoomComponentView({
       setRetryCount(prev => prev + 1);
       setError(null);
       setIsLoading(true);
-      setHasAttemptedJoin(false); // Reset join attempt flag
+      setHasAttemptedJoin(false);
+      setContainerReady(false);
       setCurrentStep('Retrying...');
       
       // Clean up and retry
@@ -266,7 +244,7 @@ export function ZoomComponentView({
         maxRetries={maxRetries}
       />
 
-      {/* Zoom meeting container - exact dimensions as per Zoom docs */}
+      {/* Zoom meeting container - ensure it's always mounted */}
       <div className="zoom-meeting-wrapper">
         <div 
           ref={containerRef}
