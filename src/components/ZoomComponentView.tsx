@@ -102,12 +102,14 @@ export function ZoomComponentView({
   }, []);
 
   const executeJoin = useCallback(async () => {
-    if (!mountedRef.current || joinAttempted || !isReady || hasError) {
+    // Prevent multiple join attempts
+    if (!mountedRef.current || joinAttempted || !isReady || hasError || isJoined) {
       console.log('⏭️ [COMPONENT-VIEW] Join skipped:', { 
         mounted: mountedRef.current, 
         attempted: joinAttempted, 
         ready: isReady,
-        hasError 
+        hasError,
+        isJoined
       });
       return;
     }
@@ -156,27 +158,36 @@ export function ZoomComponentView({
       if (!mountedRef.current) return;
       
       console.error('❌ [COMPONENT-VIEW] Join failed:', error);
-      setError(error.message || 'Failed to join meeting');
-      onMeetingError?.(error.message || 'Failed to join meeting');
-      setJoinAttempted(false); // Allow retry
+      
+      // Map specific error messages
+      let errorMessage = error.message || 'Failed to join meeting';
+      if (error.message?.includes('Already has other meetings in progress')) {
+        errorMessage = 'Another meeting is already in progress. Please end the current meeting first.';
+      } else if (error.message?.includes('Meeting not found')) {
+        errorMessage = 'Meeting not found or has ended';
+      }
+      
+      setError(errorMessage);
+      onMeetingError?.(errorMessage);
+      setJoinAttempted(false); // Allow retry on error
     }
-  }, [isReady, joinAttempted, meetingNumber, role, providedUserName, user, meetingPassword, getAuthTokens, joinMeeting, onMeetingJoined, onMeetingError, hasError]);
+  }, [isReady, joinAttempted, meetingNumber, role, providedUserName, user, meetingPassword, getAuthTokens, joinMeeting, onMeetingJoined, onMeetingError, hasError, isJoined]);
 
-  // Auto-join when SDK is ready - single attempt
+  // Auto-join when SDK is ready
   useEffect(() => {
-    if (isReady && !joinAttempted && !error && !hasError && mountedRef.current) {
+    if (isReady && !joinAttempted && !error && !hasError && !isJoined && mountedRef.current) {
       console.log('▶️ [COMPONENT-VIEW] SDK ready - starting auto-join');
       
       // Small delay to ensure everything is stable
       const timer = setTimeout(() => {
-        if (mountedRef.current && !joinAttempted && isReady && !hasError) {
+        if (mountedRef.current && !joinAttempted && isReady && !hasError && !isJoined) {
           executeJoin();
         }
       }, 500);
 
       return () => clearTimeout(timer);
     }
-  }, [isReady, error, hasError, joinAttempted, executeJoin]);
+  }, [isReady, error, hasError, joinAttempted, executeJoin, isJoined]);
 
   // Update step display
   useEffect(() => {
