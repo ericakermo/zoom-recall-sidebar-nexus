@@ -21,6 +21,7 @@ class ZoomSDKSingleton {
   private listeners: Set<Function> = new Set();
   private initPromise: Promise<void> | null = null;
   private sessionId: string | null = null;
+  private joinLock = false;
 
   static getInstance(): ZoomSDKSingleton {
     if (!ZoomSDKSingleton.instance) {
@@ -71,11 +72,12 @@ class ZoomSDKSingleton {
       isInitializing: this.isInitializing,
       hasClient: !!this.client,
       containerChanged: this.currentContainer !== container,
-      sessionId: this.sessionId
+      sessionId: this.sessionId,
+      isJoined: this.isJoined
     });
 
-    // If already initialized with same container and session, return
-    if (this.isInitialized && this.client && this.currentContainer === container && this.sessionId) {
+    // If already initialized with same container and not joined, return
+    if (this.isInitialized && this.client && this.currentContainer === container && !this.isJoined) {
       console.log('✅ [ZOOM-SDK] Already initialized with same container');
       this.notifyListeners('ready');
       return;
@@ -87,10 +89,16 @@ class ZoomSDKSingleton {
       return this.initPromise;
     }
 
-    // If we have active session, clean up first
-    if (this.isJoined || this.client) {
-      console.log('🧹 [ZOOM-SDK] Cleaning up existing session first');
+    // If we have active session and different container, clean up first
+    if ((this.isJoined || this.client) && this.currentContainer !== container) {
+      console.log('🧹 [ZOOM-SDK] Cleaning up existing session for new container');
       await this.cleanup();
+    }
+
+    // Don't initialize if we're currently in a meeting
+    if (this.isJoined) {
+      console.log('⚠️ [ZOOM-SDK] Cannot initialize - already in meeting');
+      return;
     }
 
     // Validate container
@@ -115,7 +123,7 @@ class ZoomSDKSingleton {
     try {
       console.log('🚀 [ZOOM-SDK] Creating new client');
       
-      // Clear container
+      // Clear container first
       container.innerHTML = '';
 
       // Create client
@@ -163,16 +171,21 @@ class ZoomSDKSingleton {
       isJoined: this.isJoined,
       isJoining: this.isJoining,
       hasClient: !!this.client,
-      sessionId: this.sessionId
+      sessionId: this.sessionId,
+      joinLock: this.joinLock
     });
 
     if (!this.isInitialized || !this.client) {
       throw new Error('SDK not initialized');
     }
 
+    if (this.joinLock) {
+      throw new Error('Join already in progress - locked');
+    }
+
     if (this.isJoined) {
-      console.log('⚠️ [ZOOM-SDK] Already in meeting, leaving first');
-      await this.leave();
+      console.log('✅ [ZOOM-SDK] Already in meeting - skipping join');
+      return;
     }
 
     if (this.isJoining) {
@@ -180,6 +193,7 @@ class ZoomSDKSingleton {
     }
 
     this.isJoining = true;
+    this.joinLock = true;
 
     try {
       console.log('🔗 [ZOOM-SDK] Calling client.join()');
@@ -214,20 +228,19 @@ class ZoomSDKSingleton {
       
       // Map specific errors correctly
       let mappedError = error;
-      if (error?.type === 'JOIN_MEETING_FAILED') {
-        if (error.errorCode === 3000) {
-          mappedError = new Error('Another meeting is already in progress. Please end the current meeting first.');
-        } else if (error.reason?.includes('Invalid meeting credentials')) {
-          mappedError = new Error('Invalid meeting credentials - check meeting ID and password');
-        } else if (error.reason?.includes('Meeting not found')) {
-          mappedError = new Error('Meeting not found or has ended');
-        }
+      if (error?.errorCode === 3000) {
+        mappedError = new Error('Another meeting is already in progress. Please end the current meeting first.');
+      } else if (error?.reason?.includes('Invalid meeting credentials')) {
+        mappedError = new Error('Invalid meeting credentials - check meeting ID and password');
+      } else if (error?.reason?.includes('Meeting not found')) {
+        mappedError = new Error('Meeting not found or has ended');
       }
       
       this.notifyListeners('joinError', mappedError);
       throw mappedError;
     } finally {
       this.isJoining = false;
+      this.joinLock = false;
     }
   }
 
@@ -262,8 +275,8 @@ class ZoomSDKSingleton {
     this.isInitialized = false;
     this.isInitializing = false;
     this.isJoining = false;
+    this.joinLock = false;
     this.sessionId = null;
-    this.listeners.clear();
     
     console.log('✅ [ZOOM-SDK] Cleanup completed');
   }
@@ -275,7 +288,8 @@ class ZoomSDKSingleton {
       isInitializing: this.isInitializing,
       isJoining: this.isJoining,
       hasClient: !!this.client,
-      sessionId: this.sessionId
+      sessionId: this.sessionId,
+      joinLock: this.joinLock
     };
   }
 }
@@ -291,6 +305,7 @@ export function useZoomSDK({ containerRef, shouldInitialize = true, onReady, onE
   const mountedRef = useRef(true);
   const listenerRef = useRef<Function | null>(null);
   const initTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const initializingRef = useRef(false);
 
   // Create listener function
   useEffect(() => {
@@ -332,17 +347,22 @@ export function useZoomSDK({ containerRef, shouldInitialize = true, onReady, onE
     };
   }, [onReady, onError]);
 
-  // Initialize when container is ready
+  // Initialize when container is ready - but prevent multiple calls
   useLayoutEffect(() => {
-    if (!containerRef.current || !shouldInitialize || !mountedRef.current) {
+    if (!containerRef.current || !shouldInitialize || !mountedRef.current || initializingRef.current) {
       return;
     }
 
     const initializeSDK = async () => {
+      if (initializingRef.current) return;
+      initializingRef.current = true;
+      
       try {
         await zoomSingleton.initialize(containerRef.current!);
       } catch (error) {
         console.error('❌ [ZOOM-SDK] Initialization failed:', error);
+      } finally {
+        initializingRef.current = false;
       }
     };
 

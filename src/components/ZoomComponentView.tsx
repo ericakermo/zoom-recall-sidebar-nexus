@@ -28,11 +28,13 @@ export function ZoomComponentView({
   const [error, setError] = useState<string | null>(null);
   const [currentStep, setCurrentStep] = useState('Initializing Zoom SDK...');
   const [joinAttempted, setJoinAttempted] = useState(false);
+  const [hasJoinedSuccessfully, setHasJoinedSuccessfully] = useState(false);
   
   const { user } = useAuth();
   const containerRef = useRef<HTMLDivElement>(null);
   const mountedRef = useRef(true);
   const joinTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const processingRef = useRef(false);
 
   useEffect(() => {
     return () => {
@@ -40,9 +42,14 @@ export function ZoomComponentView({
       if (joinTimeoutRef.current) {
         clearTimeout(joinTimeoutRef.current);
       }
-      console.log('🔚 [COMPONENT-VIEW] Component unmounting');
+      // Only cleanup if we haven't successfully joined
+      if (!hasJoinedSuccessfully) {
+        console.log('🔚 [COMPONENT-VIEW] Component unmounting - no successful join');
+      } else {
+        console.log('🔚 [COMPONENT-VIEW] Component unmounting - but meeting was successful');
+      }
     };
-  }, []);
+  }, [hasJoinedSuccessfully]);
 
   const {
     isReady,
@@ -54,14 +61,14 @@ export function ZoomComponentView({
     cleanup
   } = useZoomSDK({
     containerRef,
-    shouldInitialize: true,
+    shouldInitialize: !hasJoinedSuccessfully, // Don't reinitialize if already joined
     onReady: () => {
-      if (!mountedRef.current) return;
+      if (!mountedRef.current || hasJoinedSuccessfully) return;
       console.log('✅ [COMPONENT-VIEW] SDK ready - proceeding to join');
       setCurrentStep('SDK ready - preparing to join...');
     },
     onError: (error) => {
-      if (!mountedRef.current) return;
+      if (!mountedRef.current || hasJoinedSuccessfully) return;
       console.error('❌ [COMPONENT-VIEW] SDK error:', error);
       setError(error);
       onMeetingError?.(error);
@@ -106,27 +113,30 @@ export function ZoomComponentView({
   }, []);
 
   const executeJoin = useCallback(async () => {
-    // Prevent multiple join attempts with stricter checks
-    if (!mountedRef.current || joinAttempted || !isReady || hasError || isJoined) {
+    // Prevent multiple join attempts and processing
+    if (!mountedRef.current || joinAttempted || !isReady || hasError || isJoined || processingRef.current || hasJoinedSuccessfully) {
       console.log('⏭️ [COMPONENT-VIEW] Join skipped:', { 
         mounted: mountedRef.current, 
         attempted: joinAttempted, 
         ready: isReady,
         hasError,
-        isJoined
+        isJoined,
+        processing: processingRef.current,
+        alreadyJoined: hasJoinedSuccessfully
       });
       return;
     }
 
     console.log('🎯 [COMPONENT-VIEW] Starting join process');
     setJoinAttempted(true);
+    processingRef.current = true;
 
     try {
       setCurrentStep('Getting authentication...');
       const tokens = await getAuthTokens(meetingNumber, role || 0);
 
-      if (!mountedRef.current) {
-        console.log('🚫 [COMPONENT-VIEW] Component unmounted during token fetch');
+      if (!mountedRef.current || hasJoinedSuccessfully) {
+        console.log('🚫 [COMPONENT-VIEW] Component unmounted or already joined during token fetch');
         return;
       }
 
@@ -161,6 +171,7 @@ export function ZoomComponentView({
       }
       
       console.log('✅ [COMPONENT-VIEW] Join completed successfully');
+      setHasJoinedSuccessfully(true);
       setCurrentStep('Connected to meeting');
       onMeetingJoined?.();
 
@@ -171,12 +182,14 @@ export function ZoomComponentView({
       setError(error.message || 'Failed to join meeting');
       onMeetingError?.(error.message || 'Failed to join meeting');
       setJoinAttempted(false); // Allow retry on error
+    } finally {
+      processingRef.current = false;
     }
-  }, [isReady, joinAttempted, meetingNumber, role, providedUserName, user, meetingPassword, getAuthTokens, joinMeeting, onMeetingJoined, onMeetingError, hasError, isJoined]);
+  }, [isReady, joinAttempted, meetingNumber, role, providedUserName, user, meetingPassword, getAuthTokens, joinMeeting, onMeetingJoined, onMeetingError, hasError, isJoined, hasJoinedSuccessfully]);
 
-  // Auto-join when SDK is ready with improved timing
+  // Auto-join when SDK is ready - but only once
   useEffect(() => {
-    if (isReady && !joinAttempted && !error && !hasError && !isJoined && mountedRef.current) {
+    if (isReady && !joinAttempted && !error && !hasError && !isJoined && mountedRef.current && !hasJoinedSuccessfully && !processingRef.current) {
       console.log('▶️ [COMPONENT-VIEW] SDK ready - starting auto-join');
       
       // Clear any existing timeout
@@ -184,9 +197,9 @@ export function ZoomComponentView({
         clearTimeout(joinTimeoutRef.current);
       }
 
-      // Delay to ensure everything is stable
+      // Small delay to ensure everything is stable
       joinTimeoutRef.current = setTimeout(() => {
-        if (mountedRef.current && !joinAttempted && isReady && !hasError && !isJoined) {
+        if (mountedRef.current && !joinAttempted && isReady && !hasError && !isJoined && !hasJoinedSuccessfully && !processingRef.current) {
           executeJoin();
         }
       }, 500);
@@ -197,24 +210,26 @@ export function ZoomComponentView({
         }
       };
     }
-  }, [isReady, error, hasError, joinAttempted, executeJoin, isJoined]);
+  }, [isReady, error, hasError, joinAttempted, executeJoin, isJoined, hasJoinedSuccessfully]);
 
   // Update step display
   useEffect(() => {
-    if (isJoined) {
+    if (hasJoinedSuccessfully || isJoined) {
       setCurrentStep('Connected to meeting');
     } else if (isReady && !joinAttempted) {
       setCurrentStep('Ready to join meeting');
     } else if (isLoading) {
       setCurrentStep('Loading Zoom SDK...');
     }
-  }, [isReady, isJoined, joinAttempted, isLoading]);
+  }, [isReady, isJoined, joinAttempted, isLoading, hasJoinedSuccessfully]);
 
   const handleRetry = useCallback(() => {
     console.log('🔄 [COMPONENT-VIEW] Retrying connection');
     setError(null);
     setJoinAttempted(false);
+    setHasJoinedSuccessfully(false);
     setCurrentStep('Retrying...');
+    processingRef.current = false;
     
     // Clean restart
     cleanup();
@@ -224,7 +239,7 @@ export function ZoomComponentView({
   }, [cleanup]);
 
   const displayError = error || (hasError ? 'SDK initialization failed' : null);
-  const isLoadingState = isLoading || (!isReady && !displayError);
+  const isLoadingState = (isLoading || (!isReady && !displayError)) && !hasJoinedSuccessfully;
 
   if (displayError) {
     return (
