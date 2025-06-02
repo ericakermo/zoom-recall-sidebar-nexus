@@ -200,6 +200,58 @@ export function ZoomComponentView({
     };
   }, [hasJoinedSuccessfully]);
 
+  useEffect(() => {
+    // Add CSS overrides to force 16:9 and disable dragging
+    const style = document.createElement('style');
+    style.id = 'zoom-sdk-overrides';
+    style.textContent = `
+      /* Force 16:9 aspect ratio on all Zoom SDK elements */
+      #meetingSDKElement [class*="css-"],
+      #meetingSDKElement canvas,
+      #meetingSDKElement video,
+      #meetingSDKElement div[width],
+      #meetingSDKElement ul[width] {
+        max-width: 1000px !important;
+        max-height: 563px !important;
+        width: 1000px !important;
+        height: 563px !important;
+      }
+      
+      /* Disable dragging completely */
+      #meetingSDKElement .react-draggable {
+        pointer-events: none !important;
+        cursor: default !important;
+      }
+      
+      /* Force container bounds */
+      #meetingSDKElement {
+        max-width: 1000px !important;
+        max-height: 563px !important;
+        overflow: hidden !important;
+      }
+      
+      /* Override Zoom's internal CSS classes */
+      #meetingSDKElement .css-6ppjdi,
+      #meetingSDKElement .css-30np0x,
+      #meetingSDKElement .css-vv0cdr {
+        width: 1000px !important;
+        height: 563px !important;
+        max-width: 1000px !important;
+        max-height: 563px !important;
+      }
+    `;
+    
+    document.head.appendChild(style);
+    
+    return () => {
+      // Cleanup the style when component unmounts
+      const existingStyle = document.getElementById('zoom-sdk-overrides');
+      if (existingStyle) {
+        existingStyle.remove();
+      }
+    };
+  }, []);
+
   if (error) {
     return (
       <ZoomErrorDisplay
@@ -213,7 +265,7 @@ export function ZoomComponentView({
   }
 
   return (
-    <div className="w-full h-full flex items-center justify-center bg-gray-50">
+    <div className="w-full h-full flex items-center justify-center">
       <ZoomLoadingOverlay
         isLoading={isLoading}
         currentStep={currentStep}
@@ -224,16 +276,15 @@ export function ZoomComponentView({
 
       {/* Zoom meeting container with absolute 16:9 enforcement */}
       <div 
-        className="relative"
+        className="relative bg-black"
         style={{
           width: '1000px',
           height: '563px',
-          maxWidth: '100%',
-          overflow: 'hidden',
-          // Prevent any SDK overrides
+          maxWidth: '1000px',
+          maxHeight: '563px',
           minWidth: '1000px',
           minHeight: '563px',
-          maxHeight: '563px'
+          overflow: 'hidden'
         }}
       >
         <div 
@@ -243,15 +294,12 @@ export function ZoomComponentView({
           style={{
             width: '1000px',
             height: '563px',
-            // Prevent SDK from overriding dimensions
-            minWidth: '1000px',
-            minHeight: '563px',
             maxWidth: '1000px',
             maxHeight: '563px',
-            pointerEvents: 'auto',
-            // Force container bounds on child elements
-            position: 'relative',
-            overflow: 'hidden'
+            minWidth: '1000px',
+            minHeight: '563px',
+            overflow: 'hidden',
+            position: 'relative'
           }}
         />
       </div>
