@@ -100,36 +100,3 @@
     @apply bg-background text-foreground;
   }
 }
-
-/* Zoom meeting container styles - Following Zoom documentation exactly */
-.zoom-meeting-wrapper {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  height: 100%;
-  width: 100%;
-  overflow: hidden;
-}
-
-.zoom-container {
-  width: 900px !important;
-  height: 506px !important;
-  position: relative;
-  border-radius: 8px;
-  overflow: hidden !important;
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-  /* Ensure no layout conflicts */
-  flex-shrink: 0;
-  margin: 0 auto;
-}
-
-/* Ensure Zoom SDK content is not restricted by parent containers */
-.zoom-container * {
-  max-width: none !important;
-  max-height: none !important;
-}
-
-/* Hide default Zoom meeting root if it exists */
-#zmmtg-root {
-  display: none !important;
-}

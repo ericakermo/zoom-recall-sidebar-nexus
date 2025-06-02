@@ -38,13 +38,14 @@ export function ZoomSettings() {
       if (!user) return;
 
       try {
+        // Use a generic approach to query the zoom_connections table
         const { data, error } = await supabase
           .from('zoom_connections' as any)
           .select('*')
           .eq('user_id', user.id)
           .single();
 
-        if (error && error.code !== 'PGRST116') {
+        if (error && error.code !== 'PGRST116') { // PGRST116 is "no rows returned" error
           throw error;
         }
         
@@ -74,7 +75,8 @@ export function ZoomSettings() {
       return;
     }
 
-    const zoomClientId = "eFAZ8Vf7RbG5saQVqL1zGA";
+    // Use the updated client ID
+    const zoomClientId = "eFAZ8Vf7RbG5saQVqL1zGA"; // Updated Zoom Client ID
     if (!zoomClientId) {
       toast({
         title: "Error",
@@ -84,6 +86,7 @@ export function ZoomSettings() {
       return;
     }
 
+    // Use the Supabase URL for the redirect URI
     const supabaseUrl = "https://qsxlvwwebbakmzpwjfbb.supabase.co";
     const redirectUri = `${supabaseUrl}/functions/v1/zoom-oauth-callback`;
     const zoomAuthUrl = `https://zoom.us/oauth/authorize?response_type=code&client_id=${
@@ -98,6 +101,7 @@ export function ZoomSettings() {
 
     try {
       setIsLoading(true);
+      // Use a generic approach to query the zoom_connections table
       const { error } = await supabase
         .from('zoom_connections' as any)
         .delete()
@@ -123,7 +127,7 @@ export function ZoomSettings() {
   };
 
   const onSubmitJoinMeeting = (values: z.infer<typeof joinMeetingSchema>) => {
-    navigate(`/meetings?join=${values.meetingId}&password=${values.meetingPassword || ''}`);
+    navigate(`/meetings/join?meetingId=${values.meetingId}&password=${values.meetingPassword || ''}`);
   };
 
   return (
