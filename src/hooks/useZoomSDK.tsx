@@ -10,9 +10,8 @@ interface UseZoomSDKProps {
 }
 
 export function useZoomSDK({ containerRef, shouldInitialize = true, onReady, onError }: UseZoomSDKProps) {
-  const [isSDKLoaded, setIsSDKLoaded] = useState(false);
-  const [isReady, setIsReady] = useState(false);
-  const [isJoined, setIsJoined] = useState(false);
+  const [isSDKReady, setIsSDKReady] = useState(false);
+  const [isMeetingJoined, setIsMeetingJoined] = useState(false);
   
   const clientRef = useRef<any>(null);
   const initAttemptedRef = useRef(false);
@@ -30,7 +29,7 @@ export function useZoomSDK({ containerRef, shouldInitialize = true, onReady, onE
     
     if (clientRef.current) {
       try {
-        if (isJoined && typeof clientRef.current.leave === 'function') {
+        if (isMeetingJoined && typeof clientRef.current.leave === 'function') {
           clientRef.current.leave();
         }
         
@@ -48,26 +47,38 @@ export function useZoomSDK({ containerRef, shouldInitialize = true, onReady, onE
       containerRef.current.innerHTML = '';
     }
     
-    setIsSDKLoaded(false);
-    setIsReady(false);
-    setIsJoined(false);
+    setIsSDKReady(false);
+    setIsMeetingJoined(false);
     initAttemptedRef.current = false;
     isJoiningRef.current = false;
     
     console.log('🔍 [ZOOM-SDK] Cleanup completed');
-  }, [isJoined, containerRef]);
+  }, [isMeetingJoined, containerRef]);
 
   const validateContainer = useCallback(() => {
     if (!containerRef.current) {
+      console.log('🔍 [ZOOM-SDK] Container ref not available');
       return false;
     }
 
     const rect = containerRef.current.getBoundingClientRect();
-    return rect.width > 0 && rect.height > 0;
+    const isValid = rect.width > 0 && rect.height > 0;
+    console.log('🔍 [ZOOM-SDK] Container validation:', { 
+      width: rect.width, 
+      height: rect.height, 
+      isValid 
+    });
+    return isValid;
   }, [containerRef]);
 
   const initializeSDK = useCallback(async () => {
     if (initAttemptedRef.current || !containerRef.current || !shouldInitialize || !mountedRef.current) {
+      console.log('🔍 [ZOOM-SDK] Skipping init - conditions not met:', {
+        attempted: initAttemptedRef.current,
+        hasContainer: !!containerRef.current,
+        shouldInit: shouldInitialize,
+        mounted: mountedRef.current
+      });
       return false;
     }
 
@@ -97,8 +108,7 @@ export function useZoomSDK({ containerRef, shouldInitialize = true, onReady, onE
         success: () => {
           if (mountedRef.current) {
             console.log('🔍 [ZOOM-SDK] Initialization successful');
-            setIsSDKLoaded(true);
-            setIsReady(true);
+            setIsSDKReady(true);
             onReady?.();
           }
         },
@@ -106,6 +116,7 @@ export function useZoomSDK({ containerRef, shouldInitialize = true, onReady, onE
           if (mountedRef.current) {
             console.error('🔍 [ZOOM-SDK] Initialization failed:', event);
             const errorMsg = event?.errorMessage || 'SDK initialization failed';
+            initAttemptedRef.current = false;
             onError?.(errorMsg);
           }
         }
@@ -125,7 +136,7 @@ export function useZoomSDK({ containerRef, shouldInitialize = true, onReady, onE
   }, [containerRef, shouldInitialize, validateContainer, onReady, onError]);
 
   const joinMeeting = useCallback(async (joinConfig: any) => {
-    if (!isReady || !clientRef.current || isJoiningRef.current || !mountedRef.current) {
+    if (!isSDKReady || !clientRef.current || isJoiningRef.current || !mountedRef.current) {
       throw new Error('SDK not ready for join operation');
     }
 
@@ -150,7 +161,7 @@ export function useZoomSDK({ containerRef, shouldInitialize = true, onReady, onE
         success: (success: any) => {
           if (mountedRef.current) {
             console.log('🔍 [ZOOM-SDK] Join successful:', success);
-            setIsJoined(true);
+            setIsMeetingJoined(true);
             isJoiningRef.current = false;
           }
         },
@@ -187,30 +198,54 @@ export function useZoomSDK({ containerRef, shouldInitialize = true, onReady, onE
         throw error;
       }
     }
-  }, [isReady]);
+  }, [isSDKReady]);
 
   const leaveMeeting = useCallback(() => {
-    if (clientRef.current && isJoined && mountedRef.current) {
+    if (clientRef.current && isMeetingJoined && mountedRef.current) {
       console.log('🔍 [ZOOM-SDK] Leaving meeting...');
       try {
         clientRef.current.leave();
-        setIsJoined(false);
+        setIsMeetingJoined(false);
       } catch (error) {
         console.error('🔍 [ZOOM-SDK] Leave error:', error);
       }
     }
-  }, [isJoined]);
+  }, [isMeetingJoined]);
 
-  // Initialize when container is ready
+  // Initialize when conditions are right
   useEffect(() => {
-    if (containerRef.current && shouldInitialize && !initAttemptedRef.current && mountedRef.current) {
-      const timer = setTimeout(() => {
-        initializeSDK();
-      }, 100);
-      
-      return () => clearTimeout(timer);
+    const initWhenReady = () => {
+      if (containerRef.current && shouldInitialize && !initAttemptedRef.current && mountedRef.current) {
+        // Use multiple checks to ensure container is truly ready
+        const checkContainer = () => {
+          if (validateContainer()) {
+            console.log('🔍 [ZOOM-SDK] Container ready, initializing...');
+            initializeSDK();
+          } else {
+            // Retry after a short delay
+            setTimeout(checkContainer, 200);
+          }
+        };
+        
+        checkContainer();
+      }
+    };
+
+    // Initial check
+    if (containerRef.current) {
+      initWhenReady();
     }
-  }, [containerRef, shouldInitialize, initializeSDK]);
+
+    // Also check on resize in case container becomes available
+    const handleResize = () => {
+      if (!isSDKReady && containerRef.current && !initAttemptedRef.current) {
+        initWhenReady();
+      }
+    };
+
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, [containerRef, shouldInitialize, initializeSDK, validateContainer, isSDKReady]);
 
   // Cleanup on unmount
   useEffect(() => {
@@ -220,9 +255,8 @@ export function useZoomSDK({ containerRef, shouldInitialize = true, onReady, onE
   }, [cleanup]);
 
   return {
-    isSDKLoaded,
-    isReady,
-    isJoined,
+    isSDKReady,
+    isMeetingJoined,
     joinMeeting,
     leaveMeeting,
     cleanup
