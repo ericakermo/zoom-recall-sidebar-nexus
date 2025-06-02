@@ -201,43 +201,67 @@ export function ZoomComponentView({
   }, [hasJoinedSuccessfully]);
 
   useEffect(() => {
-    // Add CSS overrides to force 16:9 and disable dragging
+    // Add responsive CSS overrides for proper 16:9 scaling
     const style = document.createElement('style');
-    style.id = 'zoom-sdk-overrides';
+    style.id = 'zoom-sdk-responsive-overrides';
     style.textContent = `
-      /* Force 16:9 aspect ratio on all Zoom SDK elements */
-      #meetingSDKElement [class*="css-"],
+      /* Responsive 16:9 container styling */
+      #meetingSDKElement {
+        width: 100% !important;
+        height: 100% !important;
+        display: flex !important;
+        flex-direction: column !important;
+        position: relative !important;
+      }
+      
+      /* Force all Zoom SDK elements to scale responsively */
       #meetingSDKElement canvas,
-      #meetingSDKElement video,
+      #meetingSDKElement video {
+        width: 100% !important;
+        height: 100% !important;
+        object-fit: contain !important;
+        max-width: 100% !important;
+        max-height: 100% !important;
+      }
+      
+      /* Make Zoom containers responsive */
+      #meetingSDKElement [class*="css-"],
       #meetingSDKElement div[width],
       #meetingSDKElement ul[width] {
-        max-width: 1000px !important;
-        max-height: 563px !important;
-        width: 1000px !important;
-        height: 563px !important;
+        width: 100% !important;
+        height: 100% !important;
+        max-width: 100% !important;
+        max-height: 100% !important;
       }
       
       /* Disable dragging completely */
       #meetingSDKElement .react-draggable {
         pointer-events: none !important;
         cursor: default !important;
+        transform: none !important;
       }
       
-      /* Force container bounds */
-      #meetingSDKElement {
-        max-width: 1000px !important;
-        max-height: 563px !important;
-        overflow: hidden !important;
+      /* Ensure flex behavior for internal containers */
+      #meetingSDKElement > div {
+        flex: 1 1 auto !important;
+        display: flex !important;
+        flex-direction: column !important;
       }
       
-      /* Override Zoom's internal CSS classes */
-      #meetingSDKElement .css-6ppjdi,
-      #meetingSDKElement .css-30np0x,
-      #meetingSDKElement .css-vv0cdr {
-        width: 1000px !important;
-        height: 563px !important;
-        max-width: 1000px !important;
-        max-height: 563px !important;
+      /* Fix for participant list scaling */
+      #meetingSDKElement ul.css-vv0cdr {
+        position: relative !important;
+        width: 100% !important;
+        height: 100% !important;
+      }
+      
+      /* Fix for individual participant items */
+      #meetingSDKElement li[style*="width"] {
+        position: relative !important;
+        width: 100% !important;
+        height: auto !important;
+        top: auto !important;
+        left: auto !important;
       }
     `;
     
@@ -245,7 +269,7 @@ export function ZoomComponentView({
     
     return () => {
       // Cleanup the style when component unmounts
-      const existingStyle = document.getElementById('zoom-sdk-overrides');
+      const existingStyle = document.getElementById('zoom-sdk-responsive-overrides');
       if (existingStyle) {
         existingStyle.remove();
       }
@@ -274,16 +298,25 @@ export function ZoomComponentView({
         maxRetries={maxRetries}
       />
 
-      {/* Simple container following Zoom's best practices */}
+      {/* Responsive 16:9 container following ChatGPT's recommendations */}
       <div 
-        id="meetingSDKElement"
-        ref={containerRef}
-        className="w-full h-full"
+        className="relative w-full overflow-hidden"
         style={{
-          minHeight: '400px',
-          backgroundColor: '#000'
+          aspectRatio: '16 / 9',
+          maxWidth: '100%'
         }}
-      />
+      >
+        <div 
+          id="meetingSDKElement"
+          ref={containerRef}
+          className="w-full h-full"
+          style={{
+            display: 'flex',
+            flexDirection: 'column',
+            backgroundColor: '#000'
+          }}
+        />
+      </div>
     </div>
   );
 }
