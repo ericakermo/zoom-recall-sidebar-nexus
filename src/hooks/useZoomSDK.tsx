@@ -20,17 +20,11 @@ export function useZoomSDK({ containerRef, shouldInitialize = true, onReady, onE
   const mountedRef = useRef(true);
 
   const validateContainer = useCallback(() => {
-    console.log('🔍 [ZOOM-SDK] Validating container...');
+    if (!containerRef.current) return false;
     
-    if (!containerRef.current) {
-      console.log('❌ [ZOOM-SDK] Container ref is null');
-      return false;
-    }
-
     const element = containerRef.current;
     const rect = element.getBoundingClientRect();
     const isInDOM = document.contains(element);
-    
     const isValid = rect.width >= 320 && rect.height >= 240 && isInDOM;
     
     console.log('🔍 [ZOOM-SDK] Container validation:', {
@@ -44,21 +38,19 @@ export function useZoomSDK({ containerRef, shouldInitialize = true, onReady, onE
   }, [containerRef]);
 
   const cleanup = useCallback(() => {
-    console.log('🧹 [ZOOM-SDK] Starting cleanup...');
+    console.log('🧹 [ZOOM-SDK] Cleanup started');
     
     if (clientRef.current) {
       try {
         if (isJoined && typeof clientRef.current.leave === 'function') {
           clientRef.current.leave();
         }
-        
         if (typeof clientRef.current.destroy === 'function') {
           clientRef.current.destroy();
         }
       } catch (error) {
         console.warn('🧹 [ZOOM-SDK] Cleanup warning:', error);
       }
-      
       clientRef.current = null;
     }
 
@@ -72,19 +64,19 @@ export function useZoomSDK({ containerRef, shouldInitialize = true, onReady, onE
     setHasError(false);
     initAttemptedRef.current = false;
     
-    console.log('🧹 [ZOOM-SDK] Cleanup completed');
+    console.log('✅ [ZOOM-SDK] Cleanup completed');
   }, [isJoined, containerRef]);
 
   const initializeSDK = useCallback(async () => {
-    console.log('🚀 [ZOOM-SDK] Starting SDK initialization...');
+    console.log('🚀 [ZOOM-SDK] Initializing SDK...');
 
     if (initAttemptedRef.current || !shouldInitialize || !mountedRef.current) {
-      console.log('⏭️ [ZOOM-SDK] Skipping init - conditions not met');
+      console.log('⏭️ [ZOOM-SDK] Init skipped');
       return;
     }
 
     if (!validateContainer()) {
-      console.log('❌ [ZOOM-SDK] Container validation failed');
+      console.log('❌ [ZOOM-SDK] Container not ready');
       setHasError(true);
       onError?.('Container not ready for SDK initialization');
       return;
@@ -95,20 +87,16 @@ export function useZoomSDK({ containerRef, shouldInitialize = true, onReady, onE
     setHasError(false);
 
     try {
-      // Create Zoom client
-      console.log('🔧 [ZOOM-SDK] Creating ZoomMtgEmbedded client...');
+      console.log('🔧 [ZOOM-SDK] Creating client...');
       clientRef.current = ZoomMtgEmbedded.createClient();
       
       if (!clientRef.current) {
         throw new Error('Failed to create Zoom client');
       }
-      
-      console.log('✅ [ZOOM-SDK] Zoom client created successfully');
 
-      // Clear container
+      // Clear container before init
       containerRef.current!.innerHTML = '';
 
-      // Initialize SDK
       const initConfig = {
         zoomAppRoot: containerRef.current!,
         language: 'en-US',
@@ -116,7 +104,7 @@ export function useZoomSDK({ containerRef, shouldInitialize = true, onReady, onE
         leaveOnPageUnload: true,
         success: () => {
           if (mountedRef.current) {
-            console.log('🎉 [ZOOM-SDK] SDK initialization SUCCESS');
+            console.log('✅ [ZOOM-SDK] SDK ready');
             setIsReady(true);
             setIsLoading(false);
             onReady?.();
@@ -124,7 +112,7 @@ export function useZoomSDK({ containerRef, shouldInitialize = true, onReady, onE
         },
         error: (event: any) => {
           if (mountedRef.current) {
-            console.error('💥 [ZOOM-SDK] SDK initialization ERROR:', event);
+            console.error('❌ [ZOOM-SDK] Init failed:', event);
             const errorMsg = event?.errorMessage || 'SDK initialization failed';
             setHasError(true);
             setIsLoading(false);
@@ -134,12 +122,12 @@ export function useZoomSDK({ containerRef, shouldInitialize = true, onReady, onE
         }
       };
 
-      console.log('🔧 [ZOOM-SDK] Calling client.init()...');
+      console.log('🔧 [ZOOM-SDK] Calling init...');
       await clientRef.current.init(initConfig);
 
     } catch (error: any) {
       if (mountedRef.current) {
-        console.error('💥 [ZOOM-SDK] Init error:', error);
+        console.error('❌ [ZOOM-SDK] Init error:', error);
         setHasError(true);
         setIsLoading(false);
         initAttemptedRef.current = false;
@@ -149,19 +137,18 @@ export function useZoomSDK({ containerRef, shouldInitialize = true, onReady, onE
   }, [containerRef, shouldInitialize, validateContainer, onReady, onError]);
 
   const joinMeeting = useCallback(async (joinConfig: any) => {
-    console.log('🎯 [ZOOM-SDK] Starting join process...');
+    console.log('🎯 [ZOOM-SDK] Joining meeting...');
 
     if (!isReady || !clientRef.current || !mountedRef.current) {
-      const errorMsg = `SDK not ready for join - isReady: ${isReady}, hasClient: ${!!clientRef.current}`;
+      const errorMsg = `Cannot join - SDK not ready (isReady: ${isReady}, hasClient: ${!!clientRef.current})`;
       console.error('❌ [ZOOM-SDK]', errorMsg);
       throw new Error(errorMsg);
     }
 
+    // Simple meeting number validation
     const meetingNumberStr = String(joinConfig.meetingNumber).replace(/\s+/g, '');
     if (!/^\d{10,11}$/.test(meetingNumberStr)) {
-      const errorMsg = `Invalid meeting number: ${joinConfig.meetingNumber}`;
-      console.error('❌ [ZOOM-SDK]', errorMsg);
-      throw new Error(errorMsg);
+      throw new Error(`Invalid meeting number: ${joinConfig.meetingNumber}`);
     }
 
     try {
@@ -175,14 +162,15 @@ export function useZoomSDK({ containerRef, shouldInitialize = true, onReady, onE
         zak: joinConfig.zak || '',
         success: (success: any) => {
           if (mountedRef.current) {
-            console.log('🎉 [ZOOM-SDK] Join SUCCESS:', success);
+            console.log('✅ [ZOOM-SDK] Join success:', success);
             setIsJoined(true);
           }
         },
         error: (error: any) => {
           if (mountedRef.current) {
-            console.error('💥 [ZOOM-SDK] Join ERROR:', error);
+            console.error('❌ [ZOOM-SDK] Join failed:', error);
             
+            // Map common error codes to user-friendly messages
             let errorMessage = 'Failed to join meeting';
             if (error?.errorCode === 200) {
               errorMessage = 'Meeting join failed - please check meeting details';
@@ -197,7 +185,7 @@ export function useZoomSDK({ containerRef, shouldInitialize = true, onReady, onE
         }
       };
 
-      console.log('🔧 [ZOOM-SDK] Calling client.join()...', {
+      console.log('🔧 [ZOOM-SDK] Join params:', {
         meetingNumber: joinParams.meetingNumber,
         userName: joinParams.userName,
         hasPassword: !!joinParams.password,
@@ -208,7 +196,7 @@ export function useZoomSDK({ containerRef, shouldInitialize = true, onReady, onE
 
     } catch (error: any) {
       if (mountedRef.current) {
-        console.error('💥 [ZOOM-SDK] Join process failed:', error);
+        console.error('❌ [ZOOM-SDK] Join process failed:', error);
         throw error;
       }
     }
@@ -221,16 +209,16 @@ export function useZoomSDK({ containerRef, shouldInitialize = true, onReady, onE
       try {
         clientRef.current.leave();
         setIsJoined(false);
-        console.log('✅ [ZOOM-SDK] Leave completed');
+        console.log('✅ [ZOOM-SDK] Left meeting');
       } catch (error) {
-        console.error('💥 [ZOOM-SDK] Leave error:', error);
+        console.error('❌ [ZOOM-SDK] Leave error:', error);
       }
     }
   }, [isJoined]);
 
-  // Use layoutEffect for DOM-dependent operations
+  // Initialize when container is ready
   useLayoutEffect(() => {
-    const checkContainerAndInit = () => {
+    const initWhenReady = () => {
       if (containerRef.current && shouldInitialize && !initAttemptedRef.current && mountedRef.current) {
         // Small delay to ensure container is fully rendered
         setTimeout(() => {
@@ -241,9 +229,8 @@ export function useZoomSDK({ containerRef, shouldInitialize = true, onReady, onE
       }
     };
 
-    checkContainerAndInit();
+    initWhenReady();
 
-    // Cleanup on unmount
     return () => {
       mountedRef.current = false;
       cleanup();
