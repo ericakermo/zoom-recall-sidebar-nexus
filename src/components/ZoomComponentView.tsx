@@ -53,8 +53,8 @@ export function ZoomComponentView({
     shouldInitialize: true,
     onReady: () => {
       if (!mountedRef.current) return;
-      console.log('✅ [COMPONENT-VIEW] SDK ready');
-      setCurrentStep('SDK ready - authenticating...');
+      console.log('✅ [COMPONENT-VIEW] SDK ready - proceeding to join');
+      setCurrentStep('SDK ready - preparing to join...');
     },
     onError: (error) => {
       if (!mountedRef.current) return;
@@ -103,6 +103,7 @@ export function ZoomComponentView({
 
   const executeJoin = useCallback(async () => {
     if (!mountedRef.current || joinAttempted || !isReady) {
+      console.log('⏭️ [COMPONENT-VIEW] Join skipped:', { mounted: mountedRef.current, attempted: joinAttempted, ready: isReady });
       return;
     }
 
@@ -115,7 +116,6 @@ export function ZoomComponentView({
 
       if (!mountedRef.current) return;
 
-      // Standard join configuration following Zoom SDK best practices
       const joinConfig = {
         sdkKey: tokens.sdkKey,
         signature: tokens.signature,
@@ -131,11 +131,14 @@ export function ZoomComponentView({
         meetingNumber: joinConfig.meetingNumber,
         userName: joinConfig.userName,
         role: joinConfig.role,
-        hasZAK: !!joinConfig.zak
+        hasZAK: !!joinConfig.zak,
+        hasSDKKey: !!joinConfig.sdkKey,
+        hasSignature: !!joinConfig.signature
       });
 
       setCurrentStep('Joining meeting...');
       
+      console.log('🔗 [COMPONENT-VIEW] Calling joinMeeting()');
       await joinMeeting(joinConfig);
       
       if (!mountedRef.current) return;
@@ -157,13 +160,13 @@ export function ZoomComponentView({
   // Auto-join when SDK is ready
   useEffect(() => {
     if (isReady && !joinAttempted && !error && !hasError && mountedRef.current) {
-      console.log('▶️ [COMPONENT-VIEW] SDK ready - starting join');
+      console.log('▶️ [COMPONENT-VIEW] SDK ready - starting auto-join');
       // Small delay to ensure everything is stable
       const timer = setTimeout(() => {
-        if (mountedRef.current && !joinAttempted) {
+        if (mountedRef.current && !joinAttempted && isReady) {
           executeJoin();
         }
-      }, 100);
+      }, 200);
 
       return () => clearTimeout(timer);
     }
