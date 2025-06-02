@@ -1,6 +1,5 @@
 
 import { useEffect, useCallback, useRef } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
 
 interface UseMeetingExitProps {
   zoomClient: any;
@@ -15,8 +14,6 @@ export function useMeetingExit({
   onConfirmExit, 
   onCancelExit 
 }: UseMeetingExitProps) {
-  const navigate = useNavigate();
-  const location = useLocation();
   const isLeavingRef = useRef(false);
 
   const leaveMeeting = useCallback(async () => {

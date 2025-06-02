@@ -1,5 +1,6 @@
+
 import React, { useEffect, useState, useCallback } from 'react';
-import { useParams, useNavigate, useBlocker } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
@@ -32,7 +33,6 @@ const Meeting = () => {
   const [zoomClient, setZoomClient] = useState<any>(null);
   const [isJoined, setIsJoined] = useState(false);
   const [showExitDialog, setShowExitDialog] = useState(false);
-  const [pendingNavigation, setPendingNavigation] = useState<string | null>(null);
   const { toast } = useToast();
 
   const { leaveMeeting, checkMeetingStatus } = useMeetingExit({
@@ -46,48 +46,20 @@ const Meeting = () => {
     }
   });
 
-  // Block navigation if in meeting
-  const blocker = useBlocker(
-    ({ currentLocation, nextLocation }) => {
-      const isLeavingMeetingPage = currentLocation.pathname.includes('/meeting') && 
-                                  !nextLocation.pathname.includes('/meeting');
-      
-      if (isLeavingMeetingPage && checkMeetingStatus()) {
-        setPendingNavigation(nextLocation.pathname);
-        setShowExitDialog(true);
-        return true;
-      }
-      return false;
-    }
-  );
-
   const handleConfirmExit = useCallback(async () => {
     await leaveMeeting();
     setIsJoined(false);
     setShowExitDialog(false);
-    
-    if (pendingNavigation) {
-      navigate(pendingNavigation);
-      setPendingNavigation(null);
-    } else {
-      navigate('/calendar');
-    }
-  }, [leaveMeeting, navigate, pendingNavigation]);
+    navigate('/calendar');
+  }, [leaveMeeting, navigate]);
 
   const handleCancelExit = useCallback(() => {
     setShowExitDialog(false);
-    setPendingNavigation(null);
-    
-    // Reset the blocker
-    if (blocker.state === "blocked") {
-      blocker.reset?.();
-    }
-  }, [blocker]);
+  }, []);
 
   const handleBackToCalendar = useCallback(() => {
     if (checkMeetingStatus()) {
       setShowExitDialog(true);
-      setPendingNavigation('/calendar');
     } else {
       navigate('/calendar');
     }
