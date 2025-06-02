@@ -1,6 +1,5 @@
 
 import { useState, useRef, useCallback, useLayoutEffect, useEffect } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
 import ZoomMtgEmbedded from '@zoom/meetingsdk/embedded';
 
 interface UseZoomSDKProps {
@@ -10,7 +9,7 @@ interface UseZoomSDKProps {
   onError?: (error: string) => void;
 }
 
-// TRUE SINGLETON - only one client globally
+// TRUE SINGLETON - only one client globally with proper state management
 class ZoomSDKSingleton {
   private static instance: ZoomSDKSingleton;
   private client: any = null;
@@ -20,6 +19,8 @@ class ZoomSDKSingleton {
   private isJoining = false;
   private currentContainer: HTMLDivElement | null = null;
   private listeners: Set<Function> = new Set();
+  private initPromise: Promise<void> | null = null;
+  private sessionId: string | null = null;
 
   static getInstance(): ZoomSDKSingleton {
     if (!ZoomSDKSingleton.instance) {
@@ -41,52 +42,78 @@ class ZoomSDKSingleton {
       try {
         callback(event, data);
       } catch (error) {
-        console.warn('Listener error:', error);
+        console.warn('🚨 [ZOOM-SDK] Listener error:', error);
       }
     });
   }
 
+  private validateContainer(container: HTMLDivElement): boolean {
+    const rect = container.getBoundingClientRect();
+    const isValid = container.id === 'meetingSDKElement' && 
+                   rect.width > 0 && 
+                   rect.height > 0 && 
+                   document.body.contains(container);
+    
+    console.log('🔍 [ZOOM-SDK] Container validation:', {
+      hasCorrectId: container.id === 'meetingSDKElement',
+      width: rect.width,
+      height: rect.height,
+      isInDOM: document.body.contains(container),
+      isVisible: rect.width > 0 && rect.height > 0
+    });
+    
+    return isValid;
+  }
+
   async initialize(container: HTMLDivElement): Promise<void> {
-    console.log('🔧 [ZOOM-SINGLETON] Initialize called', {
+    console.log('🔧 [ZOOM-SDK] Initialize called', {
       isInitialized: this.isInitialized,
       isInitializing: this.isInitializing,
       hasClient: !!this.client,
-      containerChanged: this.currentContainer !== container
+      containerChanged: this.currentContainer !== container,
+      sessionId: this.sessionId
     });
 
-    // If already initialized with same container, return immediately
-    if (this.isInitialized && this.client && this.currentContainer === container) {
-      console.log('✅ [ZOOM-SINGLETON] Already initialized with same container');
+    // If already initialized with same container and session, return
+    if (this.isInitialized && this.client && this.currentContainer === container && this.sessionId) {
+      console.log('✅ [ZOOM-SDK] Already initialized with same container');
       this.notifyListeners('ready');
       return;
     }
 
-    // If initializing, wait for completion
-    if (this.isInitializing) {
-      console.log('⏳ [ZOOM-SINGLETON] Already initializing, waiting...');
-      return new Promise((resolve) => {
-        const checkReady = () => {
-          if (this.isInitialized && !this.isInitializing) {
-            resolve();
-          } else {
-            setTimeout(checkReady, 100);
-          }
-        };
-        checkReady();
-      });
+    // If initializing, wait for existing promise
+    if (this.isInitializing && this.initPromise) {
+      console.log('⏳ [ZOOM-SDK] Already initializing, waiting...');
+      return this.initPromise;
     }
 
-    // If we have a client but different container, clean up first
-    if (this.client && this.currentContainer !== container) {
-      console.log('🧹 [ZOOM-SINGLETON] Different container, cleaning up first');
+    // If we have active session, clean up first
+    if (this.isJoined || this.client) {
+      console.log('🧹 [ZOOM-SDK] Cleaning up existing session first');
       await this.cleanup();
+    }
+
+    // Validate container
+    if (!this.validateContainer(container)) {
+      throw new Error('Invalid container for Zoom SDK');
     }
 
     this.isInitializing = true;
     this.currentContainer = container;
+    this.sessionId = `session_${Date.now()}`;
 
+    this.initPromise = this.performInitialization(container);
+    
     try {
-      console.log('🚀 [ZOOM-SINGLETON] Creating new client');
+      await this.initPromise;
+    } finally {
+      this.initPromise = null;
+    }
+  }
+
+  private async performInitialization(container: HTMLDivElement): Promise<void> {
+    try {
+      console.log('🚀 [ZOOM-SDK] Creating new client');
       
       // Clear container
       container.innerHTML = '';
@@ -98,7 +125,7 @@ class ZoomSDKSingleton {
         throw new Error('Failed to create Zoom client');
       }
 
-      console.log('🔧 [ZOOM-SINGLETON] Calling client.init()');
+      console.log('🔧 [ZOOM-SDK] Calling client.init()');
       
       // Initialize with timeout
       await Promise.race([
@@ -114,14 +141,15 @@ class ZoomSDKSingleton {
       ]);
 
       this.isInitialized = true;
-      console.log('✅ [ZOOM-SINGLETON] SDK initialized successfully');
+      console.log('✅ [ZOOM-SDK] SDK initialized successfully');
       this.notifyListeners('ready');
 
     } catch (error) {
-      console.error('❌ [ZOOM-SINGLETON] Initialization failed:', error);
+      console.error('❌ [ZOOM-SDK] Initialization failed:', error);
       this.client = null;
       this.isInitialized = false;
       this.currentContainer = null;
+      this.sessionId = null;
       this.notifyListeners('error', error);
       throw error;
     } finally {
@@ -130,11 +158,12 @@ class ZoomSDKSingleton {
   }
 
   async join(config: any): Promise<void> {
-    console.log('🎯 [ZOOM-SINGLETON] Join called', {
+    console.log('🎯 [ZOOM-SDK] Join called', {
       isInitialized: this.isInitialized,
       isJoined: this.isJoined,
       isJoining: this.isJoining,
-      hasClient: !!this.client
+      hasClient: !!this.client,
+      sessionId: this.sessionId
     });
 
     if (!this.isInitialized || !this.client) {
@@ -142,7 +171,8 @@ class ZoomSDKSingleton {
     }
 
     if (this.isJoined) {
-      throw new Error('Already joined a meeting');
+      console.log('⚠️ [ZOOM-SDK] Already in meeting, leaving first');
+      await this.leave();
     }
 
     if (this.isJoining) {
@@ -152,9 +182,9 @@ class ZoomSDKSingleton {
     this.isJoining = true;
 
     try {
-      console.log('🔗 [ZOOM-SINGLETON] Calling client.join()');
+      console.log('🔗 [ZOOM-SDK] Calling client.join()');
       
-      const result = await this.client.join({
+      const joinParams = {
         sdkKey: config.sdkKey,
         signature: config.signature,
         meetingNumber: String(config.meetingNumber).replace(/\s+/g, ''),
@@ -162,39 +192,62 @@ class ZoomSDKSingleton {
         userName: config.userName || 'Guest',
         userEmail: config.userEmail || '',
         ...(config.zak && { zak: config.zak })
+      };
+
+      console.log('📋 [ZOOM-SDK] Join params:', {
+        meetingNumber: joinParams.meetingNumber,
+        userName: joinParams.userName,
+        hasSDKKey: !!joinParams.sdkKey,
+        hasSignature: !!joinParams.signature,
+        hasZAK: !!joinParams.zak
       });
 
+      const result = await this.client.join(joinParams);
+
       this.isJoined = true;
-      console.log('✅ [ZOOM-SINGLETON] Successfully joined meeting');
+      console.log('✅ [ZOOM-SDK] Successfully joined meeting');
       this.notifyListeners('joined', result);
       return result;
 
-    } catch (error) {
-      console.error('❌ [ZOOM-SINGLETON] Join failed:', error);
-      this.notifyListeners('joinError', error);
-      throw error;
+    } catch (error: any) {
+      console.error('❌ [ZOOM-SDK] Join failed:', error);
+      
+      // Map specific errors correctly
+      let mappedError = error;
+      if (error?.type === 'JOIN_MEETING_FAILED') {
+        if (error.errorCode === 3000) {
+          mappedError = new Error('Another meeting is already in progress. Please end the current meeting first.');
+        } else if (error.reason?.includes('Invalid meeting credentials')) {
+          mappedError = new Error('Invalid meeting credentials - check meeting ID and password');
+        } else if (error.reason?.includes('Meeting not found')) {
+          mappedError = new Error('Meeting not found or has ended');
+        }
+      }
+      
+      this.notifyListeners('joinError', mappedError);
+      throw mappedError;
     } finally {
       this.isJoining = false;
     }
   }
 
   async leave(): Promise<void> {
-    console.log('👋 [ZOOM-SINGLETON] Leave called');
+    console.log('👋 [ZOOM-SDK] Leave called');
     
     if (this.client && this.isJoined) {
       try {
         await this.client.leave();
         this.isJoined = false;
-        console.log('✅ [ZOOM-SINGLETON] Left meeting successfully');
+        console.log('✅ [ZOOM-SDK] Left meeting successfully');
         this.notifyListeners('left');
       } catch (error) {
-        console.error('❌ [ZOOM-SINGLETON] Leave error:', error);
+        console.error('❌ [ZOOM-SDK] Leave error:', error);
       }
     }
   }
 
   async cleanup(): Promise<void> {
-    console.log('🧹 [ZOOM-SINGLETON] Cleanup called');
+    console.log('🧹 [ZOOM-SDK] Cleanup called');
     
     if (this.isJoined) {
       await this.leave();
@@ -209,9 +262,10 @@ class ZoomSDKSingleton {
     this.isInitialized = false;
     this.isInitializing = false;
     this.isJoining = false;
+    this.sessionId = null;
     this.listeners.clear();
     
-    console.log('✅ [ZOOM-SINGLETON] Cleanup completed');
+    console.log('✅ [ZOOM-SDK] Cleanup completed');
   }
 
   getState() {
@@ -220,7 +274,8 @@ class ZoomSDKSingleton {
       isJoined: this.isJoined,
       isInitializing: this.isInitializing,
       isJoining: this.isJoining,
-      hasClient: !!this.client
+      hasClient: !!this.client,
+      sessionId: this.sessionId
     };
   }
 }
@@ -235,6 +290,7 @@ export function useZoomSDK({ containerRef, shouldInitialize = true, onReady, onE
   
   const mountedRef = useRef(true);
   const listenerRef = useRef<Function | null>(null);
+  const initTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Create listener function
   useEffect(() => {
@@ -286,14 +342,23 @@ export function useZoomSDK({ containerRef, shouldInitialize = true, onReady, onE
       try {
         await zoomSingleton.initialize(containerRef.current!);
       } catch (error) {
-        console.error('SDK initialization failed:', error);
+        console.error('❌ [ZOOM-SDK] Initialization failed:', error);
       }
     };
 
-    // Small delay to ensure DOM is ready
-    const timer = setTimeout(initializeSDK, 100);
+    // Clear any existing timeout
+    if (initTimeoutRef.current) {
+      clearTimeout(initTimeoutRef.current);
+    }
 
-    return () => clearTimeout(timer);
+    // Small delay to ensure DOM is ready
+    initTimeoutRef.current = setTimeout(initializeSDK, 100);
+
+    return () => {
+      if (initTimeoutRef.current) {
+        clearTimeout(initTimeoutRef.current);
+      }
+    };
   }, [containerRef, shouldInitialize]);
 
   // Update state from singleton on mount
@@ -311,6 +376,9 @@ export function useZoomSDK({ containerRef, shouldInitialize = true, onReady, onE
   useEffect(() => {
     return () => {
       mountedRef.current = false;
+      if (initTimeoutRef.current) {
+        clearTimeout(initTimeoutRef.current);
+      }
       console.log('🔚 [ZOOM-SDK] Component unmounting');
     };
   }, []);

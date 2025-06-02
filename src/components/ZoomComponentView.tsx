@@ -32,10 +32,14 @@ export function ZoomComponentView({
   const { user } = useAuth();
   const containerRef = useRef<HTMLDivElement>(null);
   const mountedRef = useRef(true);
+  const joinTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     return () => {
       mountedRef.current = false;
+      if (joinTimeoutRef.current) {
+        clearTimeout(joinTimeoutRef.current);
+      }
       console.log('🔚 [COMPONENT-VIEW] Component unmounting');
     };
   }, []);
@@ -102,7 +106,7 @@ export function ZoomComponentView({
   }, []);
 
   const executeJoin = useCallback(async () => {
-    // Prevent multiple join attempts
+    // Prevent multiple join attempts with stricter checks
     if (!mountedRef.current || joinAttempted || !isReady || hasError || isJoined) {
       console.log('⏭️ [COMPONENT-VIEW] Join skipped:', { 
         mounted: mountedRef.current, 
@@ -121,7 +125,10 @@ export function ZoomComponentView({
       setCurrentStep('Getting authentication...');
       const tokens = await getAuthTokens(meetingNumber, role || 0);
 
-      if (!mountedRef.current) return;
+      if (!mountedRef.current) {
+        console.log('🚫 [COMPONENT-VIEW] Component unmounted during token fetch');
+        return;
+      }
 
       const joinConfig = {
         sdkKey: tokens.sdkKey,
@@ -148,7 +155,10 @@ export function ZoomComponentView({
       console.log('🔗 [COMPONENT-VIEW] Calling joinMeeting()');
       await joinMeeting(joinConfig);
       
-      if (!mountedRef.current) return;
+      if (!mountedRef.current) {
+        console.log('🚫 [COMPONENT-VIEW] Component unmounted during join');
+        return;
+      }
       
       console.log('✅ [COMPONENT-VIEW] Join completed successfully');
       setCurrentStep('Connected to meeting');
@@ -158,34 +168,34 @@ export function ZoomComponentView({
       if (!mountedRef.current) return;
       
       console.error('❌ [COMPONENT-VIEW] Join failed:', error);
-      
-      // Map specific error messages
-      let errorMessage = error.message || 'Failed to join meeting';
-      if (error.message?.includes('Already has other meetings in progress')) {
-        errorMessage = 'Another meeting is already in progress. Please end the current meeting first.';
-      } else if (error.message?.includes('Meeting not found')) {
-        errorMessage = 'Meeting not found or has ended';
-      }
-      
-      setError(errorMessage);
-      onMeetingError?.(errorMessage);
+      setError(error.message || 'Failed to join meeting');
+      onMeetingError?.(error.message || 'Failed to join meeting');
       setJoinAttempted(false); // Allow retry on error
     }
   }, [isReady, joinAttempted, meetingNumber, role, providedUserName, user, meetingPassword, getAuthTokens, joinMeeting, onMeetingJoined, onMeetingError, hasError, isJoined]);
 
-  // Auto-join when SDK is ready
+  // Auto-join when SDK is ready with improved timing
   useEffect(() => {
     if (isReady && !joinAttempted && !error && !hasError && !isJoined && mountedRef.current) {
       console.log('▶️ [COMPONENT-VIEW] SDK ready - starting auto-join');
       
-      // Small delay to ensure everything is stable
-      const timer = setTimeout(() => {
+      // Clear any existing timeout
+      if (joinTimeoutRef.current) {
+        clearTimeout(joinTimeoutRef.current);
+      }
+
+      // Delay to ensure everything is stable
+      joinTimeoutRef.current = setTimeout(() => {
         if (mountedRef.current && !joinAttempted && isReady && !hasError && !isJoined) {
           executeJoin();
         }
       }, 500);
 
-      return () => clearTimeout(timer);
+      return () => {
+        if (joinTimeoutRef.current) {
+          clearTimeout(joinTimeoutRef.current);
+        }
+      };
     }
   }, [isReady, error, hasError, joinAttempted, executeJoin, isJoined]);
 
