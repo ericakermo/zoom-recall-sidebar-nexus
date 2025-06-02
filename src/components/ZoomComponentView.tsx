@@ -1,4 +1,3 @@
-
 import { useEffect, useState, useCallback } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { useZoomSDK } from '@/hooks/useZoomSDK';
@@ -223,14 +222,14 @@ export function ZoomComponentView({
         maxRetries={maxRetries}
       />
 
-      {/* Zoom meeting container with controlled 16:9 aspect ratio */}
+      {/* Zoom meeting container with enforced 16:9 aspect ratio */}
       <div 
         className="relative"
         style={{
-          width: '100%',
-          maxWidth: '1000px',
-          aspectRatio: '16 / 9',
-          maxHeight: '90vh'
+          width: '1000px',
+          height: '563px', // Fixed height for 16:9 ratio (1000/16*9 = 562.5)
+          maxWidth: '100%',
+          overflow: 'hidden'
         }}
       >
         <div 
@@ -238,8 +237,9 @@ export function ZoomComponentView({
           ref={containerRef}
           className="w-full h-full"
           style={{
-            width: '100%',
-            height: '100%'
+            width: '1000px',
+            height: '563px',
+            pointerEvents: 'auto' // Ensure pointer events work but without dragging
           }}
         />
       </div>

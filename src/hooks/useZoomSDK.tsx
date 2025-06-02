@@ -1,4 +1,5 @@
 
+
 import { useState, useRef, useCallback, useEffect } from 'react';
 import ZoomMtgEmbedded from '@zoom/meetingsdk/embedded';
 
@@ -74,15 +75,15 @@ export function useZoomSDK({ onReady, onError }: UseZoomSDKProps = {}) {
       
       clientRef.current = ZoomMtgEmbedded.createClient();
       
-      console.log('🔄 Initializing Zoom embedded client with 16:9 aspect ratio...');
+      console.log('🔄 Initializing Zoom embedded client with strict 16:9 aspect ratio...');
       
-      // Use container width and calculate height for perfect 16:9 ratio
-      const containerWidth = Math.min(rect.width, 1000);
+      // Force 16:9 aspect ratio - calculate both width and height constraints
+      const maxWidth = 1000;
       const aspectRatio = 16 / 9;
-      const calculatedHeight = containerWidth / aspectRatio;
+      const calculatedHeight = maxWidth / aspectRatio;
 
-      console.log('📏 [ZOOM-SDK] Calculated 16:9 dimensions:', {
-        width: Math.round(containerWidth),
+      console.log('📏 [ZOOM-SDK] Enforced 16:9 dimensions:', {
+        width: maxWidth,
         height: Math.round(calculatedHeight)
       });
 
@@ -92,12 +93,17 @@ export function useZoomSDK({ onReady, onError }: UseZoomSDKProps = {}) {
         customize: {
           video: {
             isResizable: false,
+            disableDragging: true, // Disable dragging functionality
             viewSizes: {
               default: {
-                width: Math.round(containerWidth),
+                width: maxWidth,
                 height: Math.round(calculatedHeight)
               }
             }
+          },
+          layout: {
+            mode: 'gallery',
+            viewMode: 'fit'
           }
         },
         patchJsMedia: true,
@@ -107,7 +113,7 @@ export function useZoomSDK({ onReady, onError }: UseZoomSDKProps = {}) {
       setIsSDKLoaded(true);
       setIsReady(true);
       onReady?.();
-      console.log('✅ Zoom embedded client initialized with 16:9 aspect ratio');
+      console.log('✅ Zoom embedded client initialized with strict 16:9 and no dragging');
     } catch (error: any) {
       console.error('❌ Failed to initialize Zoom embedded client:', error);
       initializationRef.current = false;
@@ -262,3 +268,4 @@ export function useZoomSDK({ onReady, onError }: UseZoomSDKProps = {}) {
     client: clientRef.current
   };
 }
+
