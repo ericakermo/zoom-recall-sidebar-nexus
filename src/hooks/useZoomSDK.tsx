@@ -10,122 +10,11 @@ interface UseZoomSDKProps {
   onError?: (error: string) => void;
 }
 
-// Singleton pattern to prevent multiple SDK instances
-class ZoomSDKSingleton {
-  private static instance: ZoomSDKSingleton;
-  private client: any = null;
-  private isInitialized = false;
-  private isInitializing = false;
-  private initPromise: Promise<void> | null = null;
-
-  private constructor() {}
-
-  static getInstance(): ZoomSDKSingleton {
-    if (!ZoomSDKSingleton.instance) {
-      ZoomSDKSingleton.instance = new ZoomSDKSingleton();
-    }
-    return ZoomSDKSingleton.instance;
-  }
-
-  async initialize(container: HTMLDivElement): Promise<any> {
-    if (this.isInitialized && this.client) {
-      console.log('✅ [ZOOM-SINGLETON] SDK already initialized, reusing client');
-      return this.client;
-    }
-
-    if (this.isInitializing && this.initPromise) {
-      console.log('⏳ [ZOOM-SINGLETON] SDK initialization in progress, waiting...');
-      await this.initPromise;
-      return this.client;
-    }
-
-    this.isInitializing = true;
-    this.initPromise = this._doInitialize(container);
-    
-    try {
-      await this.initPromise;
-      return this.client;
-    } finally {
-      this.isInitializing = false;
-      this.initPromise = null;
-    }
-  }
-
-  private async _doInitialize(container: HTMLDivElement): Promise<void> {
-    console.log('🚀 [ZOOM-SINGLETON] Initializing Zoom Meeting SDK');
-    
-    // Log SDK version information
-    try {
-      console.log('📋 [ZOOM-SINGLETON] SDK Info:', {
-        version: ZoomMtgEmbedded.VERSION || 'unknown',
-        hasCreateClient: typeof ZoomMtgEmbedded.createClient === 'function'
-      });
-    } catch (error) {
-      console.warn('Warning getting SDK info:', error);
-    }
-
-    // Clear container and create client
-    container.innerHTML = '';
-    this.client = ZoomMtgEmbedded.createClient();
-    
-    if (!this.client) {
-      throw new Error('Failed to create Zoom Meeting SDK client');
-    }
-
-    console.log('🔧 [ZOOM-SINGLETON] Client created successfully');
-
-    // Initialize with proper configuration
-    const initConfig = {
-      zoomAppRoot: container,
-      language: 'en-US',
-    };
-
-    console.log('🔧 [ZOOM-SINGLETON] Calling client.init()');
-    
-    await new Promise((resolve, reject) => {
-      const timeoutId = setTimeout(() => {
-        reject(new Error('Initialization timeout after 15 seconds'));
-      }, 15000);
-
-      this.client.init(initConfig)
-        .then((result: any) => {
-          clearTimeout(timeoutId);
-          console.log('✅ [ZOOM-SINGLETON] Init completed successfully:', result);
-          this.isInitialized = true;
-          resolve(result);
-        })
-        .catch((error: any) => {
-          clearTimeout(timeoutId);
-          console.error('❌ [ZOOM-SINGLETON] Init failed:', error);
-          this.reset();
-          reject(error);
-        });
-    });
-  }
-
-  getClient(): any {
-    return this.client;
-  }
-
-  isReady(): boolean {
-    return this.isInitialized && this.client;
-  }
-
-  reset(): void {
-    console.log('🔄 [ZOOM-SINGLETON] Resetting SDK singleton');
-    this.isInitialized = false;
-    this.isInitializing = false;
-    this.initPromise = null;
-    if (this.client) {
-      try {
-        this.client.destroy?.();
-      } catch (error) {
-        console.warn('Warning during client destroy:', error);
-      }
-      this.client = null;
-    }
-  }
-}
+// Global SDK state to prevent multiple instances
+let globalClient: any = null;
+let globalInitialized = false;
+let globalInitializing = false;
+let initPromise: Promise<any> | null = null;
 
 export function useZoomSDK({ containerRef, shouldInitialize = true, onReady, onError }: UseZoomSDKProps) {
   const [isReady, setIsReady] = useState(false);
@@ -135,19 +24,30 @@ export function useZoomSDK({ containerRef, shouldInitialize = true, onReady, onE
   
   const mountedRef = useRef(true);
   const initializingRef = useRef(false);
-  const sdkSingleton = ZoomSDKSingleton.getInstance();
+  const joinAttemptedRef = useRef(false);
   const location = useLocation();
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      mountedRef.current = false;
+      console.log('🔚 [ZOOM-SDK] Component unmounting');
+      if (isJoined && globalClient) {
+        try {
+          globalClient.leave();
+        } catch (error) {
+          console.warn('Warning during unmount cleanup:', error);
+        }
+      }
+    };
+  }, [isJoined]);
 
   // Navigation cleanup
   useEffect(() => {
     const handleBeforeUnload = (e: BeforeUnloadEvent) => {
-      if (isJoined) {
-        console.log('🌐 [ZOOM-SDK] Page unloading - leaving meeting');
+      if (isJoined && globalClient) {
         try {
-          const client = sdkSingleton.getClient();
-          if (client) {
-            client.leave();
-          }
+          globalClient.leave();
         } catch (error) {
           console.warn('Warning during beforeunload cleanup:', error);
         }
@@ -156,28 +56,23 @@ export function useZoomSDK({ containerRef, shouldInitialize = true, onReady, onE
 
     window.addEventListener('beforeunload', handleBeforeUnload);
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
-  }, [isJoined, sdkSingleton]);
+  }, [isJoined]);
 
   // Route change cleanup
   useEffect(() => {
     return () => {
-      if (isJoined) {
-        console.log('🔄 [ZOOM-SDK] Route change - leaving meeting');
+      if (isJoined && globalClient) {
         try {
-          const client = sdkSingleton.getClient();
-          if (client) {
-            client.leave();
-          }
+          globalClient.leave();
         } catch (error) {
           console.warn('Warning during route change cleanup:', error);
         }
       }
     };
-  }, [location, isJoined, sdkSingleton]);
+  }, [location, isJoined]);
 
   const validateContainer = useCallback(() => {
     if (!containerRef.current) {
-      console.log('❌ [ZOOM-SDK] Container not found');
       return false;
     }
     
@@ -186,7 +81,7 @@ export function useZoomSDK({ containerRef, shouldInitialize = true, onReady, onE
     const isInDOM = document.contains(element);
     const isVisible = element.offsetParent !== null;
     const hasCorrectId = element.id === 'meetingSDKElement';
-    const isValid = rect.width >= 320 && rect.height >= 240 && isInDOM && isVisible && hasCorrectId;
+    const isValid = rect.width >= 320 && rect.height >= 240 && isInDOM && isVisible;
     
     console.log('🔍 [ZOOM-SDK] Container validation:', {
       width: rect.width,
@@ -201,7 +96,6 @@ export function useZoomSDK({ containerRef, shouldInitialize = true, onReady, onE
     // Ensure the container has the correct ID
     if (!hasCorrectId) {
       element.id = 'meetingSDKElement';
-      console.log('🔧 [ZOOM-SDK] Fixed container ID to meetingSDKElement');
     }
     
     return isValid;
@@ -209,25 +103,111 @@ export function useZoomSDK({ containerRef, shouldInitialize = true, onReady, onE
 
   const initializeSDK = useCallback(async () => {
     if (!shouldInitialize || !mountedRef.current || initializingRef.current) {
-      console.log('⏭️ [ZOOM-SDK] Init skipped', { shouldInitialize, mounted: mountedRef.current, initializing: initializingRef.current });
+      return;
+    }
+
+    // Check if already initialized globally
+    if (globalInitialized && globalClient) {
+      console.log('✅ [ZOOM-SDK] Using existing global client');
+      setIsReady(true);
+      setIsLoading(false);
+      onReady?.();
+      return;
+    }
+
+    // If already initializing globally, wait for it
+    if (globalInitializing && initPromise) {
+      console.log('⏳ [ZOOM-SDK] Waiting for global initialization');
+      try {
+        await initPromise;
+        if (mountedRef.current) {
+          setIsReady(true);
+          setIsLoading(false);
+          onReady?.();
+        }
+      } catch (error: any) {
+        if (mountedRef.current) {
+          setHasError(true);
+          setIsLoading(false);
+          onError?.(error.message);
+        }
+      }
       return;
     }
 
     if (!validateContainer()) {
-      console.log('❌ [ZOOM-SDK] Container not ready');
       setHasError(true);
       setIsLoading(false);
-      onError?.('Zoom container not ready - please ensure the page has fully loaded');
+      onError?.('Zoom container not ready');
       return;
     }
 
     initializingRef.current = true;
+    globalInitializing = true;
     setIsLoading(true);
     setHasError(false);
 
+    // Create the initialization promise
+    initPromise = (async () => {
+      try {
+        console.log('🚀 [ZOOM-SDK] Initializing Zoom Meeting SDK');
+        
+        // Clear container
+        if (containerRef.current) {
+          containerRef.current.innerHTML = '';
+        }
+
+        // Create client
+        globalClient = ZoomMtgEmbedded.createClient();
+        
+        if (!globalClient) {
+          throw new Error('Failed to create Zoom Meeting SDK client');
+        }
+
+        console.log('🔧 [ZOOM-SDK] Client created successfully');
+
+        // Initialize with proper configuration
+        const initConfig = {
+          zoomAppRoot: containerRef.current,
+          language: 'en-US',
+        };
+
+        console.log('🔧 [ZOOM-SDK] Calling client.init()');
+        
+        await new Promise((resolve, reject) => {
+          const timeoutId = setTimeout(() => {
+            reject(new Error('Initialization timeout after 15 seconds'));
+          }, 15000);
+
+          globalClient.init(initConfig)
+            .then((result: any) => {
+              clearTimeout(timeoutId);
+              console.log('✅ [ZOOM-SDK] Init completed successfully:', result);
+              globalInitialized = true;
+              resolve(result);
+            })
+            .catch((error: any) => {
+              clearTimeout(timeoutId);
+              console.error('❌ [ZOOM-SDK] Init failed:', error);
+              globalClient = null;
+              globalInitialized = false;
+              reject(error);
+            });
+        });
+
+        return globalClient;
+      } catch (error) {
+        globalClient = null;
+        globalInitialized = false;
+        throw error;
+      } finally {
+        globalInitializing = false;
+        initPromise = null;
+      }
+    })();
+
     try {
-      console.log('🔄 [ZOOM-SDK] Starting SDK initialization via singleton');
-      await sdkSingleton.initialize(containerRef.current!);
+      await initPromise;
       
       if (mountedRef.current) {
         console.log('✅ [ZOOM-SDK] SDK initialized successfully - ready for join');
@@ -251,42 +231,61 @@ export function useZoomSDK({ containerRef, shouldInitialize = true, onReady, onE
     } finally {
       initializingRef.current = false;
     }
-  }, [containerRef, shouldInitialize, validateContainer, onReady, onError, sdkSingleton]);
+  }, [containerRef, shouldInitialize, validateContainer, onReady, onError]);
 
   const joinMeeting = useCallback(async (joinConfig: any) => {
     console.log('🎯 [ZOOM-SDK] Starting meeting join process');
 
-    const client = sdkSingleton.getClient();
-    if (!sdkSingleton.isReady() || !client || !mountedRef.current) {
-      const errorMsg = `Cannot join meeting - SDK not ready (ready: ${sdkSingleton.isReady()}, client: ${!!client})`;
+    if (!globalClient || !globalInitialized || !mountedRef.current) {
+      const errorMsg = `Cannot join meeting - SDK not ready (initialized: ${globalInitialized}, client: ${!!globalClient})`;
       console.error('❌ [ZOOM-SDK]', errorMsg);
       throw new Error('Zoom SDK not ready - please wait for initialization');
     }
+
+    if (joinAttemptedRef.current) {
+      console.log('⏭️ [ZOOM-SDK] Join already attempted, skipping');
+      return;
+    }
+
+    joinAttemptedRef.current = true;
 
     console.log('📋 [ZOOM-SDK] Join config validation:', {
       meetingNumber: joinConfig.meetingNumber,
       userName: joinConfig.userName,
       role: joinConfig.role,
       hasSDKKey: !!joinConfig.sdkKey,
-      hasSignature: !!joinConfig.signature
+      hasSignature: !!joinConfig.signature,
+      hasZAK: !!joinConfig.zak
     });
 
     try {
-      // Standard Zoom SDK join parameters following documentation
+      // Clean and validate meeting number
+      const cleanMeetingNumber = String(joinConfig.meetingNumber).replace(/\s+/g, '');
+      if (!/^\d{10,11}$/.test(cleanMeetingNumber)) {
+        throw new Error(`Invalid meeting number format: ${cleanMeetingNumber}`);
+      }
+
+      // Prepare join parameters exactly as Zoom SDK expects
       const joinParams = {
         sdkKey: joinConfig.sdkKey,
         signature: joinConfig.signature,
-        meetingNumber: String(joinConfig.meetingNumber).replace(/\s+/g, ''),
+        meetingNumber: cleanMeetingNumber,
         password: joinConfig.passWord || '',
-        userName: joinConfig.userName,
+        userName: joinConfig.userName || 'Guest',
         userEmail: joinConfig.userEmail || '',
-        zak: joinConfig.zak || ''
+        ...(joinConfig.zak && { zak: joinConfig.zak })
       };
 
-      console.log('🔗 [ZOOM-SDK] Calling client.join() with params');
+      console.log('🔗 [ZOOM-SDK] Calling client.join() with cleaned params:', {
+        meetingNumber: joinParams.meetingNumber,
+        userName: joinParams.userName,
+        hasPassword: !!joinParams.password,
+        hasZAK: !!joinParams.zak,
+        hasSDKKey: !!joinParams.sdkKey,
+        hasSignature: !!joinParams.signature
+      });
       
-      // Use promise-based join following the SDK pattern
-      const result = await client.join(joinParams);
+      const result = await globalClient.join(joinParams);
       
       if (mountedRef.current) {
         console.log('✅ [ZOOM-SDK] Successfully joined meeting:', result);
@@ -295,11 +294,16 @@ export function useZoomSDK({ containerRef, shouldInitialize = true, onReady, onE
       }
 
     } catch (error: any) {
+      joinAttemptedRef.current = false; // Allow retry on error
+      
       if (mountedRef.current) {
         console.error('❌ [ZOOM-SDK] Join failed:', error);
         
         let errorMessage = 'Failed to join meeting';
-        switch (error?.errorCode) {
+        
+        // Handle specific Zoom error codes
+        const errorCode = error?.errorCode || error?.code;
+        switch (errorCode) {
           case 200:
             errorMessage = 'Invalid meeting credentials - check meeting ID and password';
             break;
@@ -310,7 +314,7 @@ export function useZoomSDK({ containerRef, shouldInitialize = true, onReady, onE
             errorMessage = 'Meeting not found or has ended';
             break;
           case 1001:
-            errorMessage = 'User rejected to give permission of camera or microphone';
+            errorMessage = 'User rejected camera or microphone permission';
             break;
           case 3001:
             errorMessage = 'Meeting locked by host';
@@ -330,43 +334,40 @@ export function useZoomSDK({ containerRef, shouldInitialize = true, onReady, onE
           default:
             if (error?.reason) {
               errorMessage = error.reason;
-            } else if (error?.errorMessage) {
-              errorMessage = error.errorMessage;
+            } else if (error?.message) {
+              errorMessage = error.message;
             }
         }
         
-        console.log('🔍 [ZOOM-SDK] Mapped error:', { code: error?.errorCode, message: errorMessage });
+        console.log('🔍 [ZOOM-SDK] Mapped error:', { code: errorCode, message: errorMessage });
         throw new Error(errorMessage);
       }
     }
-  }, [sdkSingleton]);
+  }, []);
 
   const leaveMeeting = useCallback(() => {
     console.log('👋 [ZOOM-SDK] Leaving meeting');
 
-    const client = sdkSingleton.getClient();
-    if (client && isJoined && mountedRef.current) {
+    if (globalClient && isJoined && mountedRef.current) {
       try {
-        client.leave();
+        globalClient.leave();
         setIsJoined(false);
+        joinAttemptedRef.current = false;
         console.log('✅ [ZOOM-SDK] Left meeting successfully');
       } catch (error) {
         console.error('❌ [ZOOM-SDK] Leave error:', error);
       }
     }
-  }, [isJoined, sdkSingleton]);
+  }, [isJoined]);
 
   const cleanup = useCallback(() => {
     console.log('🧹 [ZOOM-SDK] Starting cleanup');
     
-    if (isJoined) {
+    if (isJoined && globalClient) {
       try {
-        const client = sdkSingleton.getClient();
-        if (client && typeof client.leave === 'function') {
-          client.leave();
-        }
+        globalClient.leave();
       } catch (error) {
-        console.warn('Warning during cleanup:', error);
+        console.warn('Warning during cleanup leave:', error);
       }
     }
 
@@ -379,9 +380,10 @@ export function useZoomSDK({ containerRef, shouldInitialize = true, onReady, onE
     setIsLoading(true);
     setHasError(false);
     initializingRef.current = false;
+    joinAttemptedRef.current = false;
     
     console.log('✅ [ZOOM-SDK] Cleanup completed');
-  }, [isJoined, containerRef, sdkSingleton]);
+  }, [isJoined, containerRef]);
 
   // Initialize when container is ready
   useLayoutEffect(() => {

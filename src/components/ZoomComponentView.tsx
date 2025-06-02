@@ -102,8 +102,13 @@ export function ZoomComponentView({
   }, []);
 
   const executeJoin = useCallback(async () => {
-    if (!mountedRef.current || joinAttempted || !isReady) {
-      console.log('⏭️ [COMPONENT-VIEW] Join skipped:', { mounted: mountedRef.current, attempted: joinAttempted, ready: isReady });
+    if (!mountedRef.current || joinAttempted || !isReady || hasError) {
+      console.log('⏭️ [COMPONENT-VIEW] Join skipped:', { 
+        mounted: mountedRef.current, 
+        attempted: joinAttempted, 
+        ready: isReady,
+        hasError 
+      });
       return;
     }
 
@@ -155,18 +160,19 @@ export function ZoomComponentView({
       onMeetingError?.(error.message || 'Failed to join meeting');
       setJoinAttempted(false); // Allow retry
     }
-  }, [isReady, joinAttempted, meetingNumber, role, providedUserName, user, meetingPassword, getAuthTokens, joinMeeting, onMeetingJoined, onMeetingError]);
+  }, [isReady, joinAttempted, meetingNumber, role, providedUserName, user, meetingPassword, getAuthTokens, joinMeeting, onMeetingJoined, onMeetingError, hasError]);
 
-  // Auto-join when SDK is ready
+  // Auto-join when SDK is ready - single attempt
   useEffect(() => {
     if (isReady && !joinAttempted && !error && !hasError && mountedRef.current) {
       console.log('▶️ [COMPONENT-VIEW] SDK ready - starting auto-join');
+      
       // Small delay to ensure everything is stable
       const timer = setTimeout(() => {
-        if (mountedRef.current && !joinAttempted && isReady) {
+        if (mountedRef.current && !joinAttempted && isReady && !hasError) {
           executeJoin();
         }
-      }, 200);
+      }, 500);
 
       return () => clearTimeout(timer);
     }
