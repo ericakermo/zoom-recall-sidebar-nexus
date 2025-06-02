@@ -51,20 +51,11 @@ export function useZoomSDK({ onReady, onError }: UseZoomSDKProps = {}) {
       return;
     }
 
-    // Wait for the element with the specific ID
     const meetingSDKElement = document.getElementById('meetingSDKElement');
     if (!meetingSDKElement) {
       console.log('⏸️ SDK initialization waiting for meetingSDKElement');
       return;
     }
-
-    // Log container dimensions for debugging
-    const rect = meetingSDKElement.getBoundingClientRect();
-    console.log('📐 [ZOOM-SDK] Container dimensions:', {
-      width: rect.width,
-      height: rect.height,
-      aspectRatio: (rect.width / rect.height).toFixed(2)
-    });
 
     initializationRef.current = true;
 
@@ -73,68 +64,26 @@ export function useZoomSDK({ onReady, onError }: UseZoomSDKProps = {}) {
       
       clientRef.current = ZoomMtgEmbedded.createClient();
       
-      console.log('🔄 Initializing Zoom SDK with enforced 16:9 constraints...');
-      
-      // Strict 16:9 enforcement - these are the exact dimensions we want
-      const targetWidth = 1000;
-      const targetHeight = 563; // 1000/16*9 = 562.5, rounded to 563
+      console.log('🔄 Initializing Zoom SDK following best practices...');
 
-      console.log('📏 [ZOOM-SDK] Target dimensions (16:9):', {
-        width: targetWidth,
-        height: targetHeight,
-        aspectRatio: (targetWidth / targetHeight).toFixed(2)
-      });
-
+      // Simple initialization following Zoom's official sample
       await clientRef.current.init({
         zoomAppRoot: meetingSDKElement,
         language: 'en-US',
+        patchJsMedia: true,
+        leaveOnPageUnload: true,
         customize: {
           video: {
             isResizable: false,
-            disableDragging: true,
-            viewSizes: {
-              default: {
-                width: targetWidth,
-                height: targetHeight
-              }
-            }
-          },
-          layout: {
-            mode: 'gallery',
-            viewMode: 'fit',
-            // Force gallery view to respect our container dimensions
-            defaultVideoQuality: 'auto',
-            // Prevent layout from expanding beyond our constraints
-            maxParticipantsPerPage: 4,
-            // Force viewport to match our 16:9 container
-            viewport: {
-              width: targetWidth,
-              height: targetHeight
-            }
-          },
-          // Add toolbar customization to prevent UI overflow
-          toolbar: {
-            buttons: [
-              {
-                text: '',
-                className: 'ZoomSDKVideoContainer',
-                onClick: () => {}
-              }
-            ]
+            disableDragging: true
           }
-        },
-        patchJsMedia: true,
-        leaveOnPageUnload: true,
-        // Add viewport meta constraints
-        viewport: 'width=' + targetWidth + ', height=' + targetHeight,
-        // Enforce strict container bounds
-        enforceGalleryView: true
+        }
       });
 
       setIsSDKLoaded(true);
       setIsReady(true);
       onReady?.();
-      console.log('✅ Zoom SDK initialized with strict 16:9 constraints');
+      console.log('✅ Zoom SDK initialized successfully');
     } catch (error: any) {
       console.error('❌ Failed to initialize Zoom embedded client:', error);
       initializationRef.current = false;

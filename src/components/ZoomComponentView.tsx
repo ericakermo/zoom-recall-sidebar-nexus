@@ -265,7 +265,7 @@ export function ZoomComponentView({
   }
 
   return (
-    <div className="w-full h-full flex items-center justify-center">
+    <div className="w-full h-full relative">
       <ZoomLoadingOverlay
         isLoading={isLoading}
         currentStep={currentStep}
@@ -274,35 +274,16 @@ export function ZoomComponentView({
         maxRetries={maxRetries}
       />
 
-      {/* Zoom meeting container with absolute 16:9 enforcement */}
+      {/* Simple container following Zoom's best practices */}
       <div 
-        className="relative bg-black"
+        id="meetingSDKElement"
+        ref={containerRef}
+        className="w-full h-full"
         style={{
-          width: '1000px',
-          height: '563px',
-          maxWidth: '1000px',
-          maxHeight: '563px',
-          minWidth: '1000px',
-          minHeight: '563px',
-          overflow: 'hidden'
+          minHeight: '400px',
+          backgroundColor: '#000'
         }}
-      >
-        <div 
-          id="meetingSDKElement"
-          ref={containerRef}
-          className="w-full h-full"
-          style={{
-            width: '1000px',
-            height: '563px',
-            maxWidth: '1000px',
-            maxHeight: '563px',
-            minWidth: '1000px',
-            minHeight: '563px',
-            overflow: 'hidden',
-            position: 'relative'
-          }}
-        />
-      </div>
+      />
     </div>
   );
 }
