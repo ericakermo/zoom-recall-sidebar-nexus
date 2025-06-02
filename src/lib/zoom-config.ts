@@ -5,32 +5,6 @@ import { ZoomMeetingConfig, ZoomJoinParams, ZoomJoinConfig, ZoomTokenData, Meeti
 const ZOOM_SDK_KEY = "dkQMavedS2OWM2c73F6pLg"; // Updated SDK Key (Client ID)
 const SUPABASE_URL = 'https://qsxlvwwebbakmzpwjfbb.supabase.co';
 
-export const loadZoomSDK = async (): Promise<void> => {
-  return new Promise((resolve, reject) => {
-    // Check if Zoom SDK is already loaded
-    if (typeof window !== 'undefined' && (window as any).ZoomMtgEmbedded) {
-      console.log('✅ [ZOOM-CONFIG] Zoom SDK already loaded');
-      resolve();
-      return;
-    }
-
-    // For npm installation, the SDK should be available through import
-    // This function is mainly for compatibility with the existing code
-    try {
-      const ZoomMtgEmbedded = require('@zoom/meetingsdk/embedded');
-      if (ZoomMtgEmbedded) {
-        console.log('✅ [ZOOM-CONFIG] Zoom SDK loaded via npm');
-        resolve();
-      } else {
-        reject(new Error('Failed to load Zoom SDK via npm'));
-      }
-    } catch (error) {
-      console.error('❌ [ZOOM-CONFIG] Failed to load Zoom SDK:', error);
-      reject(error);
-    }
-  });
-};
-
 export const getZoomAccessToken = async (meetingNumber: string, role: number = 0): Promise<ZoomTokenData> => {
   try {
     const tokenData = localStorage.getItem('sb-qsxlvwwebbakmzpwjfbb-auth-token');
