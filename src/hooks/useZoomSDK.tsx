@@ -1,4 +1,3 @@
-
 import { useState, useRef, useCallback, useLayoutEffect, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import ZoomMtgEmbedded from '@zoom/meetingsdk/embedded';
@@ -151,46 +150,44 @@ export function useZoomSDK({ containerRef, shouldInitialize = true, onReady, onE
 
       console.log('🔧 [ZOOM-SDK] Client created, starting initialization...');
 
-      // CRITICAL FIX: Use callback-based initialization (NOT await)
+      // Correct initialization configuration following Zoom SDK docs
       const initConfig = {
         zoomAppRoot: containerRef.current!,
         language: 'en-US',
         patchJsMedia: true,
-        leaveOnPageUnload: true,
-        success: () => {
-          if (mountedRef.current) {
-            console.log('✅ [ZOOM-SDK] SDK initialized successfully - ready for join');
-            initializingRef.current = false;
-            setIsReady(true);
-            setIsLoading(false);
-            onReady?.();
-          }
-        },
-        error: (error: any) => {
-          if (mountedRef.current) {
-            console.error('❌ [ZOOM-SDK] Init failed:', error);
-            initializingRef.current = false;
-            setHasError(true);
-            setIsLoading(false);
-            
-            let userMessage = 'Failed to initialize Zoom SDK';
-            if (error?.errorMessage?.includes('network')) {
-              userMessage = 'Network connection issue - please check your internet';
-            } else if (error?.errorMessage?.includes('browser')) {
-              userMessage = 'Browser compatibility issue - try using Chrome or Firefox';
-            } else if (error?.reason) {
-              userMessage = `Zoom SDK Error: ${error.reason}`;
-            }
-            
-            onError?.(userMessage);
-          }
-        }
+        leaveOnPageUnload: true
       };
 
       console.log('🔧 [ZOOM-SDK] Calling client.init() with callback-based approach');
       
-      // FIXED: Don't await - let callbacks handle the flow
-      clientRef.current.init(initConfig);
+      // Use the correct callback-based initialization
+      clientRef.current.init(initConfig).then(() => {
+        if (mountedRef.current) {
+          console.log('✅ [ZOOM-SDK] SDK initialized successfully - ready for join');
+          initializingRef.current = false;
+          setIsReady(true);
+          setIsLoading(false);
+          onReady?.();
+        }
+      }).catch((error: any) => {
+        if (mountedRef.current) {
+          console.error('❌ [ZOOM-SDK] Init failed:', error);
+          initializingRef.current = false;
+          setHasError(true);
+          setIsLoading(false);
+          
+          let userMessage = 'Failed to initialize Zoom SDK';
+          if (error?.errorMessage?.includes('network')) {
+            userMessage = 'Network connection issue - please check your internet';
+          } else if (error?.errorMessage?.includes('browser')) {
+            userMessage = 'Browser compatibility issue - try using Chrome or Firefox';
+          } else if (error?.reason) {
+            userMessage = `Zoom SDK Error: ${error.reason}`;
+          }
+          
+          onError?.(userMessage);
+        }
+      });
 
     } catch (error: any) {
       if (mountedRef.current) {
@@ -229,120 +226,62 @@ export function useZoomSDK({ containerRef, shouldInitialize = true, onReady, onE
         password: joinConfig.passWord || '',
         userName: joinConfig.userName,
         userEmail: joinConfig.userEmail || '',
-        zak: joinConfig.zak || '',
-        success: (result: any) => {
-          if (mountedRef.current) {
-            console.log('✅ [ZOOM-SDK] Successfully joined meeting:', result);
-            setIsJoined(true);
-          }
-        },
-        error: (error: any) => {
-          if (mountedRef.current) {
-            console.error('❌ [ZOOM-SDK] Join failed:', error);
-            
-            let errorMessage = 'Failed to join meeting';
-            switch (error?.errorCode) {
-              case 200:
-                errorMessage = 'Invalid meeting credentials - check meeting ID and password';
-                break;
-              case 3712:
-                errorMessage = 'Authentication failed - invalid meeting signature';
-                break;
-              case 3000:
-                errorMessage = 'Meeting not found or has ended';
-                break;
-              case 1001:
-                errorMessage = 'User rejected to give permission of camera or microphone';
-                break;
-              case 3001:
-                errorMessage = 'Meeting locked by host';
-                break;
-              case 3002:
-                errorMessage = 'Meeting restricted';
-                break;
-              case 3003:
-                errorMessage = 'Meeting has reached maximum capacity';
-                break;
-              case 3004:
-                errorMessage = 'Meeting does not exist';
-                break;
-              case 3005:
-                errorMessage = 'Feature disabled by host';
-                break;
-              default:
-                if (error?.reason) {
-                  errorMessage = error.reason;
-                } else if (error?.errorMessage) {
-                  errorMessage = error.errorMessage;
-                }
-            }
-            
-            console.log('🔍 [ZOOM-SDK] Mapped error:', { code: error?.errorCode, message: errorMessage });
-            throw new Error(errorMessage);
-          }
-        }
+        zak: joinConfig.zak || ''
       };
 
       console.log('🔗 [ZOOM-SDK] Calling client.join() with params');
       
-      // CRITICAL: Use callback-based join (matching the SDK pattern)
-      return new Promise((resolve, reject) => {
-        const enhancedParams = {
-          ...joinParams,
-          success: (result: any) => {
-            if (mountedRef.current) {
-              console.log('✅ [ZOOM-SDK] Successfully joined meeting:', result);
-              setIsJoined(true);
-              resolve(result);
-            }
-          },
-          error: (error: any) => {
-            if (mountedRef.current) {
-              console.error('❌ [ZOOM-SDK] Join failed:', error);
-              
-              let errorMessage = 'Failed to join meeting';
-              switch (error?.errorCode) {
-                case 200:
-                  errorMessage = 'Invalid meeting credentials - check meeting ID and password';
-                  break;
-                case 3712:
-                  errorMessage = 'Authentication failed - invalid meeting signature';
-                  break;
-                case 3000:
-                  errorMessage = 'Meeting not found or has ended';
-                  break;
-                case 1001:
-                  errorMessage = 'User rejected to give permission of camera or microphone';
-                  break;
-                case 3001:
-                  errorMessage = 'Meeting locked by host';
-                  break;
-                case 3002:
-                  errorMessage = 'Meeting restricted';
-                  break;
-                case 3003:
-                  errorMessage = 'Meeting has reached maximum capacity';
-                  break;
-                case 3004:
-                  errorMessage = 'Meeting does not exist';
-                  break;
-                case 3005:
-                  errorMessage = 'Feature disabled by host';
-                  break;
-                default:
-                  if (error?.reason) {
-                    errorMessage = error.reason;
-                  } else if (error?.errorMessage) {
-                    errorMessage = error.errorMessage;
-                  }
+      // Use promise-based join following the SDK pattern
+      return clientRef.current.join(joinParams).then((result: any) => {
+        if (mountedRef.current) {
+          console.log('✅ [ZOOM-SDK] Successfully joined meeting:', result);
+          setIsJoined(true);
+          return result;
+        }
+      }).catch((error: any) => {
+        if (mountedRef.current) {
+          console.error('❌ [ZOOM-SDK] Join failed:', error);
+          
+          let errorMessage = 'Failed to join meeting';
+          switch (error?.errorCode) {
+            case 200:
+              errorMessage = 'Invalid meeting credentials - check meeting ID and password';
+              break;
+            case 3712:
+              errorMessage = 'Authentication failed - invalid meeting signature';
+              break;
+            case 3000:
+              errorMessage = 'Meeting not found or has ended';
+              break;
+            case 1001:
+              errorMessage = 'User rejected to give permission of camera or microphone';
+              break;
+            case 3001:
+              errorMessage = 'Meeting locked by host';
+              break;
+            case 3002:
+              errorMessage = 'Meeting restricted';
+              break;
+            case 3003:
+              errorMessage = 'Meeting has reached maximum capacity';
+              break;
+            case 3004:
+              errorMessage = 'Meeting does not exist';
+              break;
+            case 3005:
+              errorMessage = 'Feature disabled by host';
+              break;
+            default:
+              if (error?.reason) {
+                errorMessage = error.reason;
+              } else if (error?.errorMessage) {
+                errorMessage = error.errorMessage;
               }
-              
-              reject(new Error(errorMessage));
-            }
           }
-        };
-
-        clientRef.current.join(enhancedParams);
+          
+          console.log('🔍 [ZOOM-SDK] Mapped error:', { code: error?.errorCode, message: errorMessage });
+          throw new Error(errorMessage);
+        }
       });
 
     } catch (error: any) {
