@@ -46,8 +46,15 @@ export function useZoomSDK({ onReady, onError }: UseZoomSDKProps = {}) {
   }, [isJoined]);
 
   const initializeSDK = useCallback(async () => {
-    if (initializationRef.current || !containerRef.current) {
-      console.log('⏸️ SDK initialization skipped - already initialized or container not ready');
+    if (initializationRef.current) {
+      console.log('⏸️ SDK initialization skipped - already initialized');
+      return;
+    }
+
+    // Wait for the element with the specific ID
+    const meetingSDKElement = document.getElementById('meetingSDKElement');
+    if (!meetingSDKElement) {
+      console.log('⏸️ SDK initialization waiting for meetingSDKElement');
       return;
     }
 
@@ -58,13 +65,23 @@ export function useZoomSDK({ onReady, onError }: UseZoomSDKProps = {}) {
       
       clientRef.current = ZoomMtgEmbedded.createClient();
       
-      console.log('🔄 Initializing Zoom embedded client with minimal configuration...');
+      console.log('🔄 Initializing Zoom embedded client with recommended configuration...');
       
-      // Solution 3: Minimal SDK configuration to avoid conflicts
+      // Following Zoom's recommended initialization
       await clientRef.current.init({
-        debug: true,
-        zoomAppRoot: containerRef.current,
+        zoomAppRoot: meetingSDKElement,
         language: 'en-US',
+        customize: {
+          video: {
+            isResizable: false, // Make it non-resizable as requested
+            viewSizes: {
+              default: {
+                width: 1000,
+                height: 600
+              }
+            }
+          }
+        },
         patchJsMedia: true,
         leaveOnPageUnload: true
       });
@@ -72,7 +89,7 @@ export function useZoomSDK({ onReady, onError }: UseZoomSDKProps = {}) {
       setIsSDKLoaded(true);
       setIsReady(true);
       onReady?.();
-      console.log('✅ Zoom embedded client initialized successfully with minimal config');
+      console.log('✅ Zoom embedded client initialized successfully with recommended config');
     } catch (error: any) {
       console.error('❌ Failed to initialize Zoom embedded client:', error);
       initializationRef.current = false;
@@ -172,11 +189,19 @@ export function useZoomSDK({ onReady, onError }: UseZoomSDKProps = {}) {
     }
   }, [isJoined]);
 
-  // Initialize when container is available
+  // Initialize when DOM element is ready
   useEffect(() => {
-    if (containerRef.current && !initializationRef.current) {
-      initializeSDK();
-    }
+    const checkForElement = () => {
+      const meetingSDKElement = document.getElementById('meetingSDKElement');
+      if (meetingSDKElement && !initializationRef.current) {
+        initializeSDK();
+      } else if (!meetingSDKElement) {
+        // Keep checking for the element
+        setTimeout(checkForElement, 100);
+      }
+    };
+    
+    checkForElement();
   }, [initializeSDK]);
 
   // Cleanup on unmount and page unload

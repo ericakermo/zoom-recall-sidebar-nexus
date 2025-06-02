@@ -1,4 +1,3 @@
-
 import { useEffect, useState, useCallback } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { useZoomSDK } from '@/hooks/useZoomSDK';
@@ -145,7 +144,6 @@ export function ZoomComponentView({
     }
   }, [isReady, hasJoinedSuccessfully, isJoined, meetingNumber, role, providedUserName, user, meetingPassword, getTokens, joinMeeting, onMeetingJoined, client]);
 
-  // Update current step based on SDK status
   useEffect(() => {
     if (isJoined && hasJoinedSuccessfully) {
       setCurrentStep('Connected to meeting');
@@ -159,7 +157,6 @@ export function ZoomComponentView({
     }
   }, [isSDKLoaded, isReady, isJoined, hasJoinedSuccessfully]);
 
-  // Join when ready (only if not already joined)
   useEffect(() => {
     if (isReady && !hasJoinedSuccessfully && !error) {
       console.log('▶️ [COMPONENT-VIEW] SDK ready - starting auto-join');
@@ -193,7 +190,6 @@ export function ZoomComponentView({
     }
   }, [retryCount, maxRetries, handleJoinMeeting, cleanup]);
 
-  // Cleanup only when component unmounts, not when successfully joined
   useEffect(() => {
     return () => {
       if (!hasJoinedSuccessfully) {
@@ -217,7 +213,7 @@ export function ZoomComponentView({
   }
 
   return (
-    <div className="absolute inset-0">
+    <div className="w-full h-full relative">
       <ZoomLoadingOverlay
         isLoading={isLoading}
         currentStep={currentStep}
@@ -226,17 +222,14 @@ export function ZoomComponentView({
         maxRetries={maxRetries}
       />
 
-      {/* Zoom meeting container - fixed positioned to fill parent */}
+      {/* Zoom meeting container following Zoom's recommendations */}
       <div 
+        id="meetingSDKElement"
         ref={containerRef}
-        className="absolute inset-0"
+        className="w-full h-full"
         style={{
-          position: 'absolute',
-          top: 0,
-          left: 0,
           width: '100%',
-          height: '100%',
-          zIndex: 1
+          height: '100%'
         }}
       />
     </div>
