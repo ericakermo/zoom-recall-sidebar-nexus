@@ -212,6 +212,7 @@ export function useZoomSDK({ onReady, onError }: UseZoomSDKProps = {}) {
     isJoined,
     joinMeeting,
     leaveMeeting,
-    cleanup
+    cleanup,
+    client: clientRef.current
   };
 }

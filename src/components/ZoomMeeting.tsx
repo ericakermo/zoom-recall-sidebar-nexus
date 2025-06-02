@@ -11,6 +11,7 @@ interface ZoomMeetingProps {
   userName?: string;
   role?: number;
   onMeetingEnd?: () => void;
+  onMeetingJoined?: (client: any) => void;
   zak?: string;
 }
 
@@ -20,6 +21,7 @@ export function ZoomMeeting({
   userName,
   role = 0,
   onMeetingEnd,
+  onMeetingJoined,
   zak
 }: ZoomMeetingProps) {
   const [error, setError] = useState<string | null>(null);
@@ -27,9 +29,10 @@ export function ZoomMeeting({
   const navigate = useNavigate();
   const { toast } = useToast();
 
-  const handleMeetingJoined = () => {
+  const handleMeetingJoined = (client: any) => {
     setIsConnected(true);
     console.log('✅ Meeting joined successfully');
+    onMeetingJoined?.(client);
     toast({
       title: "Connected",
       description: "You have joined the meeting"

@@ -1,12 +1,13 @@
-
-import React, { useEffect, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import React, { useEffect, useState, useCallback } from 'react';
+import { useParams, useNavigate, useBlocker } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
 import { Loader2, ArrowLeft } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { ZoomMeeting } from '@/components/ZoomMeeting';
+import { MeetingExitDialog } from '@/components/MeetingExitDialog';
+import { useMeetingExit } from '@/hooks/useMeetingExit';
 
 interface ZoomMeetingData {
   id: string;
@@ -28,7 +29,69 @@ const Meeting = () => {
   const [error, setError] = useState<string | null>(null);
   const [meetingData, setMeetingData] = useState<ZoomMeetingData | null>(null);
   const [meetingPassword, setMeetingPassword] = useState<string>('');
+  const [zoomClient, setZoomClient] = useState<any>(null);
+  const [isJoined, setIsJoined] = useState(false);
+  const [showExitDialog, setShowExitDialog] = useState(false);
+  const [pendingNavigation, setPendingNavigation] = useState<string | null>(null);
   const { toast } = useToast();
+
+  const { leaveMeeting, checkMeetingStatus } = useMeetingExit({
+    zoomClient,
+    isJoined,
+    onConfirmExit: () => {
+      console.log('✅ [MEETING] User confirmed exit');
+    },
+    onCancelExit: () => {
+      console.log('🚫 [MEETING] User cancelled exit');
+    }
+  });
+
+  // Block navigation if in meeting
+  const blocker = useBlocker(
+    ({ currentLocation, nextLocation }) => {
+      const isLeavingMeetingPage = currentLocation.pathname.includes('/meeting') && 
+                                  !nextLocation.pathname.includes('/meeting');
+      
+      if (isLeavingMeetingPage && checkMeetingStatus()) {
+        setPendingNavigation(nextLocation.pathname);
+        setShowExitDialog(true);
+        return true;
+      }
+      return false;
+    }
+  );
+
+  const handleConfirmExit = useCallback(async () => {
+    await leaveMeeting();
+    setIsJoined(false);
+    setShowExitDialog(false);
+    
+    if (pendingNavigation) {
+      navigate(pendingNavigation);
+      setPendingNavigation(null);
+    } else {
+      navigate('/calendar');
+    }
+  }, [leaveMeeting, navigate, pendingNavigation]);
+
+  const handleCancelExit = useCallback(() => {
+    setShowExitDialog(false);
+    setPendingNavigation(null);
+    
+    // Reset the blocker
+    if (blocker.state === "blocked") {
+      blocker.reset?.();
+    }
+  }, [blocker]);
+
+  const handleBackToCalendar = useCallback(() => {
+    if (checkMeetingStatus()) {
+      setShowExitDialog(true);
+      setPendingNavigation('/calendar');
+    } else {
+      navigate('/calendar');
+    }
+  }, [checkMeetingStatus, navigate]);
 
   useEffect(() => {
     const loadMeetingData = async () => {
@@ -71,9 +134,17 @@ const Meeting = () => {
     loadMeetingData();
   }, [id, user]);
 
-  const handleMeetingEnd = () => {
+  const handleMeetingEnd = useCallback(async () => {
+    await leaveMeeting();
+    setIsJoined(false);
     navigate('/calendar');
-  };
+  }, [leaveMeeting, navigate]);
+
+  const handleMeetingJoined = useCallback((client: any) => {
+    setZoomClient(client);
+    setIsJoined(true);
+    console.log('✅ [MEETING] Meeting joined, client set');
+  }, []);
 
   if (!user) {
     return (
@@ -115,40 +186,50 @@ const Meeting = () => {
   const isHost = meetingData.user_id === user.id;
 
   return (
-    <div className="flex flex-col h-screen">
-      {/* Header */}
-      <div className="flex items-center justify-between p-4 border-b bg-white">
-        <div className="flex items-center gap-3">
-          <Button 
-            variant="ghost" 
-            size="sm" 
-            onClick={() => navigate('/calendar')}
-            className="flex items-center gap-2"
-          >
-            <ArrowLeft className="h-4 w-4" />
-            Back to Calendar
-          </Button>
+    <>
+      <div className="flex flex-col h-screen">
+        {/* Header */}
+        <div className="flex items-center justify-between p-4 border-b bg-white">
+          <div className="flex items-center gap-3">
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              onClick={handleBackToCalendar}
+              className="flex items-center gap-2"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              Back to Calendar
+            </Button>
+          </div>
+          
+          <div className="text-center">
+            <h1 className="text-lg font-semibold">{meetingData.title}</h1>
+            <p className="text-sm text-gray-600">Meeting ID: {meetingData.meeting_id}</p>
+          </div>
+          
+          <div className="w-32"></div> {/* Spacer for centering */}
         </div>
-        
-        <div className="text-center">
-          <h1 className="text-lg font-semibold">{meetingData.title}</h1>
-          <p className="text-sm text-gray-600">Meeting ID: {meetingData.meeting_id}</p>
+
+        {/* Meeting Content */}
+        <div className="flex-1 p-4 bg-gray-50">
+          <ZoomMeeting
+            meetingNumber={meetingData.meeting_id}
+            meetingPassword={meetingPassword}
+            userName={user.email || 'Guest'}
+            role={isHost ? 1 : 0}
+            onMeetingEnd={handleMeetingEnd}
+            onMeetingJoined={handleMeetingJoined}
+          />
         </div>
-        
-        <div className="w-32"></div> {/* Spacer for centering */}
       </div>
 
-      {/* Meeting Content */}
-      <div className="flex-1 p-4 bg-gray-50">
-        <ZoomMeeting
-          meetingNumber={meetingData.meeting_id}
-          meetingPassword={meetingPassword}
-          userName={user.email || 'Guest'}
-          role={isHost ? 1 : 0}
-          onMeetingEnd={handleMeetingEnd}
-        />
-      </div>
-    </div>
+      <MeetingExitDialog
+        isOpen={showExitDialog}
+        onConfirm={handleConfirmExit}
+        onCancel={handleCancelExit}
+        meetingId={meetingData.meeting_id}
+      />
+    </>
   );
 };
 

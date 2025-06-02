@@ -10,7 +10,7 @@ interface ZoomComponentViewProps {
   meetingPassword?: string;
   userName?: string;
   role?: number;
-  onMeetingJoined?: () => void;
+  onMeetingJoined?: (client: any) => void;
   onMeetingError?: (error: string) => void;
   onMeetingLeft?: () => void;
 }
@@ -40,7 +40,8 @@ export function ZoomComponentView({
     isJoined,
     joinMeeting,
     leaveMeeting,
-    cleanup
+    cleanup,
+    client
   } = useZoomSDK({
     onReady: () => {
       console.log('✅ Zoom SDK ready');
@@ -125,14 +126,16 @@ export function ZoomComponentView({
       setIsLoading(false);
       setCurrentStep('Connected to meeting');
       setRetryCount(0);
-      onMeetingJoined?.();
+      
+      // Pass the client reference to parent
+      onMeetingJoined?.(client);
     } catch (error: any) {
       console.error('❌ Join failed:', error);
       setError(error.message);
       setIsLoading(false);
       onMeetingError?.(error.message);
     }
-  }, [isReady, hasJoinedOnce, meetingNumber, role, providedUserName, user, meetingPassword, getTokens, joinMeeting, onMeetingJoined, onMeetingError]);
+  }, [isReady, hasJoinedOnce, meetingNumber, role, providedUserName, user, meetingPassword, getTokens, joinMeeting, onMeetingJoined, client]);
 
   // Update current step based on SDK status
   useEffect(() => {
