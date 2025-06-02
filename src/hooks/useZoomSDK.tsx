@@ -1,5 +1,3 @@
-
-
 import { useState, useRef, useCallback, useEffect } from 'react';
 import ZoomMtgEmbedded from '@zoom/meetingsdk/embedded';
 
@@ -75,16 +73,16 @@ export function useZoomSDK({ onReady, onError }: UseZoomSDKProps = {}) {
       
       clientRef.current = ZoomMtgEmbedded.createClient();
       
-      console.log('🔄 Initializing Zoom embedded client with strict 16:9 aspect ratio...');
+      console.log('🔄 Initializing Zoom SDK with enforced 16:9 constraints...');
       
-      // Force 16:9 aspect ratio - calculate both width and height constraints
-      const maxWidth = 1000;
-      const aspectRatio = 16 / 9;
-      const calculatedHeight = maxWidth / aspectRatio;
+      // Strict 16:9 enforcement - these are the exact dimensions we want
+      const targetWidth = 1000;
+      const targetHeight = 563; // 1000/16*9 = 562.5, rounded to 563
 
-      console.log('📏 [ZOOM-SDK] Enforced 16:9 dimensions:', {
-        width: maxWidth,
-        height: Math.round(calculatedHeight)
+      console.log('📏 [ZOOM-SDK] Target dimensions (16:9):', {
+        width: targetWidth,
+        height: targetHeight,
+        aspectRatio: (targetWidth / targetHeight).toFixed(2)
       });
 
       await clientRef.current.init({
@@ -93,27 +91,50 @@ export function useZoomSDK({ onReady, onError }: UseZoomSDKProps = {}) {
         customize: {
           video: {
             isResizable: false,
-            disableDragging: true, // Disable dragging functionality
+            disableDragging: true,
             viewSizes: {
               default: {
-                width: maxWidth,
-                height: Math.round(calculatedHeight)
+                width: targetWidth,
+                height: targetHeight
               }
             }
           },
           layout: {
             mode: 'gallery',
-            viewMode: 'fit'
+            viewMode: 'fit',
+            // Force gallery view to respect our container dimensions
+            defaultVideoQuality: 'auto',
+            // Prevent layout from expanding beyond our constraints
+            maxParticipantsPerPage: 4,
+            // Force viewport to match our 16:9 container
+            viewport: {
+              width: targetWidth,
+              height: targetHeight
+            }
+          },
+          // Add toolbar customization to prevent UI overflow
+          toolbar: {
+            buttons: [
+              {
+                text: '',
+                className: 'ZoomSDKVideoContainer',
+                onClick: () => {}
+              }
+            ]
           }
         },
         patchJsMedia: true,
-        leaveOnPageUnload: true
+        leaveOnPageUnload: true,
+        // Add viewport meta constraints
+        viewport: 'width=' + targetWidth + ', height=' + targetHeight,
+        // Enforce strict container bounds
+        enforceGalleryView: true
       });
 
       setIsSDKLoaded(true);
       setIsReady(true);
       onReady?.();
-      console.log('✅ Zoom embedded client initialized with strict 16:9 and no dragging');
+      console.log('✅ Zoom SDK initialized with strict 16:9 constraints');
     } catch (error: any) {
       console.error('❌ Failed to initialize Zoom embedded client:', error);
       initializationRef.current = false;
@@ -268,4 +289,3 @@ export function useZoomSDK({ onReady, onError }: UseZoomSDKProps = {}) {
     client: clientRef.current
   };
 }
-

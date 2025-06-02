@@ -222,14 +222,18 @@ export function ZoomComponentView({
         maxRetries={maxRetries}
       />
 
-      {/* Zoom meeting container with enforced 16:9 aspect ratio */}
+      {/* Zoom meeting container with absolute 16:9 enforcement */}
       <div 
         className="relative"
         style={{
           width: '1000px',
-          height: '563px', // Fixed height for 16:9 ratio (1000/16*9 = 562.5)
+          height: '563px',
           maxWidth: '100%',
-          overflow: 'hidden'
+          overflow: 'hidden',
+          // Prevent any SDK overrides
+          minWidth: '1000px',
+          minHeight: '563px',
+          maxHeight: '563px'
         }}
       >
         <div 
@@ -239,7 +243,15 @@ export function ZoomComponentView({
           style={{
             width: '1000px',
             height: '563px',
-            pointerEvents: 'auto' // Ensure pointer events work but without dragging
+            // Prevent SDK from overriding dimensions
+            minWidth: '1000px',
+            minHeight: '563px',
+            maxWidth: '1000px',
+            maxHeight: '563px',
+            pointerEvents: 'auto',
+            // Force container bounds on child elements
+            position: 'relative',
+            overflow: 'hidden'
           }}
         />
       </div>
