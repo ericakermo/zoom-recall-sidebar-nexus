@@ -1,3 +1,4 @@
+
 import { useEffect, useState, useCallback } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { useZoomSDK } from '@/hooks/useZoomSDK';
@@ -213,7 +214,7 @@ export function ZoomComponentView({
   }
 
   return (
-    <div className="w-full h-full flex items-center justify-center bg-gray-900">
+    <div className="w-full h-full flex items-center justify-center bg-gray-50">
       <ZoomLoadingOverlay
         isLoading={isLoading}
         currentStep={currentStep}
@@ -224,7 +225,7 @@ export function ZoomComponentView({
 
       {/* Zoom meeting container with controlled 16:9 aspect ratio */}
       <div 
-        className="relative bg-black"
+        className="relative"
         style={{
           width: '100%',
           maxWidth: '1000px',
@@ -235,7 +236,7 @@ export function ZoomComponentView({
         <div 
           id="meetingSDKElement"
           ref={containerRef}
-          className="absolute inset-0"
+          className="w-full h-full"
           style={{
             width: '100%',
             height: '100%'

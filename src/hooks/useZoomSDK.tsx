@@ -1,3 +1,4 @@
+
 import { useState, useRef, useCallback, useEffect } from 'react';
 import ZoomMtgEmbedded from '@zoom/meetingsdk/embedded';
 
@@ -73,17 +74,16 @@ export function useZoomSDK({ onReady, onError }: UseZoomSDKProps = {}) {
       
       clientRef.current = ZoomMtgEmbedded.createClient();
       
-      console.log('🔄 Initializing Zoom embedded client with controlled sizing...');
+      console.log('🔄 Initializing Zoom embedded client with 16:9 aspect ratio...');
       
-      // Calculate dimensions to maintain 16:9 ratio within container
+      // Use container width and calculate height for perfect 16:9 ratio
       const containerWidth = Math.min(rect.width, 1000);
-      const containerHeight = Math.min(rect.height, containerWidth * (9/16));
-      const finalWidth = Math.min(containerWidth, containerHeight * (16/9));
-      const finalHeight = finalWidth * (9/16);
+      const aspectRatio = 16 / 9;
+      const calculatedHeight = containerWidth / aspectRatio;
 
-      console.log('📏 [ZOOM-SDK] Calculated dimensions:', {
-        finalWidth: Math.round(finalWidth),
-        finalHeight: Math.round(finalHeight)
+      console.log('📏 [ZOOM-SDK] Calculated 16:9 dimensions:', {
+        width: Math.round(containerWidth),
+        height: Math.round(calculatedHeight)
       });
 
       await clientRef.current.init({
@@ -94,8 +94,8 @@ export function useZoomSDK({ onReady, onError }: UseZoomSDKProps = {}) {
             isResizable: false,
             viewSizes: {
               default: {
-                width: Math.round(finalWidth),
-                height: Math.round(finalHeight)
+                width: Math.round(containerWidth),
+                height: Math.round(calculatedHeight)
               }
             }
           }
@@ -107,7 +107,7 @@ export function useZoomSDK({ onReady, onError }: UseZoomSDKProps = {}) {
       setIsSDKLoaded(true);
       setIsReady(true);
       onReady?.();
-      console.log('✅ Zoom embedded client initialized with controlled sizing');
+      console.log('✅ Zoom embedded client initialized with 16:9 aspect ratio');
     } catch (error: any) {
       console.error('❌ Failed to initialize Zoom embedded client:', error);
       initializationRef.current = false;
