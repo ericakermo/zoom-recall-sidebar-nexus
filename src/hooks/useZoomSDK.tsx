@@ -165,7 +165,7 @@ export function useZoomSDK({ containerRef, shouldInitialize = true, onReady, onE
     // Log SDK version information
     try {
       console.log('📋 [ZOOM-SDK] SDK Info:', {
-        version: ZoomMtgEmbedded.version || 'unknown',
+        version: ZoomMtgEmbedded.VERSION || 'unknown',
         hasCreateClient: typeof ZoomMtgEmbedded.createClient === 'function'
       });
     } catch (error) {
