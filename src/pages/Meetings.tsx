@@ -1,3 +1,4 @@
+
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { Button } from '@/components/ui/button';
@@ -9,7 +10,6 @@ import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/context/AuthContext';
 import { Video, VideoOff, X } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
-import { loadZoomSDK, getZoomAccessToken } from '@/lib/zoom-config';
 
 interface MeetingFormData {
   meetingId: string;
@@ -23,21 +23,7 @@ const Meetings = () => {
   const { user } = useAuth();
   const [isStartingMeeting, setIsStartingMeeting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [sdkLoaded, setSdkLoaded] = useState(false);
   const [zoomCredentials, setZoomCredentials] = useState<any>(null);
-
-  // Load the Zoom SDK on component mount
-  useState(() => {
-    loadZoomSDK()
-      .then(() => {
-        console.log("Zoom SDK loaded successfully in Meetings.tsx");
-        setSdkLoaded(true);
-      })
-      .catch(err => {
-        console.error("Failed to load Zoom SDK:", err);
-        setError("Failed to load Zoom SDK. Please try refreshing the page.");
-      });
-  });
 
   const joinMeeting = (data: MeetingFormData) => {
     if (!user) {
@@ -261,7 +247,7 @@ const Meetings = () => {
               )}
               <Button 
                 onClick={handleStartMeeting}
-                disabled={isStartingMeeting || !sdkLoaded}
+                disabled={isStartingMeeting}
                 className="w-full"
               >
                 {isStartingMeeting ? (
