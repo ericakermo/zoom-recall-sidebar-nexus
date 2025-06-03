@@ -55,17 +55,20 @@ export function useZoomSDK({ onReady, onError }: UseZoomSDKProps = {}) {
     }
 
     try {
-      console.log('🔄 Creating Zoom embedded client following official sample...');
+      console.log('🔄 Creating Zoom embedded client...');
       
-      // Direct approach like official sample - create client and init immediately
+      // Create client first
       clientRef.current = ZoomMtgEmbedded.createClient();
       
-      console.log('🔄 Initializing Zoom SDK with official configuration...');
+      console.log('🔄 Initializing Zoom SDK with proper asset path...');
 
-      // Following Zoom's official sample configuration exactly
+      // Calculate asset path following Zoom's official pattern
       const tmpPort = window.location.port === "" ? "" : ":" + window.location.port;
       const assetPath = window.location.protocol + "//" + window.location.hostname + tmpPort + "/lib";
 
+      console.log('📁 Asset path configured:', assetPath);
+
+      // Initialize with minimal configuration matching official sample
       await clientRef.current.init({
         debug: true,
         zoomAppRoot: meetingSDKElement,
@@ -76,9 +79,10 @@ export function useZoomSDK({ onReady, onError }: UseZoomSDKProps = {}) {
       setIsSDKLoaded(true);
       setIsReady(true);
       onReady?.();
-      console.log('✅ Zoom SDK initialized successfully following official sample');
+      console.log('✅ Zoom SDK initialized successfully with asset path');
     } catch (error: any) {
       console.error('❌ Failed to initialize Zoom embedded client:', error);
+      console.error('🔍 Asset path was:', window.location.protocol + "//" + window.location.hostname + (window.location.port === "" ? "" : ":" + window.location.port) + "/lib");
       clientRef.current = null;
       onError?.(error.message || 'Failed to initialize Zoom SDK');
     }
@@ -89,7 +93,7 @@ export function useZoomSDK({ onReady, onError }: UseZoomSDKProps = {}) {
       throw new Error('Zoom SDK not ready');
     }
 
-    console.log('🔄 Joining meeting following official sample pattern...');
+    console.log('🔄 Joining meeting...');
     console.log('📋 Join config details:', {
       meetingNumber: joinConfig.meetingNumber,
       userName: joinConfig.userName,
@@ -106,7 +110,7 @@ export function useZoomSDK({ onReady, onError }: UseZoomSDKProps = {}) {
     }
     
     try {
-      // Direct join approach like official sample
+      // Join with simplified configuration
       const result = await clientRef.current.join({
         sdkKey: joinConfig.sdkKey,
         signature: joinConfig.signature,
@@ -118,7 +122,7 @@ export function useZoomSDK({ onReady, onError }: UseZoomSDKProps = {}) {
       });
       
       setIsJoined(true);
-      console.log('✅ Successfully joined meeting following official sample approach');
+      console.log('✅ Successfully joined meeting');
       return result;
     } catch (error: any) {
       console.error('❌ Failed to join meeting:', error);
@@ -166,14 +170,13 @@ export function useZoomSDK({ onReady, onError }: UseZoomSDKProps = {}) {
     }
   }, [isJoined]);
 
-  // Simple initialization when DOM is ready - following official sample timing
+  // Initialize when DOM is ready
   useEffect(() => {
     const initWhenReady = () => {
       const meetingSDKElement = document.getElementById('meetingSDKElement');
       if (meetingSDKElement) {
         initializeSDK();
       } else {
-        // Check again in next tick
         setTimeout(initWhenReady, 50);
       }
     };

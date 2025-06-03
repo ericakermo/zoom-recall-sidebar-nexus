@@ -35,7 +35,6 @@ export function ZoomComponentView({
   const { user } = useAuth();
 
   const {
-    containerRef,
     isSDKLoaded,
     isReady,
     isJoined,
@@ -157,7 +156,7 @@ export function ZoomComponentView({
     }
   }, [isSDKLoaded, isReady, isJoined, hasJoinedSuccessfully]);
 
-  // Auto-join when ready - simplified approach like official sample
+  // Auto-join when ready
   useEffect(() => {
     if (isReady && !hasJoinedSuccessfully && !error) {
       console.log('▶️ [COMPONENT-VIEW] SDK ready - starting auto-join');
@@ -203,7 +202,7 @@ export function ZoomComponentView({
   }
 
   return (
-    <div className="w-full h-full">
+    <div className="w-full h-full relative">
       <ZoomLoadingOverlay
         isLoading={isLoading}
         currentStep={currentStep}
@@ -212,16 +211,10 @@ export function ZoomComponentView({
         maxRetries={maxRetries}
       />
 
-      {/* Minimal container matching Zoom's official sample exactly */}
+      {/* Minimal container exactly like Zoom's official sample */}
       <div 
         id="meetingSDKElement"
-        ref={containerRef}
         className="w-full h-full"
-        style={{
-          position: 'relative',
-          width: '100%',
-          height: '100%'
-        }}
       />
     </div>
   );
