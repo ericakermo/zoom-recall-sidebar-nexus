@@ -23,17 +23,11 @@ export function ZoomComponentView({
   onMeetingError,
   onMeetingLeft
 }: ZoomComponentViewProps) {
-  const [error, setError] = useState<string | null>(null);
-  const [hasJoinedSuccessfully, setHasJoinedSuccessfully] = useState(false);
-  
   const { user } = useAuth();
 
   const {
     isReady,
-    isJoined,
     joinMeeting,
-    leaveMeeting,
-    cleanup,
     client
   } = useZoomSDK({
     onReady: () => {
@@ -41,7 +35,6 @@ export function ZoomComponentView({
     },
     onError: (error) => {
       console.error('❌ [COMPONENT-VIEW] SDK error:', error);
-      setError(error);
       onMeetingError?.(error);
     }
   });
@@ -86,8 +79,8 @@ export function ZoomComponentView({
   }, []);
 
   const handleJoinMeeting = useCallback(async () => {
-    if (!isReady || hasJoinedSuccessfully || isJoined) {
-      console.log('⏸️ [COMPONENT-VIEW] Skipping join - already joined or not ready');
+    if (!isReady) {
+      console.log('⏸️ [COMPONENT-VIEW] SDK not ready yet');
       return;
     }
 
@@ -101,7 +94,7 @@ export function ZoomComponentView({
         meetingNumber,
         userName: providedUserName || user?.email || 'Guest',
         userEmail: user?.email || '',
-        passWord: meetingPassword || '',
+        password: meetingPassword || '',
         role: role || 0,
         zak: tokens.zak || ''
       };
@@ -118,74 +111,25 @@ export function ZoomComponentView({
       console.log('🔗 [COMPONENT-VIEW] Calling joinMeeting()');
       await joinMeeting(joinConfig);
       
-      setHasJoinedSuccessfully(true);
-      
       console.log('✅ [COMPONENT-VIEW] Join completed successfully');
       onMeetingJoined?.(client);
     } catch (error: any) {
       console.error('❌ [COMPONENT-VIEW] Join failed:', error);
-      setError(error.message);
       onMeetingError?.(error.message);
     }
-  }, [isReady, hasJoinedSuccessfully, isJoined, meetingNumber, role, providedUserName, user, meetingPassword, getTokens, joinMeeting, onMeetingJoined, client]);
+  }, [isReady, meetingNumber, role, providedUserName, user, meetingPassword, getTokens, joinMeeting, onMeetingJoined, client]);
 
   // Auto-join when ready
   useEffect(() => {
-    if (isReady && !hasJoinedSuccessfully && !error) {
+    if (isReady) {
       console.log('▶️ [COMPONENT-VIEW] SDK ready - starting auto-join');
       handleJoinMeeting();
     }
-  }, [isReady, hasJoinedSuccessfully, error, handleJoinMeeting]);
+  }, [isReady, handleJoinMeeting]);
 
-  const handleLeaveMeeting = useCallback(() => {
-    leaveMeeting();
-    setHasJoinedSuccessfully(false);
-    onMeetingLeft?.();
-  }, [leaveMeeting, onMeetingLeft]);
-
-  if (error) {
-    return (
-      <div className="flex flex-col items-center justify-center min-h-[400px] p-4">
-        <div className="text-center max-w-md">
-          <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg">
-            <p className="text-red-600 font-medium">Unable to Join Meeting</p>
-            <p className="text-red-500 text-sm mt-1">{error}</p>
-          </div>
-          
-          <div className="text-sm text-gray-600 mb-6">
-            <p className="font-medium mb-2">Troubleshooting tips:</p>
-            <ul className="list-disc list-inside text-left space-y-1">
-              <li>Check your internet connection</li>
-              <li>Verify the meeting ID is correct</li>
-              <li>Allow camera and microphone access</li>
-              <li>Try using Chrome browser</li>
-              <li>Ensure meeting hasn't ended</li>
-            </ul>
-          </div>
-          
-          <div className="flex gap-3 justify-center">
-            <button
-              onClick={() => {
-                setError(null);
-                setHasJoinedSuccessfully(false);
-                cleanup();
-                setTimeout(() => {
-                  handleJoinMeeting();
-                }, 1000);
-              }}
-              className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
-            >
-              Retry Connection
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
+  // Minimal container exactly like Zoom's official sample
   return (
     <div className="w-full h-full">
-      {/* Minimal container exactly like Zoom's official sample */}
       <div 
         id="meetingSDKElement"
         className="w-full h-full"
