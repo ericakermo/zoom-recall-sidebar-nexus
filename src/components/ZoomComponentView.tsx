@@ -42,6 +42,11 @@ export function ZoomComponentView({
   const getTokens = useCallback(async (meetingNumber: string, role: number) => {
     try {
       console.log('🔐 [COMPONENT-VIEW] Getting authentication tokens');
+      console.log('🔍 [COMPONENT-VIEW] Token request params:', {
+        meetingNumber,
+        role,
+        expirationSeconds: 7200
+      });
       
       const { data: tokenData, error: tokenError } = await supabase.functions.invoke('get-zoom-token', {
         body: {
@@ -56,6 +61,14 @@ export function ZoomComponentView({
         throw new Error(`Token error: ${tokenError.message}`);
       }
 
+      console.log('🔍 [COMPONENT-VIEW] Token response received:', {
+        hasAccessToken: !!tokenData?.accessToken,
+        hasSDKKey: !!tokenData?.sdkKey,
+        hasSignature: !!tokenData?.signature,
+        meetingNumber: tokenData?.meetingNumber,
+        role: tokenData?.role
+      });
+
       // Get fresh ZAK token for host role
       let zakToken = null;
       if (role === 1) {
@@ -68,6 +81,7 @@ export function ZoomComponentView({
         }
         
         zakToken = zakData.zak;
+        console.log('✅ [COMPONENT-VIEW] ZAK token obtained');
       }
 
       console.log('✅ [COMPONENT-VIEW] Authentication tokens obtained successfully');
@@ -86,6 +100,14 @@ export function ZoomComponentView({
 
     try {
       console.log('🎯 [COMPONENT-VIEW] Starting join process');
+      console.log('🔍 [COMPONENT-VIEW] Join parameters:', {
+        meetingNumber,
+        providedUserName,
+        userEmail: user?.email,
+        role,
+        hasPassword: !!meetingPassword
+      });
+
       const tokens = await getTokens(meetingNumber, role || 0);
 
       const joinConfig = {
@@ -105,7 +127,8 @@ export function ZoomComponentView({
         role: joinConfig.role,
         hasZAK: !!joinConfig.zak,
         hasSDKKey: !!joinConfig.sdkKey,
-        hasSignature: !!joinConfig.signature
+        hasSignature: !!joinConfig.signature,
+        hasPassword: !!joinConfig.password
       });
 
       console.log('🔗 [COMPONENT-VIEW] Calling joinMeeting()');
