@@ -1,3 +1,4 @@
+
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { useZoomSDKEnhanced } from '@/hooks/useZoomSDKEnhanced';
@@ -14,7 +15,7 @@ interface ZoomComponentViewEnhancedProps {
   onMeetingLeft?: () => void;
 }
 
-function ZoomComponentViewEnhanced({
+export function ZoomComponentViewEnhanced({
   meetingNumber,
   meetingPassword,
   userName: providedUserName,
@@ -28,8 +29,6 @@ function ZoomComponentViewEnhanced({
   const [retryCount, setRetryCount] = useState(0);
   const maxRetries = 2;
   const { forceLeaveSession, isSessionActive } = useZoomSession();
-
-  console.log('✅ [ENHANCED-VIEW] Component loaded, initializing SDK...');
 
   const {
     isReady,
@@ -177,14 +176,11 @@ function ZoomComponentViewEnhanced({
 
   // Enhanced container with session monitoring
   return (
-    <div className="flex items-center justify-center w-full h-full">
-      <div
+    <div className="w-full h-full">
+      <div 
         id="meetingSDKElement"
-        className="w-[960px] h-[540px] max-w-full max-h-full"
+        className="w-full h-full"
       />
     </div>
   );
 }
-
-// Export as default for lazy loading
-export default ZoomComponentViewEnhanced;

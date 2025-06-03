@@ -115,8 +115,7 @@ export function useZoomSDKEnhanced({ onReady, onError }: UseZoomSDKProps = {}) {
         debug: true,
         zoomAppRoot: meetingSDKElement,
         assetPath: assetPath,
-        language: 'en-US',
-        videoDrag: false
+        language: 'en-US'
       };
 
       console.log('🔄 [SDK-ENHANCED] Calling client.init()...');
