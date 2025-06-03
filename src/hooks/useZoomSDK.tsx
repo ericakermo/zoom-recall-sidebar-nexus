@@ -260,7 +260,7 @@ export function useZoomSDK({ onReady, onError }: UseZoomSDKProps = {}) {
         errorMessage = 'Meeting join already in progress or completed. Please refresh the page and try again.';
       } else if (error?.reason === 'dependent assets are not accessible') {
         errorMessage = 'SDK asset loading failed with LOCAL assets - this indicates a configuration issue. Please check browser console for network errors.';
-      } else if (error?.errorCode === 200) {
+      } else if (error?.errorCode === 200 || error?.reason === 'Fail to join the meeting.') {
         if (joinConfig.role === 1) {
           errorMessage = 'Host join failed - this usually means there is an active session conflict. Please refresh the page and try again, or the ZAK token may be expired.';
         } else {
