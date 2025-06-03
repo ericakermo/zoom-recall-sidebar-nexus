@@ -14,6 +14,7 @@ export function useZoomSDKEnhanced({ onReady, onError }: UseZoomSDKProps = {}) {
   const [isJoining, setIsJoining] = useState(false);
   const clientRef = useRef<any>(null);
   const isInitializedRef = useRef(false);
+  const containerCheckIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const { 
     currentClient, 
     setCurrentClient, 
@@ -54,8 +55,42 @@ export function useZoomSDKEnhanced({ onReady, onError }: UseZoomSDKProps = {}) {
     return true;
   }, []);
 
+  const waitForContainer = useCallback((): Promise<boolean> => {
+    return new Promise((resolve) => {
+      let attempts = 0;
+      const maxAttempts = 100; // 5 seconds max wait
+      
+      const checkContainer = () => {
+        attempts++;
+        console.log(`🔍 [SDK-ENHANCED] Checking for container (attempt ${attempts}/${maxAttempts})`);
+        
+        if (validateContainer()) {
+          console.log('✅ [SDK-ENHANCED] Container found and validated');
+          resolve(true);
+          return;
+        }
+        
+        if (attempts >= maxAttempts) {
+          console.error('❌ [SDK-ENHANCED] Container not found after maximum attempts');
+          resolve(false);
+          return;
+        }
+        
+        setTimeout(checkContainer, 50);
+      };
+      
+      checkContainer();
+    });
+  }, [validateContainer]);
+
   const cleanup = useCallback(async () => {
     console.log('🧹 [SDK-ENHANCED] Starting enhanced cleanup...');
+    
+    // Clear container check interval
+    if (containerCheckIntervalRef.current) {
+      clearInterval(containerCheckIntervalRef.current);
+      containerCheckIntervalRef.current = null;
+    }
     
     // Use session manager for cleanup
     await forceLeaveSession();
@@ -93,14 +128,18 @@ export function useZoomSDKEnhanced({ onReady, onError }: UseZoomSDKProps = {}) {
 
     console.log('🔄 [SDK-ENHANCED] Starting enhanced SDK initialization...');
     
-    const meetingSDKElement = document.getElementById('meetingSDKElement');
-    if (!meetingSDKElement) {
-      console.error('🚨 [SDK-ENHANCED] meetingSDKElement not found');
+    // Wait for container to be available
+    const containerReady = await waitForContainer();
+    if (!containerReady) {
+      console.error('🚨 [SDK-ENHANCED] Container not available, aborting initialization');
+      onError?.('Meeting container not available');
       return;
     }
 
-    if (!validateContainer()) {
-      console.error('🚨 [SDK-ENHANCED] Container validation failed');
+    const meetingSDKElement = document.getElementById('meetingSDKElement');
+    if (!meetingSDKElement) {
+      console.error('🚨 [SDK-ENHANCED] meetingSDKElement not found after container check');
+      onError?.('Meeting container not found');
       return;
     }
 
@@ -119,11 +158,15 @@ export function useZoomSDKEnhanced({ onReady, onError }: UseZoomSDKProps = {}) {
         videoDrag: false
       };
 
-      console.log('🔄 [SDK-ENHANCED] Calling client.init()...');
+      console.log('🔄 [SDK-ENHANCED] Calling client.init() with config:', initConfig);
       await clientRef.current.init(initConfig);
       
       console.log('✅ [SDK-ENHANCED] client.init() completed successfully');
-      validateContainer();
+      
+      // Final validation after init
+      if (!validateContainer()) {
+        throw new Error('Container validation failed after initialization');
+      }
 
       isInitializedRef.current = true;
       setIsReady(true);
@@ -136,7 +179,7 @@ export function useZoomSDKEnhanced({ onReady, onError }: UseZoomSDKProps = {}) {
       resetSession(); // Reset session state on error
       onError?.(error.message || 'Failed to initialize Zoom SDK');
     }
-  }, [onReady, onError, validateContainer, checkForExistingSession, resetSession]);
+  }, [onReady, onError, waitForContainer, checkForExistingSession, resetSession, validateContainer]);
 
   const joinMeeting = useCallback(async (joinConfig: any) => {
     console.log('🔄 [SDK-ENHANCED] Enhanced joinMeeting() called');
@@ -181,7 +224,7 @@ export function useZoomSDKEnhanced({ onReady, onError }: UseZoomSDKProps = {}) {
         zak: joinConfig.zak || ''
       };
 
-      console.log('🔄 [SDK-ENHANCED] Calling client.join()...');
+      console.log('🔄 [SDK-ENHANCED] Calling client.join() with validated container...');
       const joinResult = await clientRef.current.join(meetingConfig);
       
       console.log('✅ [SDK-ENHANCED] client.join() completed successfully');
@@ -189,6 +232,7 @@ export function useZoomSDKEnhanced({ onReady, onError }: UseZoomSDKProps = {}) {
       // Register with session manager
       setCurrentClient(clientRef.current);
       
+      // Final container validation after join
       setTimeout(() => {
         validateContainer();
       }, 1000);
@@ -226,24 +270,19 @@ export function useZoomSDKEnhanced({ onReady, onError }: UseZoomSDKProps = {}) {
     }
   }, [isJoined, forceLeaveSession]);
 
-  // Initialize when DOM is ready
+  // Initialize when component mounts and container should be available
   useEffect(() => {
     if (isInitializedRef.current) {
       return;
     }
 
-    const initWhenReady = () => {
-      const meetingSDKElement = document.getElementById('meetingSDKElement');
-      if (meetingSDKElement) {
-        console.log('🔍 [SDK-ENHANCED] meetingSDKElement found, starting initialization');
-        initializeSDK();
-      } else {
-        console.log('⏳ [SDK-ENHANCED] Waiting for meetingSDKElement...');
-        setTimeout(initWhenReady, 50);
-      }
-    };
-    
-    initWhenReady();
+    // Add a small delay to ensure DOM is fully rendered
+    const initTimer = setTimeout(() => {
+      console.log('🔍 [SDK-ENHANCED] Starting container check and initialization');
+      initializeSDK();
+    }, 100);
+
+    return () => clearTimeout(initTimer);
   }, [initializeSDK]);
 
   // Cleanup on unmount

@@ -131,22 +131,11 @@ const Meeting = () => {
     );
   }
 
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center h-screen">
-        <div className="text-center">
-          <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4" />
-          <p className="text-lg">Loading meeting...</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (error || !meetingData) {
+  if (error) {
     return (
       <div className="flex items-center justify-center h-screen">
         <div className="text-center max-w-md">
-          <p className="text-lg text-red-600 mb-4">{error || 'Meeting not found'}</p>
+          <p className="text-lg text-red-600 mb-4">{error}</p>
           <Button onClick={() => navigate('/calendar')}>
             Back to Calendar
           </Button>
@@ -155,7 +144,7 @@ const Meeting = () => {
     );
   }
 
-  const isHost = meetingData.user_id === user.id;
+  const isHost = meetingData?.user_id === user.id;
 
   return (
     <>
@@ -175,32 +164,62 @@ const Meeting = () => {
           </div>
           
           <div className="text-center">
-            <h1 className="text-lg font-semibold">{meetingData.title}</h1>
-            <p className="text-sm text-gray-600">Meeting ID: {meetingData.meeting_id}</p>
+            {isLoading ? (
+              <div className="flex items-center gap-2">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                <span className="text-sm">Loading meeting...</span>
+              </div>
+            ) : (
+              <>
+                <h1 className="text-lg font-semibold">{meetingData?.title || 'Zoom Meeting'}</h1>
+                <p className="text-sm text-gray-600">Meeting ID: {meetingData?.meeting_id || 'Loading...'}</p>
+              </>
+            )}
           </div>
           
           <div className="w-32"></div> {/* Spacer for centering */}
         </div>
 
-        {/* Meeting Content */}
+        {/* Meeting Content - Always render the Zoom container */}
         <div className="flex-1 p-4 bg-gray-50">
-          <ZoomMeeting
-            meetingNumber={meetingData.meeting_id}
-            meetingPassword={meetingPassword}
-            userName={user.email || 'Guest'}
-            role={isHost ? 1 : 0}
-            onMeetingEnd={handleMeetingEnd}
-            onMeetingJoined={handleMeetingJoined}
-          />
+          {isLoading ? (
+            <div className="flex items-center justify-center h-full">
+              <div className="text-center">
+                <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4" />
+                <p className="text-lg">Preparing meeting...</p>
+                <p className="text-sm text-gray-600 mt-2">Loading meeting details</p>
+              </div>
+            </div>
+          ) : meetingData ? (
+            <ZoomMeeting
+              meetingNumber={meetingData.meeting_id}
+              meetingPassword={meetingPassword}
+              userName={user.email || 'Guest'}
+              role={isHost ? 1 : 0}
+              onMeetingEnd={handleMeetingEnd}
+              onMeetingJoined={handleMeetingJoined}
+            />
+          ) : (
+            <div className="flex items-center justify-center h-full">
+              <div className="text-center">
+                <p className="text-lg text-red-600 mb-4">Meeting not found</p>
+                <Button onClick={() => navigate('/calendar')}>
+                  Back to Calendar
+                </Button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
-      <MeetingExitDialog
-        isOpen={showExitDialog}
-        onConfirm={handleConfirmExit}
-        onCancel={handleCancelExit}
-        meetingId={meetingData.meeting_id}
-      />
+      {meetingData && (
+        <MeetingExitDialog
+          isOpen={showExitDialog}
+          onConfirm={handleConfirmExit}
+          onCancel={handleCancelExit}
+          meetingId={meetingData.meeting_id}
+        />
+      )}
     </>
   );
 };
