@@ -1,5 +1,5 @@
 
-import { useEffect, useState, useCallback, useRef } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { useZoomSDK } from '@/hooks/useZoomSDK';
 import { ZoomLoadingOverlay } from '@/components/zoom/ZoomLoadingOverlay';
@@ -31,7 +31,6 @@ export function ZoomComponentView({
   const [retryCount, setRetryCount] = useState(0);
   const [hasJoinedSuccessfully, setHasJoinedSuccessfully] = useState(false);
   const maxRetries = 2;
-  const joinAttemptRef = useRef<boolean>(false);
   
   const { user } = useAuth();
 
@@ -96,12 +95,10 @@ export function ZoomComponentView({
   }, []);
 
   const handleJoinMeeting = useCallback(async () => {
-    if (!isReady || hasJoinedSuccessfully || isJoined || joinAttemptRef.current) {
-      console.log('⏸️ [COMPONENT-VIEW] Skipping join - already joined or in progress');
+    if (!isReady || hasJoinedSuccessfully || isJoined) {
+      console.log('⏸️ [COMPONENT-VIEW] Skipping join - already joined or not ready');
       return;
     }
-
-    joinAttemptRef.current = true;
 
     try {
       console.log('🎯 [COMPONENT-VIEW] Starting join process');
@@ -143,8 +140,6 @@ export function ZoomComponentView({
       setError(error.message);
       setIsLoading(false);
       onMeetingError?.(error.message);
-    } finally {
-      joinAttemptRef.current = false;
     }
   }, [isReady, hasJoinedSuccessfully, isJoined, meetingNumber, role, providedUserName, user, meetingPassword, getTokens, joinMeeting, onMeetingJoined, client]);
 
@@ -161,9 +156,9 @@ export function ZoomComponentView({
     }
   }, [isSDKLoaded, isReady, isJoined, hasJoinedSuccessfully]);
 
-  // Auto-join when ready - but only once
+  // Auto-join when ready
   useEffect(() => {
-    if (isReady && !hasJoinedSuccessfully && !error && !joinAttemptRef.current) {
+    if (isReady && !hasJoinedSuccessfully && !error) {
       console.log('▶️ [COMPONENT-VIEW] SDK ready - starting auto-join');
       handleJoinMeeting();
     }
@@ -172,7 +167,6 @@ export function ZoomComponentView({
   const handleLeaveMeeting = useCallback(() => {
     leaveMeeting();
     setHasJoinedSuccessfully(false);
-    joinAttemptRef.current = false;
     onMeetingLeft?.();
   }, [leaveMeeting, onMeetingLeft]);
 
@@ -183,7 +177,6 @@ export function ZoomComponentView({
       setError(null);
       setIsLoading(true);
       setHasJoinedSuccessfully(false);
-      joinAttemptRef.current = false;
       setCurrentStep('Retrying with fresh session...');
       
       cleanup();
@@ -195,17 +188,6 @@ export function ZoomComponentView({
       setError('Maximum retry attempts reached. Please refresh the page to try again.');
     }
   }, [retryCount, maxRetries, handleJoinMeeting, cleanup]);
-
-  // Track unmounting for debugging
-  useEffect(() => {
-    return () => {
-      if (hasJoinedSuccessfully) {
-        console.log('🔄 [COMPONENT-VIEW] Component unmounting but meeting was successful');
-      } else {
-        console.log('🔚 [COMPONENT-VIEW] Component unmounting - no successful join');
-      }
-    };
-  }, [hasJoinedSuccessfully]);
 
   if (error) {
     return (
@@ -233,7 +215,6 @@ export function ZoomComponentView({
       <div 
         id="meetingSDKElement"
         className="w-full h-full"
-        style={{ minHeight: '400px' }}
       />
     </div>
   );
