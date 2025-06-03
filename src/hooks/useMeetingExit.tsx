@@ -72,27 +72,18 @@ export function useMeetingExit({
     }
   }, [checkMeetingStatus, leaveMeeting]);
 
-  const handlePageHide = useCallback(() => {
-    if (checkMeetingStatus()) {
-      console.log('📴 [MEETING-EXIT] Pagehide detected, leaving meeting');
-      leaveMeeting();
-    }
-  }, [checkMeetingStatus, leaveMeeting]);
-
   // Set up event listeners
   useEffect(() => {
     if (isJoined) {
       window.addEventListener('beforeunload', handleBeforeUnload);
-      window.addEventListener('pagehide', handlePageHide);
       document.addEventListener('visibilitychange', handleVisibilityChange);
 
       return () => {
         window.removeEventListener('beforeunload', handleBeforeUnload);
-        window.removeEventListener('pagehide', handlePageHide);
         document.removeEventListener('visibilitychange', handleVisibilityChange);
       };
     }
-  }, [isJoined, handleBeforeUnload, handleVisibilityChange, handlePageHide]);
+  }, [isJoined, handleBeforeUnload, handleVisibilityChange]);
 
   // Cleanup on unmount
   useEffect(() => {

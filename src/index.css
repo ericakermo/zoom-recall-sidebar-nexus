@@ -100,10 +100,3 @@
     @apply bg-background text-foreground;
   }
 }
-
-/* Zoom component overrides */
-#meetingSDKElement { @apply flex items-center justify-center; }
-#meetingSDKElement .react-draggable,
-#meetingSDKElement .react-resizable { position: static !important; transform: none !important; width: 100% !important; height: 100% !important; }
-#meetingSDKElement .react-resizable-handle { display: none !important; }
-

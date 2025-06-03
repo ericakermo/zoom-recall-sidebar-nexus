@@ -89,20 +89,11 @@ export function ZoomSessionProvider({ children }: { children: React.ReactNode })
       }
     };
 
-    const handlePageHide = () => {
-      if (isSessionActive()) {
-        console.log('📴 [SESSION-MANAGER] Pagehide detected, cleaning up session');
-        forceLeaveSession();
-      }
-    };
-
     window.addEventListener('beforeunload', handleBeforeUnload);
-    window.addEventListener('pagehide', handlePageHide);
     document.addEventListener('visibilitychange', handleVisibilityChange);
 
     return () => {
       window.removeEventListener('beforeunload', handleBeforeUnload);
-      window.removeEventListener('pagehide', handlePageHide);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
   }, [forceLeaveSession, isSessionActive]);

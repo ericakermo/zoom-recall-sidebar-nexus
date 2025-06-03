@@ -1,9 +1,9 @@
+
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { useZoomSDKEnhanced } from '@/hooks/useZoomSDKEnhanced';
 import { useZoomSession } from '@/context/ZoomSessionContext';
 import { supabase } from '@/integrations/supabase/client';
-import { Loader2 } from 'lucide-react';
 
 interface ZoomComponentViewEnhancedProps {
   meetingNumber: string;
@@ -15,7 +15,7 @@ interface ZoomComponentViewEnhancedProps {
   onMeetingLeft?: () => void;
 }
 
-function ZoomComponentViewEnhanced({
+export function ZoomComponentViewEnhanced({
   meetingNumber,
   meetingPassword,
   userName: providedUserName,
@@ -27,7 +27,6 @@ function ZoomComponentViewEnhanced({
   const { user } = useAuth();
   const hasAttemptedJoinRef = useRef(false);
   const [retryCount, setRetryCount] = useState(0);
-  const [initializationStep, setInitializationStep] = useState('Preparing...');
   const maxRetries = 2;
   const { forceLeaveSession, isSessionActive } = useZoomSession();
 
@@ -40,7 +39,6 @@ function ZoomComponentViewEnhanced({
   } = useZoomSDKEnhanced({
     onReady: () => {
       console.log('✅ [ENHANCED-VIEW] SDK ready - proceeding to join');
-      setInitializationStep('SDK Ready - Joining meeting...');
     },
     onError: (error) => {
       console.error('❌ [ENHANCED-VIEW] SDK error:', error);
@@ -51,7 +49,6 @@ function ZoomComponentViewEnhanced({
   const getTokens = useCallback(async (meetingNumber: string, role: number, forceRefresh: boolean = false) => {
     try {
       console.log('🔐 [ENHANCED-VIEW] Getting authentication tokens', { forceRefresh });
-      setInitializationStep('Getting authentication tokens...');
       
       const { data: tokenData, error: tokenError } = await supabase.functions.invoke('get-zoom-token', {
         body: {
@@ -69,7 +66,6 @@ function ZoomComponentViewEnhanced({
       let zakToken = null;
       if (role === 1) {
         console.log('👑 [ENHANCED-VIEW] Getting fresh ZAK token for host (retry:', retryCount, ')');
-        setInitializationStep('Getting host authentication...');
         const { data: zakData, error: zakError } = await supabase.functions.invoke('get-zoom-zak');
         
         if (zakError || !zakData?.zak) {
@@ -93,7 +89,6 @@ function ZoomComponentViewEnhanced({
     // Check for existing sessions first
     if (isSessionActive()) {
       console.log('⚠️ [ENHANCED-VIEW] Active session detected, cleaning up first');
-      setInitializationStep('Cleaning up existing session...');
       await forceLeaveSession();
       await new Promise(resolve => setTimeout(resolve, 1000));
     }
@@ -113,7 +108,6 @@ function ZoomComponentViewEnhanced({
 
     try {
       console.log('🎯 [ENHANCED-VIEW] Starting enhanced join process (attempt', retryCount + 1, 'of', maxRetries + 1, ')');
-      setInitializationStep(`Joining meeting (attempt ${retryCount + 1})...`);
 
       const tokens = await getTokens(meetingNumber, role || 0, retryCount > 0);
 
@@ -129,12 +123,10 @@ function ZoomComponentViewEnhanced({
       };
 
       console.log('🔗 [ENHANCED-VIEW] Calling enhanced joinMeeting()');
-      setInitializationStep('Connecting to meeting...');
       await joinMeeting(joinConfig);
       
       console.log('✅ [ENHANCED-VIEW] Enhanced join completed successfully');
       setRetryCount(0);
-      setInitializationStep('Connected!');
       onMeetingJoined?.(client);
     } catch (error: any) {
       console.error('❌ [ENHANCED-VIEW] Enhanced join failed (attempt', retryCount + 1, '):', error);
@@ -149,7 +141,6 @@ function ZoomComponentViewEnhanced({
         
         if (retryCount < maxRetries) {
           console.log('🔄 [ENHANCED-VIEW] Session conflict detected, cleaning up and retrying...');
-          setInitializationStep(`Retrying in 3 seconds (${retryCount + 1}/${maxRetries})...`);
           await forceLeaveSession();
           setRetryCount(prev => prev + 1);
           
@@ -160,13 +151,11 @@ function ZoomComponentViewEnhanced({
           return;
         } else {
           console.error('❌ [ENHANCED-VIEW] Max retries exceeded');
-          setInitializationStep('Failed to join after multiple attempts');
           onMeetingError?.('Failed to join after multiple attempts due to session conflicts. Please refresh the page and try again.');
           return;
         }
       }
       
-      setInitializationStep('Join failed');
       onMeetingError?.(error.message);
     }
   }, [isReady, isJoining, isJoined, meetingNumber, role, providedUserName, user, meetingPassword, getTokens, joinMeeting, onMeetingJoined, client, retryCount, maxRetries, onMeetingError, isSessionActive, forceLeaveSession]);
@@ -183,29 +172,11 @@ function ZoomComponentViewEnhanced({
   useEffect(() => {
     hasAttemptedJoinRef.current = false;
     setRetryCount(0);
-    setInitializationStep('Preparing...');
   }, [meetingNumber]);
 
   // Enhanced container with session monitoring
   return (
-    <div className="flex items-center justify-center w-full h-full relative">
-      {/* Loading overlay when not joined */}
-      {!isJoined && (
-        <div className="absolute inset-0 bg-gray-900 flex items-center justify-center z-10">
-          <div className="text-center text-white">
-            <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4" />
-            <p className="text-lg">{initializationStep}</p>
-            <p className="text-sm text-gray-400 mt-2">Meeting ID: {meetingNumber}</p>
-            {retryCount > 0 && (
-              <p className="text-xs text-yellow-400 mt-1">
-                Retry attempt {retryCount}/{maxRetries}
-              </p>
-            )}
-          </div>
-        </div>
-      )}
-      
-      {/* Zoom SDK container - always present */}
+    <div className="flex items-center justify-center w-full h-full">
       <div
         id="meetingSDKElement"
         className="w-[960px] h-[540px] max-w-full max-h-full"
@@ -213,5 +184,3 @@ function ZoomComponentViewEnhanced({
     </div>
   );
 }
-
-export default ZoomComponentViewEnhanced;
