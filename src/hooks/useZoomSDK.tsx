@@ -1,3 +1,4 @@
+
 import { useState, useRef, useCallback, useEffect } from 'react';
 import ZoomMtgEmbedded from '@zoom/meetingsdk/embedded';
 
@@ -9,8 +10,10 @@ interface UseZoomSDKProps {
 export function useZoomSDK({ onReady, onError }: UseZoomSDKProps = {}) {
   const [isReady, setIsReady] = useState(false);
   const [isJoined, setIsJoined] = useState(false);
+  const [isJoining, setIsJoining] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const clientRef = useRef<any>(null);
+  const isInitializedRef = useRef(false);
 
   const validateContainer = useCallback(() => {
     const meetingSDKElement = document.getElementById('meetingSDKElement');
@@ -78,11 +81,19 @@ export function useZoomSDK({ onReady, onError }: UseZoomSDKProps = {}) {
     
     setIsReady(false);
     setIsJoined(false);
+    setIsJoining(false);
+    isInitializedRef.current = false;
     
     console.log('✅ [DEBUG] Zoom SDK cleanup complete');
   }, [isJoined]);
 
   const initializeSDK = useCallback(async () => {
+    // Prevent multiple initializations
+    if (isInitializedRef.current || clientRef.current) {
+      console.log('⏸️ [DEBUG] SDK already initialized, skipping');
+      return;
+    }
+
     console.log('🔄 [DEBUG] Starting SDK initialization...');
     
     const meetingSDKElement = document.getElementById('meetingSDKElement');
@@ -97,11 +108,6 @@ export function useZoomSDK({ onReady, onError }: UseZoomSDKProps = {}) {
       return;
     }
 
-    if (clientRef.current) {
-      console.log('⏸️ [DEBUG] SDK already initialized');
-      return;
-    }
-
     try {
       console.log('🔄 [DEBUG] Creating Zoom embedded client...');
       
@@ -111,7 +117,7 @@ export function useZoomSDK({ onReady, onError }: UseZoomSDKProps = {}) {
       
       console.log('🔄 [DEBUG] Initializing Zoom SDK with LOCAL assets...');
 
-      // CRITICAL: Use LOCAL assets to prevent CDN 403 errors
+      // Use LOCAL assets to prevent CDN 403 errors
       const assetPath = '/lib';
       console.log('📁 [DEBUG] Asset path configured (LOCAL):', assetPath);
       console.log('🔍 [DEBUG] Using local assets to prevent CDN 403 errors');
@@ -135,6 +141,7 @@ export function useZoomSDK({ onReady, onError }: UseZoomSDKProps = {}) {
       // Validate container again after init
       validateContainer();
 
+      isInitializedRef.current = true;
       setIsReady(true);
       onReady?.();
       console.log('✅ [DEBUG] Zoom SDK initialization complete - ready for join');
@@ -146,6 +153,7 @@ export function useZoomSDK({ onReady, onError }: UseZoomSDKProps = {}) {
         assetPath: '/lib (local)'
       });
       clientRef.current = null;
+      isInitializedRef.current = false;
       onError?.(error.message || 'Failed to initialize Zoom SDK');
     }
   }, [onReady, onError, validateContainer]);
@@ -162,8 +170,20 @@ export function useZoomSDK({ onReady, onError }: UseZoomSDKProps = {}) {
       zak: joinConfig.zak ? 'present' : 'none'
     });
     
-    if (!isReady || !clientRef.current) {
-      console.error('🚨 [DEBUG] Cannot join - SDK not ready or client missing');
+    // Prevent multiple join attempts
+    if (!isReady || !clientRef.current || isJoining || isJoined) {
+      console.error('🚨 [DEBUG] Cannot join - invalid state:', {
+        isReady,
+        hasClient: !!clientRef.current,
+        isJoining,
+        isJoined
+      });
+      if (isJoined) {
+        throw new Error('Already joined meeting');
+      }
+      if (isJoining) {
+        throw new Error('Join operation already in progress');
+      }
       throw new Error('Zoom SDK not ready');
     }
 
@@ -178,6 +198,8 @@ export function useZoomSDK({ onReady, onError }: UseZoomSDKProps = {}) {
       console.error('🚨 [DEBUG] Invalid meeting number format:', joinConfig.meetingNumber);
       throw new Error(`Invalid meeting number format: ${joinConfig.meetingNumber}`);
     }
+    
+    setIsJoining(true);
     
     try {
       console.log('🔄 [DEBUG] Preparing to join meeting...');
@@ -216,6 +238,7 @@ export function useZoomSDK({ onReady, onError }: UseZoomSDKProps = {}) {
       }, 1000);
       
       setIsJoined(true);
+      setIsJoining(false);
       console.log('✅ [DEBUG] Meeting join process complete');
       return joinResult;
     } catch (error: any) {
@@ -230,8 +253,12 @@ export function useZoomSDK({ onReady, onError }: UseZoomSDKProps = {}) {
       console.error('🔍 [DEBUG] Zoom Error Reason:', error?.reason);
       console.error('🔍 [DEBUG] Zoom Error Type:', error?.type);
       
+      setIsJoining(false);
+      
       let errorMessage = error.message || 'Failed to join meeting';
-      if (error?.reason === 'dependent assets are not accessible') {
+      if (error?.reason === 'Duplicated join operation') {
+        errorMessage = 'Meeting join already in progress or completed. Please refresh the page and try again.';
+      } else if (error?.reason === 'dependent assets are not accessible') {
         errorMessage = 'SDK asset loading failed with LOCAL assets - this indicates a configuration issue. Please check browser console for network errors.';
       } else if (error?.errorCode === 200) {
         if (joinConfig.role === 1) {
@@ -249,7 +276,7 @@ export function useZoomSDK({ onReady, onError }: UseZoomSDKProps = {}) {
       
       throw new Error(errorMessage);
     }
-  }, [isReady, validateContainer]);
+  }, [isReady, isJoining, isJoined, validateContainer]);
 
   const leaveMeeting = useCallback(() => {
     if (clientRef.current && isJoined) {
@@ -258,6 +285,7 @@ export function useZoomSDK({ onReady, onError }: UseZoomSDKProps = {}) {
         if (typeof clientRef.current.leave === 'function') {
           clientRef.current.leave();
           setIsJoined(false);
+          setIsJoining(false);
           console.log('✅ [DEBUG] Left meeting successfully');
         } else {
           console.warn('⚠️ [DEBUG] Leave function not available on Zoom client');
@@ -268,8 +296,12 @@ export function useZoomSDK({ onReady, onError }: UseZoomSDKProps = {}) {
     }
   }, [isJoined]);
 
-  // Initialize when DOM is ready
+  // Initialize when DOM is ready - but only once
   useEffect(() => {
+    if (isInitializedRef.current) {
+      return;
+    }
+
     const initWhenReady = () => {
       const meetingSDKElement = document.getElementById('meetingSDKElement');
       if (meetingSDKElement) {
@@ -295,6 +327,7 @@ export function useZoomSDK({ onReady, onError }: UseZoomSDKProps = {}) {
     containerRef,
     isReady,
     isJoined,
+    isJoining,
     joinMeeting,
     leaveMeeting,
     cleanup,

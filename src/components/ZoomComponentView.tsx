@@ -1,5 +1,5 @@
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { useZoomSDK } from '@/hooks/useZoomSDK';
 import { supabase } from '@/integrations/supabase/client';
@@ -24,9 +24,12 @@ export function ZoomComponentView({
   onMeetingLeft
 }: ZoomComponentViewProps) {
   const { user } = useAuth();
+  const hasAttemptedJoinRef = useRef(false);
 
   const {
     isReady,
+    isJoining,
+    isJoined,
     joinMeeting,
     client
   } = useZoomSDK({
@@ -93,10 +96,18 @@ export function ZoomComponentView({
   }, []);
 
   const handleJoinMeeting = useCallback(async () => {
-    if (!isReady) {
-      console.log('⏸️ [COMPONENT-VIEW] SDK not ready yet');
+    // Prevent multiple join attempts
+    if (!isReady || isJoining || isJoined || hasAttemptedJoinRef.current) {
+      console.log('⏸️ [COMPONENT-VIEW] Join attempt prevented:', {
+        isReady,
+        isJoining,
+        isJoined,
+        hasAttempted: hasAttemptedJoinRef.current
+      });
       return;
     }
+
+    hasAttemptedJoinRef.current = true;
 
     try {
       console.log('🎯 [COMPONENT-VIEW] Starting join process');
@@ -138,17 +149,23 @@ export function ZoomComponentView({
       onMeetingJoined?.(client);
     } catch (error: any) {
       console.error('❌ [COMPONENT-VIEW] Join failed:', error);
+      hasAttemptedJoinRef.current = false; // Reset on error to allow retry
       onMeetingError?.(error.message);
     }
-  }, [isReady, meetingNumber, role, providedUserName, user, meetingPassword, getTokens, joinMeeting, onMeetingJoined, client]);
+  }, [isReady, isJoining, isJoined, meetingNumber, role, providedUserName, user, meetingPassword, getTokens, joinMeeting, onMeetingJoined, client]);
 
-  // Auto-join when ready
+  // Auto-join when ready - but only once
   useEffect(() => {
-    if (isReady) {
+    if (isReady && !hasAttemptedJoinRef.current) {
       console.log('▶️ [COMPONENT-VIEW] SDK ready - starting auto-join');
       handleJoinMeeting();
     }
   }, [isReady, handleJoinMeeting]);
+
+  // Reset attempt flag when component unmounts or meeting changes
+  useEffect(() => {
+    hasAttemptedJoinRef.current = false;
+  }, [meetingNumber]);
 
   // Minimal container exactly like Zoom's official sample
   return (
