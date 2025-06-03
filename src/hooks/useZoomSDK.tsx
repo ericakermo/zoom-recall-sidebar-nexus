@@ -1,3 +1,4 @@
+
 import { useState, useRef, useCallback, useEffect } from 'react';
 import ZoomMtgEmbedded from '@zoom/meetingsdk/embedded';
 
@@ -59,14 +60,14 @@ export function useZoomSDK({ onReady, onError }: UseZoomSDKProps = {}) {
       // Create client first
       clientRef.current = ZoomMtgEmbedded.createClient();
       
-      console.log('🔄 Initializing Zoom SDK...');
+      console.log('🔄 Initializing Zoom SDK with CDN assets...');
 
-      // Use the current origin for asset path
-      const assetPath = `${window.location.origin}/lib`;
+      // Use Zoom's official CDN for assets - this is the recommended approach
+      const assetPath = 'https://source.zoom.us/3.13.2/lib';
 
       console.log('📁 Asset path configured:', assetPath);
 
-      // Initialize with proper configuration
+      // Initialize with CDN configuration
       await clientRef.current.init({
         debug: true,
         zoomAppRoot: meetingSDKElement,
@@ -77,10 +78,10 @@ export function useZoomSDK({ onReady, onError }: UseZoomSDKProps = {}) {
       setIsSDKLoaded(true);
       setIsReady(true);
       onReady?.();
-      console.log('✅ Zoom SDK initialized successfully');
+      console.log('✅ Zoom SDK initialized successfully with CDN assets');
     } catch (error: any) {
       console.error('❌ Failed to initialize Zoom embedded client:', error);
-      console.error('🔍 Asset path was:', `${window.location.origin}/lib`);
+      console.error('🔍 Asset path was:', 'https://source.zoom.us/3.13.2/lib');
       clientRef.current = null;
       onError?.(error.message || 'Failed to initialize Zoom SDK');
     }
