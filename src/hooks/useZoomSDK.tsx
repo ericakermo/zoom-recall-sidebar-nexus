@@ -1,3 +1,4 @@
+
 import { useState, useRef, useCallback, useEffect } from 'react';
 import ZoomMtgEmbedded from '@zoom/meetingsdk/embedded';
 
@@ -60,30 +61,25 @@ export function useZoomSDK({ onReady, onError }: UseZoomSDKProps = {}) {
     initializationRef.current = true;
 
     try {
-      console.log('🔄 Creating new Zoom embedded client instance...');
+      console.log('🔄 Creating new Zoom embedded client following official sample...');
       
       clientRef.current = ZoomMtgEmbedded.createClient();
       
-      console.log('🔄 Initializing Zoom SDK following best practices...');
+      console.log('🔄 Initializing Zoom SDK with official configuration...');
 
-      // Simple initialization following Zoom's official sample
+      // Following Zoom's official sample configuration exactly
       await clientRef.current.init({
+        debug: true,
         zoomAppRoot: meetingSDKElement,
         language: 'en-US',
         patchJsMedia: true,
-        leaveOnPageUnload: true,
-        customize: {
-          video: {
-            isResizable: false,
-            disableDragging: true
-          }
-        }
+        leaveOnPageUnload: true
       });
 
       setIsSDKLoaded(true);
       setIsReady(true);
       onReady?.();
-      console.log('✅ Zoom SDK initialized successfully');
+      console.log('✅ Zoom SDK initialized successfully using official sample approach');
     } catch (error: any) {
       console.error('❌ Failed to initialize Zoom embedded client:', error);
       initializationRef.current = false;
@@ -103,7 +99,7 @@ export function useZoomSDK({ onReady, onError }: UseZoomSDKProps = {}) {
 
     joinAttemptRef.current = true;
 
-    console.log('🔄 Joining meeting with fresh session...');
+    console.log('🔄 Joining meeting following official sample pattern...');
     console.log('📋 Join config details:', {
       meetingNumber: joinConfig.meetingNumber,
       userName: joinConfig.userName,
@@ -114,7 +110,6 @@ export function useZoomSDK({ onReady, onError }: UseZoomSDKProps = {}) {
       hasZak: !!joinConfig.zak
     });
 
-    // Validate meeting number format
     const meetingNumberStr = String(joinConfig.meetingNumber).replace(/\s+/g, '');
     if (!/^\d{10,11}$/.test(meetingNumberStr)) {
       joinAttemptRef.current = false;
@@ -122,6 +117,7 @@ export function useZoomSDK({ onReady, onError }: UseZoomSDKProps = {}) {
     }
     
     try {
+      // Following Zoom's official sample join pattern exactly
       const result = await clientRef.current.join({
         sdkKey: joinConfig.sdkKey,
         signature: joinConfig.signature,
@@ -133,7 +129,7 @@ export function useZoomSDK({ onReady, onError }: UseZoomSDKProps = {}) {
       });
       
       setIsJoined(true);
-      console.log('✅ Successfully joined meeting');
+      console.log('✅ Successfully joined meeting using official sample approach');
       return result;
     } catch (error: any) {
       console.error('❌ Failed to join meeting:', error);
@@ -183,17 +179,15 @@ export function useZoomSDK({ onReady, onError }: UseZoomSDKProps = {}) {
     }
   }, [isJoined]);
 
-  // Initialize when DOM element is ready
+  // Initialize when DOM element is ready - following official sample pattern
   useEffect(() => {
     const checkForElement = () => {
       const meetingSDKElement = document.getElementById('meetingSDKElement');
       if (meetingSDKElement && !initializationRef.current) {
-        // Add a small delay to ensure container is fully rendered
         setTimeout(() => {
           initializeSDK();
         }, 100);
       } else if (!meetingSDKElement) {
-        // Keep checking for the element
         setTimeout(checkForElement, 100);
       }
     };

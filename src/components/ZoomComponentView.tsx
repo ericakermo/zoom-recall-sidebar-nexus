@@ -1,3 +1,4 @@
+
 import { useEffect, useState, useCallback } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { useZoomSDK } from '@/hooks/useZoomSDK';
@@ -134,7 +135,6 @@ export function ZoomComponentView({
       setRetryCount(0);
       
       console.log('✅ [COMPONENT-VIEW] Join completed successfully');
-      // Pass the client reference to parent
       onMeetingJoined?.(client);
     } catch (error: any) {
       console.error('❌ [COMPONENT-VIEW] Join failed:', error);
@@ -179,11 +179,10 @@ export function ZoomComponentView({
       setHasJoinedSuccessfully(false);
       setCurrentStep('Retrying with fresh session...');
       
-      // Clean up and retry
       cleanup();
       setTimeout(() => {
         handleJoinMeeting();
-      }, 1000); // Brief delay to ensure cleanup
+      }, 1000);
     } else {
       console.warn('⚠️ [COMPONENT-VIEW] Max retry attempts reached');
       setError('Maximum retry attempts reached. Please refresh the page to try again.');
@@ -199,82 +198,6 @@ export function ZoomComponentView({
       }
     };
   }, [hasJoinedSuccessfully]);
-
-  useEffect(() => {
-    // Add responsive CSS overrides for proper 16:9 scaling
-    const style = document.createElement('style');
-    style.id = 'zoom-sdk-responsive-overrides';
-    style.textContent = `
-      /* Responsive 16:9 container styling */
-      #meetingSDKElement {
-        width: 100% !important;
-        height: 100% !important;
-        display: flex !important;
-        flex-direction: column !important;
-        position: relative !important;
-      }
-      
-      /* Force all Zoom SDK elements to scale responsively */
-      #meetingSDKElement canvas,
-      #meetingSDKElement video {
-        width: 100% !important;
-        height: 100% !important;
-        object-fit: contain !important;
-        max-width: 100% !important;
-        max-height: 100% !important;
-      }
-      
-      /* Make Zoom containers responsive */
-      #meetingSDKElement [class*="css-"],
-      #meetingSDKElement div[width],
-      #meetingSDKElement ul[width] {
-        width: 100% !important;
-        height: 100% !important;
-        max-width: 100% !important;
-        max-height: 100% !important;
-      }
-      
-      /* Disable dragging completely */
-      #meetingSDKElement .react-draggable {
-        pointer-events: none !important;
-        cursor: default !important;
-        transform: none !important;
-      }
-      
-      /* Ensure flex behavior for internal containers */
-      #meetingSDKElement > div {
-        flex: 1 1 auto !important;
-        display: flex !important;
-        flex-direction: column !important;
-      }
-      
-      /* Fix for participant list scaling */
-      #meetingSDKElement ul.css-vv0cdr {
-        position: relative !important;
-        width: 100% !important;
-        height: 100% !important;
-      }
-      
-      /* Fix for individual participant items */
-      #meetingSDKElement li[style*="width"] {
-        position: relative !important;
-        width: 100% !important;
-        height: auto !important;
-        top: auto !important;
-        left: auto !important;
-      }
-    `;
-    
-    document.head.appendChild(style);
-    
-    return () => {
-      // Cleanup the style when component unmounts
-      const existingStyle = document.getElementById('zoom-sdk-responsive-overrides');
-      if (existingStyle) {
-        existingStyle.remove();
-      }
-    };
-  }, []);
 
   if (error) {
     return (
@@ -298,23 +221,19 @@ export function ZoomComponentView({
         maxRetries={maxRetries}
       />
 
-      {/* Responsive 16:9 container following ChatGPT's recommendations */}
+      {/* Following Zoom's official sample setup - simple container with 16:9 aspect ratio */}
       <div 
-        className="relative w-full overflow-hidden"
+        className="w-full"
         style={{
           aspectRatio: '16 / 9',
-          maxWidth: '100%'
+          backgroundColor: '#000',
+          position: 'relative'
         }}
       >
         <div 
           id="meetingSDKElement"
           ref={containerRef}
           className="w-full h-full"
-          style={{
-            display: 'flex',
-            flexDirection: 'column',
-            backgroundColor: '#000'
-          }}
         />
       </div>
     </div>
