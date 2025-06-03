@@ -1,7 +1,12 @@
-import { useEffect, useState, useCallback, useRef } from 'react';
+
+import { useEffect, useState, useCallback, useRef, Suspense, lazy } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { useZoomSDK } from '@/hooks/useZoomSDK';
 import { supabase } from '@/integrations/supabase/client';
+import { Loader2 } from 'lucide-react';
+
+// Lazy load the enhanced component
+const ZoomComponentViewEnhanced = lazy(() => import('./ZoomComponentViewEnhanced'));
 
 interface ZoomComponentViewProps {
   meetingNumber: string;
@@ -13,6 +18,15 @@ interface ZoomComponentViewProps {
   onMeetingLeft?: () => void;
 }
 
+const LoadingFallback = () => (
+  <div className="flex items-center justify-center w-full h-full">
+    <div className="text-center">
+      <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4" />
+      <p className="text-lg">Loading Zoom SDK...</p>
+    </div>
+  </div>
+);
+
 export function ZoomComponentView({
   meetingNumber,
   meetingPassword,
@@ -22,20 +36,19 @@ export function ZoomComponentView({
   onMeetingError,
   onMeetingLeft
 }: ZoomComponentViewProps) {
-  // Redirect to enhanced version
-  console.log('🔄 [COMPONENT-VIEW] Redirecting to enhanced version');
-  
-  const ZoomComponentViewEnhanced = require('./ZoomComponentViewEnhanced').ZoomComponentViewEnhanced;
+  console.log('🔄 [COMPONENT-VIEW] Loading enhanced Zoom component');
   
   return (
-    <ZoomComponentViewEnhanced
-      meetingNumber={meetingNumber}
-      meetingPassword={meetingPassword}
-      userName={providedUserName}
-      role={role}
-      onMeetingJoined={onMeetingJoined}
-      onMeetingError={onMeetingError}
-      onMeetingLeft={onMeetingLeft}
-    />
+    <Suspense fallback={<LoadingFallback />}>
+      <ZoomComponentViewEnhanced
+        meetingNumber={meetingNumber}
+        meetingPassword={meetingPassword}
+        userName={providedUserName}
+        role={role}
+        onMeetingJoined={onMeetingJoined}
+        onMeetingError={onMeetingError}
+        onMeetingLeft={onMeetingLeft}
+      />
+    </Suspense>
   );
 }
