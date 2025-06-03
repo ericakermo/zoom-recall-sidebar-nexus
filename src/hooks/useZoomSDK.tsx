@@ -67,19 +67,22 @@ export function useZoomSDK({ onReady, onError }: UseZoomSDKProps = {}) {
       
       console.log('🔄 Initializing Zoom SDK with official configuration...');
 
-      // Following Zoom's official sample configuration exactly
+      // Following Zoom's official sample configuration exactly - including assetPath
+      const tmpPort = window.location.port === "" ? "" : ":" + window.location.port;
+      const assetPath = window.location.protocol + "//" + window.location.hostname + tmpPort + "/lib";
+
       await clientRef.current.init({
         debug: true,
         zoomAppRoot: meetingSDKElement,
-        language: 'en-US',
-        patchJsMedia: true,
-        leaveOnPageUnload: true
+        assetPath: assetPath, // Added missing assetPath like in official sample
+        language: 'en-US'
+        // Removed patchJsMedia and leaveOnPageUnload - not in official sample
       });
 
       setIsSDKLoaded(true);
       setIsReady(true);
       onReady?.();
-      console.log('✅ Zoom SDK initialized successfully using official sample approach');
+      console.log('✅ Zoom SDK initialized successfully using official sample approach with assetPath');
     } catch (error: any) {
       console.error('❌ Failed to initialize Zoom embedded client:', error);
       initializationRef.current = false;
