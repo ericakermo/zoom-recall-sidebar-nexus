@@ -1,7 +1,5 @@
 
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { ZoomComponentView } from './ZoomComponentView';
 
@@ -24,9 +22,7 @@ export function ZoomMeeting({
   onMeetingJoined,
   zak
 }: ZoomMeetingProps) {
-  const [error, setError] = useState<string | null>(null);
   const [isConnected, setIsConnected] = useState(false);
-  const navigate = useNavigate();
   const { toast } = useToast();
 
   const handleMeetingJoined = (client: any) => {
@@ -40,9 +36,13 @@ export function ZoomMeeting({
   };
 
   const handleMeetingError = (errorMessage: string) => {
-    setError(errorMessage);
     setIsConnected(false);
     console.error('❌ Meeting error:', errorMessage);
+    toast({
+      title: "Connection Failed",
+      description: errorMessage,
+      variant: "destructive"
+    });
   };
 
   const handleMeetingLeft = () => {
