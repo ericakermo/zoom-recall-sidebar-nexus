@@ -13,8 +13,16 @@ export function useZoomSDK({ onReady, onError }: UseZoomSDKProps = {}) {
   const [isJoined, setIsJoined] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const clientRef = useRef<any>(null);
+  const initializationRef = useRef<boolean>(false);
+  const hasJoinedSuccessfullyRef = useRef<boolean>(false);
 
   const cleanup = useCallback(() => {
+    // Don't cleanup if we've successfully joined and are still in a meeting
+    if (hasJoinedSuccessfullyRef.current && isJoined) {
+      console.log('⏸️ Skipping cleanup - meeting is active');
+      return;
+    }
+
     console.log('🧹 Starting Zoom SDK cleanup...');
     
     if (clientRef.current) {
@@ -38,6 +46,8 @@ export function useZoomSDK({ onReady, onError }: UseZoomSDKProps = {}) {
     setIsSDKLoaded(false);
     setIsReady(false);
     setIsJoined(false);
+    initializationRef.current = false;
+    hasJoinedSuccessfullyRef.current = false;
     
     console.log('✅ Zoom SDK cleanup completed');
   }, [isJoined]);
@@ -49,18 +59,36 @@ export function useZoomSDK({ onReady, onError }: UseZoomSDKProps = {}) {
       return;
     }
 
-    if (clientRef.current) {
-      console.log('⏸️ SDK already initialized');
+    if (clientRef.current || initializationRef.current) {
+      console.log('⏸️ SDK already initialized or initializing');
       return;
     }
 
+    initializationRef.current = true;
+
     try {
-      console.log('🔄 Creating Zoom embedded client...');
-      
-      // Create client first
+      console.log('📐 [ZOOM-SDK] Container dimensions:', {
+        width: meetingSDKElement.offsetWidth,
+        height: meetingSDKElement.offsetHeight,
+        aspectRatio: (meetingSDKElement.offsetWidth / meetingSDKElement.offsetHeight).toFixed(2)
+      });
+
+      console.log('🔄 Creating new Zoom embedded client instance...');
       clientRef.current = ZoomMtgEmbedded.createClient();
       
-      console.log('🔄 Initializing Zoom SDK with proper asset path...');
+      if (!clientRef.current) {
+        throw new Error('Failed to create Zoom embedded client');
+      }
+
+      console.log('🔄 Initializing Zoom embedded client with strict 16:9 aspect ratio...');
+
+      const containerWidth = meetingSDKElement.offsetWidth;
+      const containerHeight = Math.round(containerWidth / (16/9));
+      
+      console.log('📏 [ZOOM-SDK] Enforced 16:9 dimensions:', {
+        width: containerWidth,
+        height: containerHeight
+      });
 
       // Calculate asset path following Zoom's official pattern
       const tmpPort = window.location.port === "" ? "" : ":" + window.location.port;
@@ -68,22 +96,37 @@ export function useZoomSDK({ onReady, onError }: UseZoomSDKProps = {}) {
 
       console.log('📁 Asset path configured:', assetPath);
 
-      // Initialize with minimal configuration matching official sample
+      // Initialize with configuration that prevents dragging and enforces sizing
       await clientRef.current.init({
         debug: true,
         zoomAppRoot: meetingSDKElement,
         assetPath: assetPath,
-        language: 'en-US'
+        language: 'en-US',
+        patchJsMedia: true,
+        videoDrag: false, // Disable dragging
+        sharingMode: 'both',
+        videoHeader: true,
+        isLockBottom: true, // Lock bottom controls
+        screenShare: true,
+        meetingInfo: ['topic', 'host', 'mn', 'pwd', 'telPwd', 'invite', 'participant', 'dc', 'enctype'],
+        success: () => {
+          console.log('✅ [COMPONENT-VIEW] SDK ready - proceeding to join');
+          setIsSDKLoaded(true);
+          setIsReady(true);
+          onReady?.();
+        },
+        error: (error: any) => {
+          console.error('❌ SDK initialization error:', error);
+          initializationRef.current = false;
+          onError?.(error?.message || 'Failed to initialize Zoom SDK');
+        }
       });
 
-      setIsSDKLoaded(true);
-      setIsReady(true);
-      onReady?.();
-      console.log('✅ Zoom SDK initialized successfully with asset path');
+      console.log('✅ Zoom embedded client initialized with strict 16:9 and no dragging');
     } catch (error: any) {
       console.error('❌ Failed to initialize Zoom embedded client:', error);
-      console.error('🔍 Asset path was:', window.location.protocol + "//" + window.location.hostname + (window.location.port === "" ? "" : ":" + window.location.port) + "/lib");
       clientRef.current = null;
+      initializationRef.current = false;
       onError?.(error.message || 'Failed to initialize Zoom SDK');
     }
   }, [onReady, onError]);
@@ -93,7 +136,7 @@ export function useZoomSDK({ onReady, onError }: UseZoomSDKProps = {}) {
       throw new Error('Zoom SDK not ready');
     }
 
-    console.log('🔄 Joining meeting...');
+    console.log('🔄 Joining meeting with fresh session...');
     console.log('📋 Join config details:', {
       meetingNumber: joinConfig.meetingNumber,
       userName: joinConfig.userName,
@@ -122,6 +165,7 @@ export function useZoomSDK({ onReady, onError }: UseZoomSDKProps = {}) {
       });
       
       setIsJoined(true);
+      hasJoinedSuccessfullyRef.current = true;
       console.log('✅ Successfully joined meeting');
       return result;
     } catch (error: any) {
@@ -160,6 +204,7 @@ export function useZoomSDK({ onReady, onError }: UseZoomSDKProps = {}) {
         if (typeof clientRef.current.leave === 'function') {
           clientRef.current.leave();
           setIsJoined(false);
+          hasJoinedSuccessfullyRef.current = false;
           console.log('✅ Left meeting successfully');
         } else {
           console.warn('⚠️ Leave function not available on Zoom client');
@@ -172,11 +217,13 @@ export function useZoomSDK({ onReady, onError }: UseZoomSDKProps = {}) {
 
   // Initialize when DOM is ready
   useEffect(() => {
+    if (initializationRef.current) return;
+
     const initWhenReady = () => {
       const meetingSDKElement = document.getElementById('meetingSDKElement');
-      if (meetingSDKElement) {
+      if (meetingSDKElement && !initializationRef.current) {
         initializeSDK();
-      } else {
+      } else if (!initializationRef.current) {
         setTimeout(initWhenReady, 50);
       }
     };
@@ -184,10 +231,15 @@ export function useZoomSDK({ onReady, onError }: UseZoomSDKProps = {}) {
     initWhenReady();
   }, [initializeSDK]);
 
-  // Cleanup on unmount
+  // Only cleanup on unmount if we haven't successfully joined
   useEffect(() => {
     return () => {
-      cleanup();
+      if (!hasJoinedSuccessfullyRef.current) {
+        console.log('🔚 [ZOOM-SDK] Component unmounting - cleaning up');
+        cleanup();
+      } else {
+        console.log('🔄 [ZOOM-SDK] Component unmounting but meeting active - preserving connection');
+      }
     };
   }, [cleanup]);
 
