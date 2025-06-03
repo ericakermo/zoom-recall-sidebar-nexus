@@ -1,4 +1,3 @@
-
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { useZoomSDKEnhanced } from '@/hooks/useZoomSDKEnhanced';
@@ -16,7 +15,7 @@ interface ZoomComponentViewEnhancedProps {
   onMeetingLeft?: () => void;
 }
 
-export function ZoomComponentViewEnhanced({
+function ZoomComponentViewEnhanced({
   meetingNumber,
   meetingPassword,
   userName: providedUserName,
@@ -214,3 +213,5 @@ export function ZoomComponentViewEnhanced({
     </div>
   );
 }
+
+export default ZoomComponentViewEnhanced;
