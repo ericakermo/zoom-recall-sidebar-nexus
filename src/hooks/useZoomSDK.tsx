@@ -8,7 +8,6 @@ interface UseZoomSDKProps {
 }
 
 export function useZoomSDK({ onReady, onError }: UseZoomSDKProps = {}) {
-  const [isSDKLoaded, setIsSDKLoaded] = useState(false);
   const [isReady, setIsReady] = useState(false);
   const [isJoined, setIsJoined] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -35,7 +34,6 @@ export function useZoomSDK({ onReady, onError }: UseZoomSDKProps = {}) {
       clientRef.current = null;
     }
     
-    setIsSDKLoaded(false);
     setIsReady(false);
     setIsJoined(false);
     
@@ -57,7 +55,7 @@ export function useZoomSDK({ onReady, onError }: UseZoomSDKProps = {}) {
     try {
       console.log('🔄 Creating Zoom embedded client...');
       
-      // Create client first
+      // Create client - exactly like Zoom's official sample
       clientRef.current = ZoomMtgEmbedded.createClient();
       
       console.log('🔄 Initializing Zoom SDK with CDN assets...');
@@ -67,7 +65,7 @@ export function useZoomSDK({ onReady, onError }: UseZoomSDKProps = {}) {
 
       console.log('📁 Asset path configured:', assetPath);
 
-      // Initialize with CDN configuration
+      // Initialize with CDN configuration - matching Zoom's official sample
       await clientRef.current.init({
         debug: true,
         zoomAppRoot: meetingSDKElement,
@@ -75,7 +73,6 @@ export function useZoomSDK({ onReady, onError }: UseZoomSDKProps = {}) {
         language: 'en-US'
       });
 
-      setIsSDKLoaded(true);
       setIsReady(true);
       onReady?.();
       console.log('✅ Zoom SDK initialized successfully with CDN assets');
@@ -109,7 +106,7 @@ export function useZoomSDK({ onReady, onError }: UseZoomSDKProps = {}) {
     }
     
     try {
-      // Join with simplified configuration
+      // Join with configuration matching Zoom's official sample
       const result = await clientRef.current.join({
         sdkKey: joinConfig.sdkKey,
         signature: joinConfig.signature,
@@ -192,7 +189,6 @@ export function useZoomSDK({ onReady, onError }: UseZoomSDKProps = {}) {
 
   return {
     containerRef,
-    isSDKLoaded,
     isReady,
     isJoined,
     joinMeeting,
