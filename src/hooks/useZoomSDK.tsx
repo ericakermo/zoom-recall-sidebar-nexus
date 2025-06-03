@@ -13,8 +13,6 @@ export function useZoomSDK({ onReady, onError }: UseZoomSDKProps = {}) {
   const [isJoined, setIsJoined] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const clientRef = useRef<any>(null);
-  const initializationRef = useRef(false);
-  const joinAttemptRef = useRef(false);
 
   const cleanup = useCallback(() => {
     console.log('🧹 Starting Zoom SDK cleanup...');
@@ -40,52 +38,48 @@ export function useZoomSDK({ onReady, onError }: UseZoomSDKProps = {}) {
     setIsSDKLoaded(false);
     setIsReady(false);
     setIsJoined(false);
-    initializationRef.current = false;
-    joinAttemptRef.current = false;
     
     console.log('✅ Zoom SDK cleanup completed');
   }, [isJoined]);
 
   const initializeSDK = useCallback(async () => {
-    if (initializationRef.current) {
-      console.log('⏸️ SDK initialization skipped - already initialized');
-      return;
-    }
-
     const meetingSDKElement = document.getElementById('meetingSDKElement');
     if (!meetingSDKElement) {
       console.log('⏸️ SDK initialization waiting for meetingSDKElement');
       return;
     }
 
-    initializationRef.current = true;
+    if (clientRef.current) {
+      console.log('⏸️ SDK already initialized');
+      return;
+    }
 
     try {
-      console.log('🔄 Creating new Zoom embedded client following official sample...');
+      console.log('🔄 Creating Zoom embedded client following official sample...');
       
+      // Direct approach like official sample - create client and init immediately
       clientRef.current = ZoomMtgEmbedded.createClient();
       
       console.log('🔄 Initializing Zoom SDK with official configuration...');
 
-      // Following Zoom's official sample configuration exactly - including assetPath
+      // Following Zoom's official sample configuration exactly
       const tmpPort = window.location.port === "" ? "" : ":" + window.location.port;
       const assetPath = window.location.protocol + "//" + window.location.hostname + tmpPort + "/lib";
 
       await clientRef.current.init({
         debug: true,
         zoomAppRoot: meetingSDKElement,
-        assetPath: assetPath, // Added missing assetPath like in official sample
+        assetPath: assetPath,
         language: 'en-US'
-        // Removed patchJsMedia and leaveOnPageUnload - not in official sample
       });
 
       setIsSDKLoaded(true);
       setIsReady(true);
       onReady?.();
-      console.log('✅ Zoom SDK initialized successfully using official sample approach with assetPath');
+      console.log('✅ Zoom SDK initialized successfully following official sample');
     } catch (error: any) {
       console.error('❌ Failed to initialize Zoom embedded client:', error);
-      initializationRef.current = false;
+      clientRef.current = null;
       onError?.(error.message || 'Failed to initialize Zoom SDK');
     }
   }, [onReady, onError]);
@@ -94,13 +88,6 @@ export function useZoomSDK({ onReady, onError }: UseZoomSDKProps = {}) {
     if (!isReady || !clientRef.current) {
       throw new Error('Zoom SDK not ready');
     }
-
-    if (joinAttemptRef.current) {
-      console.log('⏸️ Join attempt already in progress');
-      return;
-    }
-
-    joinAttemptRef.current = true;
 
     console.log('🔄 Joining meeting following official sample pattern...');
     console.log('📋 Join config details:', {
@@ -115,12 +102,11 @@ export function useZoomSDK({ onReady, onError }: UseZoomSDKProps = {}) {
 
     const meetingNumberStr = String(joinConfig.meetingNumber).replace(/\s+/g, '');
     if (!/^\d{10,11}$/.test(meetingNumberStr)) {
-      joinAttemptRef.current = false;
       throw new Error(`Invalid meeting number format: ${joinConfig.meetingNumber}`);
     }
     
     try {
-      // Following Zoom's official sample join pattern exactly
+      // Direct join approach like official sample
       const result = await clientRef.current.join({
         sdkKey: joinConfig.sdkKey,
         signature: joinConfig.signature,
@@ -132,7 +118,7 @@ export function useZoomSDK({ onReady, onError }: UseZoomSDKProps = {}) {
       });
       
       setIsJoined(true);
-      console.log('✅ Successfully joined meeting using official sample approach');
+      console.log('✅ Successfully joined meeting following official sample approach');
       return result;
     } catch (error: any) {
       console.error('❌ Failed to join meeting:', error);
@@ -160,8 +146,6 @@ export function useZoomSDK({ onReady, onError }: UseZoomSDKProps = {}) {
       }
       
       throw new Error(errorMessage);
-    } finally {
-      joinAttemptRef.current = false;
     }
   }, [isReady]);
 
@@ -182,47 +166,27 @@ export function useZoomSDK({ onReady, onError }: UseZoomSDKProps = {}) {
     }
   }, [isJoined]);
 
-  // Initialize when DOM element is ready - following official sample pattern
+  // Simple initialization when DOM is ready - following official sample timing
   useEffect(() => {
-    const checkForElement = () => {
+    const initWhenReady = () => {
       const meetingSDKElement = document.getElementById('meetingSDKElement');
-      if (meetingSDKElement && !initializationRef.current) {
-        setTimeout(() => {
-          initializeSDK();
-        }, 100);
-      } else if (!meetingSDKElement) {
-        setTimeout(checkForElement, 100);
+      if (meetingSDKElement) {
+        initializeSDK();
+      } else {
+        // Check again in next tick
+        setTimeout(initWhenReady, 50);
       }
     };
     
-    checkForElement();
+    initWhenReady();
   }, [initializeSDK]);
 
-  // Cleanup on unmount and page unload
+  // Cleanup on unmount
   useEffect(() => {
-    const handleBeforeUnload = () => {
-      console.log('🔄 Page unload detected, cleaning up Zoom session...');
-      cleanup();
-    };
-
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === 'hidden') {
-        console.log('🔄 Page hidden, leaving meeting...');
-        if (clientRef.current && isJoined) {
-          leaveMeeting();
-        }
-      }
-    };
-
-    window.addEventListener('beforeunload', handleBeforeUnload);
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-
     return () => {
-      window.removeEventListener('beforeunload', handleBeforeUnload);
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
       cleanup();
     };
-  }, [isJoined, leaveMeeting, cleanup]);
+  }, [cleanup]);
 
   return {
     containerRef,

@@ -1,3 +1,4 @@
+
 import { useEffect, useState, useCallback } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { useZoomSDK } from '@/hooks/useZoomSDK';
@@ -156,6 +157,7 @@ export function ZoomComponentView({
     }
   }, [isSDKLoaded, isReady, isJoined, hasJoinedSuccessfully]);
 
+  // Auto-join when ready - simplified approach like official sample
   useEffect(() => {
     if (isReady && !hasJoinedSuccessfully && !error) {
       console.log('▶️ [COMPONENT-VIEW] SDK ready - starting auto-join');
@@ -188,16 +190,6 @@ export function ZoomComponentView({
     }
   }, [retryCount, maxRetries, handleJoinMeeting, cleanup]);
 
-  useEffect(() => {
-    return () => {
-      if (!hasJoinedSuccessfully) {
-        console.log('🔚 [COMPONENT-VIEW] Component unmounting - no successful join');
-      } else {
-        console.log('🔚 [COMPONENT-VIEW] Component unmounting - had successful join');
-      }
-    };
-  }, [hasJoinedSuccessfully]);
-
   if (error) {
     return (
       <ZoomErrorDisplay
@@ -220,11 +212,16 @@ export function ZoomComponentView({
         maxRetries={maxRetries}
       />
 
-      {/* Simplified container matching Zoom's official sample - no constraints or forced sizing */}
+      {/* Minimal container matching Zoom's official sample exactly */}
       <div 
         id="meetingSDKElement"
         ref={containerRef}
         className="w-full h-full"
+        style={{
+          position: 'relative',
+          width: '100%',
+          height: '100%'
+        }}
       />
     </div>
   );
