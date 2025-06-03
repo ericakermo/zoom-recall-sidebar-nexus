@@ -60,6 +60,12 @@ export const loadZoomSDK = async (): Promise<void> => {
   return sdkLoadPromise;
 };
 
+// Legacy function for backward compatibility with ZoomMeetingSample
+export const getSignature = async (meetingNumber: string, role: number = 0) => {
+  console.warn('getSignature is deprecated. Use Supabase edge functions instead.');
+  throw new Error('getSignature is deprecated. Use Supabase edge functions instead.');
+};
+
 const loadCSS = (url: string): Promise<void> => {
   return new Promise((resolve, reject) => {
     // Check if CSS is already loaded
