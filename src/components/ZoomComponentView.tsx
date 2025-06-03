@@ -1,7 +1,6 @@
-import { useEffect, useState, useCallback, useRef } from 'react';
-import { useAuth } from '@/context/AuthContext';
-import { useZoomSDK } from '@/hooks/useZoomSDK';
-import { supabase } from '@/integrations/supabase/client';
+import { lazy, Suspense } from 'react';
+
+const ZoomComponentViewEnhanced = lazy(() => import('./ZoomComponentViewEnhanced'));
 
 interface ZoomComponentViewProps {
   meetingNumber: string;
@@ -13,29 +12,12 @@ interface ZoomComponentViewProps {
   onMeetingLeft?: () => void;
 }
 
-export function ZoomComponentView({
-  meetingNumber,
-  meetingPassword,
-  userName: providedUserName,
-  role = 0,
-  onMeetingJoined,
-  onMeetingError,
-  onMeetingLeft
-}: ZoomComponentViewProps) {
-  // Redirect to enhanced version
+export function ZoomComponentView(props: ZoomComponentViewProps) {
   console.log('🔄 [COMPONENT-VIEW] Redirecting to enhanced version');
-  
-  const ZoomComponentViewEnhanced = require('./ZoomComponentViewEnhanced').ZoomComponentViewEnhanced;
-  
+
   return (
-    <ZoomComponentViewEnhanced
-      meetingNumber={meetingNumber}
-      meetingPassword={meetingPassword}
-      userName={providedUserName}
-      role={role}
-      onMeetingJoined={onMeetingJoined}
-      onMeetingError={onMeetingError}
-      onMeetingLeft={onMeetingLeft}
-    />
+    <Suspense fallback={<div className="flex items-center justify-center w-full h-full">Loading...</div>}>
+      <ZoomComponentViewEnhanced {...props} />
+    </Suspense>
   );
 }
