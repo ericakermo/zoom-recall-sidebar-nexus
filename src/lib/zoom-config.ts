@@ -13,6 +13,93 @@ const ZOOM_CSS_FILES = [
 ];
 
 let sdkLoadPromise: Promise<void> | null = null;
+let assetsPreloaded = false;
+
+export const preloadZoomAssets = async (): Promise<void> => {
+  if (assetsPreloaded) {
+    console.log('🔍 [ZOOM-CONFIG] Assets already preloaded');
+    return Promise.resolve();
+  }
+
+  console.log('🔄 [ZOOM-CONFIG] Starting conditional asset preloading...');
+  
+  try {
+    // Preload main JS files
+    await Promise.all([
+      preloadScript('/lib/js_media.min.js'),
+      preloadScript('/lib/av/zoom-meeting-embedded-3.13.2.min.js')
+    ]);
+    
+    // Preload CSS files
+    await Promise.all(ZOOM_CSS_FILES.map(preloadCSS));
+    
+    assetsPreloaded = true;
+    console.log('✅ [ZOOM-CONFIG] All assets preloaded successfully');
+  } catch (error) {
+    console.error('❌ [ZOOM-CONFIG] Asset preloading failed:', error);
+    throw new Error(`Failed to preload Zoom assets: ${error.message}`);
+  }
+};
+
+const preloadScript = (url: string): Promise<void> => {
+  return new Promise((resolve, reject) => {
+    // Check if already preloaded
+    const existingLink = document.querySelector(`link[href="${url}"][rel="preload"]`);
+    if (existingLink) {
+      console.log(`🔍 [ZOOM-CONFIG] Script already preloaded: ${url}`);
+      resolve();
+      return;
+    }
+
+    const link = document.createElement('link');
+    link.rel = 'preload';
+    link.href = url;
+    link.as = 'script';
+    link.crossOrigin = 'anonymous';
+    
+    link.onload = () => {
+      console.log(`✅ [ZOOM-CONFIG] Script preloaded: ${url}`);
+      resolve();
+    };
+    
+    link.onerror = () => {
+      console.error(`❌ [ZOOM-CONFIG] Failed to preload script: ${url}`);
+      reject(new Error(`Failed to preload script: ${url}`));
+    };
+    
+    document.head.appendChild(link);
+  });
+};
+
+const preloadCSS = (url: string): Promise<void> => {
+  return new Promise((resolve, reject) => {
+    // Check if already preloaded
+    const existingLink = document.querySelector(`link[href="${url}"][rel="preload"]`);
+    if (existingLink) {
+      console.log(`🔍 [ZOOM-CONFIG] CSS already preloaded: ${url}`);
+      resolve();
+      return;
+    }
+
+    const link = document.createElement('link');
+    link.rel = 'preload';
+    link.href = url;
+    link.as = 'style';
+    link.crossOrigin = 'anonymous';
+    
+    link.onload = () => {
+      console.log(`✅ [ZOOM-CONFIG] CSS preloaded: ${url}`);
+      resolve();
+    };
+    
+    link.onerror = () => {
+      console.error(`❌ [ZOOM-CONFIG] Failed to preload CSS: ${url}`);
+      reject(new Error(`Failed to preload CSS: ${url}`));
+    };
+    
+    document.head.appendChild(link);
+  });
+};
 
 export const loadZoomSDK = async (): Promise<void> => {
   // Return existing promise if already loading
@@ -22,23 +109,26 @@ export const loadZoomSDK = async (): Promise<void> => {
 
   // Return immediately if already loaded
   if (window.ZoomSDKLoaded && window.ZoomMtgEmbedded) {
-    console.log('Zoom SDK already loaded');
+    console.log('✅ [ZOOM-CONFIG] Zoom SDK already loaded');
     return Promise.resolve();
   }
 
-  console.log('Beginning Zoom Component SDK loading sequence');
+  console.log('🔄 [ZOOM-CONFIG] Beginning Zoom Component SDK loading sequence');
 
   sdkLoadPromise = (async () => {
     try {
+      // Ensure assets are preloaded first
+      await preloadZoomAssets();
+
       // Load CSS files first
-      console.log('Loading Zoom CSS files');
+      console.log('🔄 [ZOOM-CONFIG] Loading Zoom CSS files');
       await Promise.all(ZOOM_CSS_FILES.map(loadCSS));
-      console.log('All CSS files loaded');
+      console.log('✅ [ZOOM-CONFIG] All CSS files loaded');
 
       // Load main SDK script
-      console.log(`Loading script: ${ZOOM_SDK_URL}`);
+      console.log(`🔄 [ZOOM-CONFIG] Loading script: ${ZOOM_SDK_URL}`);
       await loadScript(ZOOM_SDK_URL);
-      console.log(`Script loaded successfully: ${ZOOM_SDK_URL}`);
+      console.log(`✅ [ZOOM-CONFIG] Script loaded successfully: ${ZOOM_SDK_URL}`);
 
       // Wait for ZoomMtgEmbedded to be available
       await waitForZoomMtgEmbedded();
@@ -46,12 +136,12 @@ export const loadZoomSDK = async (): Promise<void> => {
       // Verify SDK initialization
       if (typeof window.ZoomMtgEmbedded?.createClient === 'function') {
         window.ZoomSDKLoaded = true;
-        console.log('SDK initialization verified successfully');
+        console.log('✅ [ZOOM-CONFIG] SDK initialization verified successfully');
       } else {
         throw new Error('ZoomMtgEmbedded.createClient is not available');
       }
     } catch (error) {
-      console.error('Failed to load Zoom SDK:', error);
+      console.error('❌ [ZOOM-CONFIG] Failed to load Zoom SDK:', error);
       sdkLoadPromise = null; // Reset promise to allow retry
       throw error;
     }

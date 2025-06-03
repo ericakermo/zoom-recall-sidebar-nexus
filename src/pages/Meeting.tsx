@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
@@ -9,6 +8,7 @@ import { useAuth } from '@/context/AuthContext';
 import { ZoomMeeting } from '@/components/ZoomMeeting';
 import { MeetingExitDialog } from '@/components/MeetingExitDialog';
 import { useMeetingExit } from '@/hooks/useMeetingExit';
+import { preloadZoomAssets } from '@/lib/zoom-config';
 
 interface ZoomMeetingData {
   id: string;
@@ -73,6 +73,12 @@ const Meeting = () => {
         setIsLoading(true);
         setError(null);
 
+        // Start asset preloading early while fetching meeting data
+        console.log('🔄 [MEETING] Starting early asset preloading...');
+        const assetPromise = preloadZoomAssets().catch(error => {
+          console.warn('⚠️ [MEETING] Asset preloading failed (non-critical):', error);
+        });
+
         // Get meeting details from database
         const { data: meeting, error: meetingError } = await supabase
           .from('zoom_meetings')
@@ -94,6 +100,10 @@ const Meeting = () => {
         if (!detailsError && meetingDetails?.password) {
           setMeetingPassword(meetingDetails.password);
         }
+
+        // Wait for assets to complete before proceeding
+        await assetPromise;
+        console.log('✅ [MEETING] Assets preloaded, meeting data loaded');
 
         setIsLoading(false);
       } catch (err: any) {

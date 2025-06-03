@@ -3,6 +3,8 @@ import { useEffect, useState, useCallback, useRef } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { useZoomSDKEnhanced } from '@/hooks/useZoomSDKEnhanced';
 import { useZoomSession } from '@/context/ZoomSessionContext';
+import { useContainerReadiness } from '@/hooks/useContainerReadiness';
+import { preloadZoomAssets } from '@/lib/zoom-config';
 import { supabase } from '@/integrations/supabase/client';
 
 interface ZoomComponentViewProps {
@@ -27,10 +29,40 @@ export function ZoomComponentView({
   const { user } = useAuth();
   const hasAttemptedJoinRef = useRef(false);
   const [retryCount, setRetryCount] = useState(0);
+  const [assetsLoaded, setAssetsLoaded] = useState(false);
   const maxRetries = 2;
   const { forceLeaveSession, isSessionActive } = useZoomSession();
 
   console.log('🔄 [COMPONENT-VIEW] Initializing with enhanced SDK');
+
+  // Container readiness check
+  const { isReady: isContainerReady, error: containerError } = useContainerReadiness({
+    containerId: 'meetingSDKElement',
+    onReady: () => {
+      console.log('✅ [COMPONENT-VIEW] Container is ready for SDK initialization');
+    },
+    onTimeout: () => {
+      console.error('❌ [COMPONENT-VIEW] Container readiness timeout');
+      onMeetingError?.('Meeting container failed to initialize properly');
+    }
+  });
+
+  // Preload assets when component mounts
+  useEffect(() => {
+    const loadAssets = async () => {
+      try {
+        console.log('🔄 [COMPONENT-VIEW] Starting conditional asset preloading...');
+        await preloadZoomAssets();
+        setAssetsLoaded(true);
+        console.log('✅ [COMPONENT-VIEW] Assets preloaded successfully');
+      } catch (error) {
+        console.error('❌ [COMPONENT-VIEW] Asset preloading failed:', error);
+        onMeetingError?.(`Failed to load meeting assets: ${error.message}`);
+      }
+    };
+
+    loadAssets();
+  }, [onMeetingError]);
 
   const {
     isReady,
@@ -88,6 +120,23 @@ export function ZoomComponentView({
   }, [retryCount]);
 
   const handleJoinMeeting = useCallback(async () => {
+    // Check all prerequisites
+    if (!assetsLoaded) {
+      console.log('⏸️ [COMPONENT-VIEW] Waiting for assets to load');
+      return;
+    }
+
+    if (!isContainerReady) {
+      console.log('⏸️ [COMPONENT-VIEW] Waiting for container to be ready');
+      return;
+    }
+
+    if (containerError) {
+      console.error('❌ [COMPONENT-VIEW] Container error:', containerError);
+      onMeetingError?.(containerError);
+      return;
+    }
+
     // Check for existing sessions first
     if (isSessionActive()) {
       console.log('⚠️ [COMPONENT-VIEW] Active session detected, cleaning up first');
@@ -160,15 +209,15 @@ export function ZoomComponentView({
       
       onMeetingError?.(error.message);
     }
-  }, [isReady, isJoining, isJoined, meetingNumber, role, providedUserName, user, meetingPassword, getTokens, joinMeeting, onMeetingJoined, client, retryCount, maxRetries, onMeetingError, isSessionActive, forceLeaveSession]);
+  }, [assetsLoaded, isContainerReady, containerError, isReady, isJoining, isJoined, meetingNumber, role, providedUserName, user, meetingPassword, getTokens, joinMeeting, onMeetingJoined, client, retryCount, maxRetries, onMeetingError, isSessionActive, forceLeaveSession]);
 
-  // Auto-join when ready
+  // Auto-join when all prerequisites are met
   useEffect(() => {
-    if (isReady && !hasAttemptedJoinRef.current) {
-      console.log('▶️ [COMPONENT-VIEW] SDK ready - starting auto-join');
+    if (assetsLoaded && isContainerReady && isReady && !hasAttemptedJoinRef.current && !containerError) {
+      console.log('▶️ [COMPONENT-VIEW] All prerequisites met - starting auto-join');
       handleJoinMeeting();
     }
-  }, [isReady, handleJoinMeeting]);
+  }, [assetsLoaded, isContainerReady, isReady, handleJoinMeeting, containerError]);
 
   // Reset attempt flag when meeting changes
   useEffect(() => {
@@ -176,22 +225,12 @@ export function ZoomComponentView({
     setRetryCount(0);
   }, [meetingNumber]);
 
-  // Container with proper mounting verification
-  useEffect(() => {
-    console.log('🔍 [COMPONENT-VIEW] Container mounted, verifying DOM element');
-    const element = document.getElementById('meetingSDKElement');
-    if (element) {
-      console.log('✅ [COMPONENT-VIEW] meetingSDKElement found in DOM');
-    } else {
-      console.error('❌ [COMPONENT-VIEW] meetingSDKElement not found in DOM');
-    }
-  }, []);
-
   return (
     <div className="w-full h-full">
       <div 
         id="meetingSDKElement"
         className="w-full h-full"
+        style={{ minHeight: '400px' }} // Ensure immediate dimensions
       />
     </div>
   );
