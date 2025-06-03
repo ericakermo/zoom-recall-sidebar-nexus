@@ -1,14 +1,47 @@
 
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/favicon.ico" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Zoom Meeting App</title>
+    <title>Zoom & Recall.ai Integration</title>
+    <meta name="description" content="Zoom SDK and Recall.ai Integration App" />
+    <meta name="author" content="Lovable" />
+
+    <meta property="og:title" content="Zoom & Recall.ai Integration" />
+    <meta property="og:description" content="Zoom SDK and Recall.ai Integration App" />
+    <meta property="og:type" content="website" />
+    <meta property="og:image" content="https://lovable.dev/opengraph-image-p98pqg.png" />
+
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:site" content="@lovable_dev" />
+    <meta name="twitter:image" content="https://lovable.dev/opengraph-image-p98pqg.png" />
+    
+    <!-- Zoom SDK CSS files - important for styling the SDK properly -->
+    <link type="text/css" rel="stylesheet" href="https://source.zoom.us/3.13.2/css/bootstrap.css" />
+    <link type="text/css" rel="stylesheet" href="https://source.zoom.us/3.13.2/css/react-select.css" />
   </head>
+
   <body>
     <div id="root"></div>
+    <!-- Preload local Zoom SDK assets -->
+    <script>
+      // Preload critical SDK assets to ensure they're available
+      const preloadAssets = [
+        '/lib/js_media.min.js',
+        '/lib/av/zoom-meeting-embedded-3.13.2.min.js'
+      ];
+      
+      preloadAssets.forEach(asset => {
+        const link = document.createElement('link');
+        link.rel = 'preload';
+        link.href = asset;
+        link.as = 'script';
+        document.head.appendChild(link);
+      });
+    </script>
+    <!-- IMPORTANT: DO NOT REMOVE THIS SCRIPT TAG OR THIS VERY COMMENT! -->
+    <script src="https://cdn.gpteng.co/gptengineer.js" type="module"></script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

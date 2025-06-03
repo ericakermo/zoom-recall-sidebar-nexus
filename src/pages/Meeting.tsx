@@ -4,7 +4,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
-import { Loader2, ArrowLeft, AlertCircle } from 'lucide-react';
+import { Loader2, ArrowLeft } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { ZoomMeeting } from '@/components/ZoomMeeting';
 import { MeetingExitDialog } from '@/components/MeetingExitDialog';
@@ -67,16 +67,11 @@ const Meeting = () => {
 
   useEffect(() => {
     const loadMeetingData = async () => {
-      if (!user || !id) {
-        setError('User not authenticated or meeting ID missing');
-        setIsLoading(false);
-        return;
-      }
+      if (!user || !id) return;
 
       try {
         setIsLoading(true);
         setError(null);
-        console.log('🔄 [MEETING] Loading meeting data for ID:', id);
 
         // Get meeting details from database
         const { data: meeting, error: meetingError } = await supabase
@@ -90,28 +85,19 @@ const Meeting = () => {
         }
 
         setMeetingData(meeting);
-        console.log('✅ [MEETING] Meeting data loaded:', meeting);
 
         // Get meeting password
-        try {
-          const { data: meetingDetails, error: detailsError } = await supabase.functions.invoke('get-meeting-details', {
-            body: { meetingId: meeting.meeting_id }
-          });
+        const { data: meetingDetails, error: detailsError } = await supabase.functions.invoke('get-meeting-details', {
+          body: { meetingId: meeting.meeting_id }
+        });
 
-          if (!detailsError && meetingDetails?.password) {
-            setMeetingPassword(meetingDetails.password);
-            console.log('✅ [MEETING] Meeting password retrieved');
-          }
-        } catch (passwordError) {
-          console.warn('⚠️ [MEETING] Could not get meeting password:', passwordError);
-          // Continue without password - not critical
+        if (!detailsError && meetingDetails?.password) {
+          setMeetingPassword(meetingDetails.password);
         }
 
         setIsLoading(false);
-        console.log('✅ [MEETING] Meeting page ready');
-
       } catch (err: any) {
-        console.error('❌ [MEETING] Error loading meeting:', err);
+        console.error('Error loading meeting:', err);
         setError(err.message || 'Failed to load meeting');
         setIsLoading(false);
       }
@@ -121,33 +107,21 @@ const Meeting = () => {
   }, [id, user]);
 
   const handleMeetingEnd = useCallback(async () => {
-    console.log('🔄 [MEETING] Meeting ended');
     await leaveMeeting();
     setIsJoined(false);
     navigate('/calendar');
   }, [leaveMeeting, navigate]);
 
   const handleMeetingJoined = useCallback((client: any) => {
-    console.log('✅ [MEETING] Meeting joined successfully');
     setZoomClient(client);
     setIsJoined(true);
+    console.log('✅ [MEETING] Meeting joined, client set');
   }, []);
-
-  const handleMeetingError = useCallback((error: string) => {
-    console.error('❌ [MEETING] Meeting error:', error);
-    toast({
-      title: "Meeting Error",
-      description: error,
-      variant: "destructive",
-      duration: 5000
-    });
-  }, [toast]);
 
   if (!user) {
     return (
       <div className="flex items-center justify-center h-screen">
         <div className="text-center">
-          <AlertCircle className="h-12 w-12 text-amber-500 mx-auto mb-4" />
           <p className="text-lg mb-4">Please log in to join the meeting</p>
           <Button onClick={() => navigate('/auth')}>
             Go to Login
@@ -163,7 +137,6 @@ const Meeting = () => {
         <div className="text-center">
           <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4" />
           <p className="text-lg">Loading meeting...</p>
-          <p className="text-sm text-gray-500 mt-2">Meeting ID: {id}</p>
         </div>
       </div>
     );
@@ -173,16 +146,10 @@ const Meeting = () => {
     return (
       <div className="flex items-center justify-center h-screen">
         <div className="text-center max-w-md">
-          <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-4" />
           <p className="text-lg text-red-600 mb-4">{error || 'Meeting not found'}</p>
-          <div className="space-y-2">
-            <Button onClick={() => navigate('/calendar')} className="w-full">
-              Back to Calendar
-            </Button>
-            <Button variant="outline" onClick={() => window.location.reload()} className="w-full">
-              Reload Page
-            </Button>
-          </div>
+          <Button onClick={() => navigate('/calendar')}>
+            Back to Calendar
+          </Button>
         </div>
       </div>
     );
@@ -209,16 +176,14 @@ const Meeting = () => {
           
           <div className="text-center">
             <h1 className="text-lg font-semibold">{meetingData.title}</h1>
-            <p className="text-sm text-gray-600">
-              Meeting ID: {meetingData.meeting_id} | Role: {isHost ? 'Host' : 'Attendee'}
-            </p>
+            <p className="text-sm text-gray-600">Meeting ID: {meetingData.meeting_id}</p>
           </div>
           
           <div className="w-32"></div> {/* Spacer for centering */}
         </div>
 
         {/* Meeting Content */}
-        <div className="flex-1 bg-gray-50">
+        <div className="flex-1 p-4 bg-gray-50">
           <ZoomMeeting
             meetingNumber={meetingData.meeting_id}
             meetingPassword={meetingPassword}

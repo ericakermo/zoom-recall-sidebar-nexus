@@ -1,223 +1,512 @@
+import { ZoomMeetingConfig, ZoomJoinParams, ZoomJoinConfig, ZoomTokenData, MeetingStatus } from '@/types/zoom';
+import { createHash } from 'crypto';
 
-declare global {
-  interface Window {
-    ZoomMtgEmbedded: any;
-    ZoomSDKLoaded: boolean;
+// Use the updated client ID as the SDK Key
+const ZOOM_SDK_KEY = "dkQMavedS2OWM2c73F6pLg"; // Updated SDK Key (Client ID)
+const SUPABASE_URL = 'https://qsxlvwwebbakmzpwjfbb.supabase.co';
+
+// State to manage SDK loading
+let zoomSDKLoadingPromise: Promise<boolean> | null = null;
+let zoomSDKLoaded = false;
+
+// Load Zoom CSS files
+export const loadZoomCss = async (): Promise<void> => {
+  const cssFiles = [
+    'https://source.zoom.us/3.13.2/css/bootstrap.css',
+    'https://source.zoom.us/3.13.2/css/react-select.css'
+  ];
+  
+  console.log('Loading Zoom CSS files');
+  
+  const loadCss = (url: string): Promise<void> => {
+    return new Promise((resolve, reject) => {
+      if (document.querySelector(`link[href="${url}"]`)) {
+        console.log('CSS already loaded:', url);
+        resolve();
+        return;
+      }
+      
+      const link = document.createElement('link');
+      link.rel = 'stylesheet';
+      link.type = 'text/css';
+      link.href = url;
+      link.onload = () => {
+        console.log('CSS loaded successfully:', url);
+        resolve();
+      };
+      link.onerror = (e) => {
+        console.error('Failed to load CSS:', url, e);
+        resolve(); // Don't reject, just continue
+      };
+      document.head.appendChild(link);
+    });
+  };
+  
+  await Promise.all(cssFiles.map(loadCss));
+  console.log('All CSS files loaded');
+};
+
+export const loadZoomSDK = async (): Promise<boolean> => {
+  if (window.ZoomMtgEmbedded) {
+    console.log('Zoom Component SDK already loaded');
+    return Promise.resolve(true);
   }
-}
 
-const ZOOM_SDK_URL = 'https://source.zoom.us/3.13.2/zoom-meeting-embedded-3.13.2.min.js';
-const ZOOM_CSS_FILES = [
-  'https://source.zoom.us/3.13.2/css/bootstrap.css',
-  'https://source.zoom.us/3.13.2/css/react-select.css'
-];
-
-let sdkLoadPromise: Promise<void> | null = null;
-let assetsPreloaded = false;
-
-export const preloadZoomAssets = async (): Promise<void> => {
-  if (assetsPreloaded) {
-    console.log('🔍 [ZOOM-CONFIG] Assets already preloaded');
-    return Promise.resolve();
+  if (zoomSDKLoadingPromise) {
+    return zoomSDKLoadingPromise;
   }
 
-  console.log('🔄 [ZOOM-CONFIG] Starting conditional asset preloading...');
+  zoomSDKLoadingPromise = new Promise<boolean>(async (resolve, reject) => {
+    try {
+      console.log('Beginning Zoom Component SDK loading sequence');
+      
+      // Load CSS first
+      await loadZoomCss();
+
+      // Make React available globally
+      if (!window.React) {
+        console.log('Making React available globally');
+        window.React = (await import('react')).default;
+      }
+      if (!window.ReactDOM) {
+        console.log('Making ReactDOM available globally');
+        window.ReactDOM = (await import('react-dom')).default;
+      }
+
+      // Load the SDK script
+      const zoomEmbeddedSdkUrl = 'https://source.zoom.us/3.13.2/zoom-meeting-embedded-3.13.2.min.js';
+      
+      const loadScript = (url: string): Promise<void> => {
+        return new Promise((res, rej) => {
+          if (document.querySelector(`script[src="${url}"]`)) {
+            console.log('Script already exists:', url);
+            res();
+            return;
+          }
+
+          console.log('Loading script:', url);
+          const script = document.createElement('script');
+          script.src = url;
+          script.async = false;
+          script.crossOrigin = 'anonymous';
+          script.onload = () => {
+            console.log('Script loaded successfully:', url);
+            res();
+          };
+          script.onerror = (e) => {
+            console.error('Failed to load script:', url, e);
+            rej(new Error(`Failed to load ${url}`));
+          };
+          document.head.appendChild(script);
+        });
+      };
+
+      await loadScript(zoomEmbeddedSdkUrl);
+
+      // Poll for window.ZoomMtgEmbedded
+      const maxAttempts = 60;
+      let attempts = 0;
+      const pollInterval = 500;
+
+      const checkZoomEmbeddedAvailability = async () => {
+        attempts++;
+        
+        if (attempts % 10 === 0) {
+          console.log(`Still checking for ZoomMtgEmbedded (attempt ${attempts}/${maxAttempts})`);
+        }
+        
+        if (window.ZoomMtgEmbedded) {
+          console.log('ZoomMtgEmbedded found after', attempts, 'attempts!');
+          console.log('ZoomMtgEmbedded version:', window.ZoomMtgEmbedded.version || 'unknown');
+          
+          try {
+            // Create a test client to verify SDK is working
+            const testClient = window.ZoomMtgEmbedded.createClient();
+            if (!testClient) {
+              throw new Error('Failed to create test client');
+            }
+            
+            console.log('SDK initialization verified successfully');
+            zoomSDKLoaded = true;
+            resolve(true);
+          } catch (error) {
+            console.error('Error during SDK verification:', error);
+            reject(error);
+          }
+        } else if (attempts >= maxAttempts) {
+          console.error('ZoomMtgEmbedded not available after maximum attempts');
+          reject(new Error('Timed out waiting for ZoomMtgEmbedded to initialize'));
+        } else {
+          setTimeout(checkZoomEmbeddedAvailability, pollInterval);
+        }
+      };
+
+      checkZoomEmbeddedAvailability();
+    } catch (error) {
+      console.error('Error loading Zoom SDK:', error);
+      zoomSDKLoadingPromise = null;
+      reject(error);
+    }
+  });
+
+  return zoomSDKLoadingPromise;
+};
+
+export const getZoomAccessToken = async (meetingNumber: string, role: number = 0): Promise<ZoomTokenData> => {
+  try {
+    const tokenData = localStorage.getItem('sb-qsxlvwwebbakmzpwjfbb-auth-token');
+    if (!tokenData) {
+      throw new Error('Authentication required');
+    }
+    
+    const parsedToken = JSON.parse(tokenData);
+    const authToken = parsedToken?.access_token;
+    
+    // Get OAuth token and signature
+    const response = await fetch(`https://qsxlvwwebbakmzpwjfbb.supabase.co/functions/v1/get-zoom-token`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${authToken}`,
+      },
+      body: JSON.stringify({
+        meetingNumber,
+        role,
+        expirationSeconds: 7200 // 2 hours
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to get Zoom token');
+    }
+
+    const data = await response.json();
+    
+    // If host role, get ZAK token
+    if (role === 1) {
+      const zakResponse = await fetch(`https://qsxlvwwebbakmzpwjfbb.supabase.co/functions/v1/get-zoom-zak`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${authToken}`,
+        }
+      });
+
+      if (!zakResponse.ok) {
+        throw new Error('Failed to get ZAK token');
+      }
+
+      const zakData = await zakResponse.json();
+      data.zak = zakData.zak;
+    }
+
+    return {
+      accessToken: data.accessToken,
+      tokenType: data.tokenType,
+      sdkKey: data.sdkKey || ZOOM_SDK_KEY,
+      signature: data.signature,
+      zak: data.zak
+    };
+  } catch (error) {
+    console.error('Error getting Zoom token:', error);
+    throw error;
+  }
+};
+
+export const checkMeetingStatus = async (meetingNumber: string): Promise<MeetingStatus> => {
+  try {
+    const tokenData = await getZoomAccessToken(meetingNumber);
+    
+    const response = await fetch(`https://api.zoom.us/v2/meetings/${meetingNumber}`, {
+      headers: {
+        'Authorization': `Bearer ${tokenData.accessToken}`
+      }
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to check meeting status');
+    }
+
+    const data = await response.json();
+    return {
+      status: data.status,
+      startTime: data.start_time,
+      duration: data.duration,
+      joinBeforeHost: data.settings?.join_before_host
+    };
+  } catch (error) {
+    console.error('Error checking meeting status:', error);
+    throw error;
+  }
+};
+
+// Legacy function name for backward compatibility
+export const getSignature = getZoomAccessToken;
+
+export const createAndInitializeZoomClient = async (
+  zoomAppRoot: HTMLElement,
+  initOptions?: any
+): Promise<any> => {
+  console.log('Beginning client initialization with container:', {
+    id: zoomAppRoot.id,
+    width: zoomAppRoot.offsetWidth,
+    height: zoomAppRoot.offsetHeight,
+    classList: Array.from(zoomAppRoot.classList),
+    children: zoomAppRoot.childElementCount
+  });
+  
+  if (!window.ZoomMtgEmbedded) {
+    console.log('ZoomMtgEmbedded not found, loading SDK first');
+    await loadZoomSDK();
+    
+    if (!window.ZoomMtgEmbedded) {
+      throw new Error('Failed to load Zoom SDK after explicit loading attempt');
+    }
+  }
+
+  // Validate container
+  if (!zoomAppRoot) {
+    throw new Error('Container element is null or undefined');
+  }
+  
+  if (!zoomAppRoot.id || zoomAppRoot.id !== 'meetingSDKElement') {
+    console.error('Container has incorrect or missing ID:', zoomAppRoot.id);
+    zoomAppRoot.id = 'meetingSDKElement';
+    console.log('Fixed container ID to:', zoomAppRoot.id);
+  }
+  
+  // Check container dimensions and visibility
+  const containerStyle = window.getComputedStyle(zoomAppRoot);
+  const containerDimensions = {
+    width: zoomAppRoot.offsetWidth,
+    height: zoomAppRoot.offsetHeight,
+    display: containerStyle.display,
+    position: containerStyle.position,
+    visibility: containerStyle.visibility,
+    opacity: containerStyle.opacity
+  };
+  
+  console.log('Container style check:', containerDimensions);
+  
+  // Validate dimensions
+  if (containerDimensions.width <= 0 || containerDimensions.height <= 0) {
+    console.error('Container has invalid dimensions:', containerDimensions);
+    zoomAppRoot.style.minWidth = '640px';
+    zoomAppRoot.style.minHeight = '480px';
+    console.log('Applied forced minimum dimensions to container');
+  }
+  
+  // Ensure container is visible
+  if (containerDimensions.display === 'none' || containerDimensions.visibility === 'hidden' || containerDimensions.opacity === '0') {
+    console.error('Container is not visible:', containerDimensions);
+    zoomAppRoot.style.display = 'block';
+    zoomAppRoot.style.visibility = 'visible';
+    zoomAppRoot.style.opacity = '1';
+    console.log('Applied forced visibility to container');
+  }
+
+  console.log('Creating Zoom client');
+  const client = window.ZoomMtgEmbedded.createClient();
   
   try {
-    // Preload main JS files
-    await Promise.all([
-      preloadScript('/lib/js_media.min.js'),
-      preloadScript('/lib/av/zoom-meeting-embedded-3.13.2.min.js')
-    ]);
+    const initConfig = {
+      zoomAppRoot,
+      language: 'en-US',
+      patchJsMedia: true,
+      showMeetingHeader: true,
+      disableInvite: false,
+      disableCallOut: false,
+      disableRecord: false,
+      disableJoinAudio: false,
+      audioPanelAlwaysOpen: false,
+      showPureSharingContent: false,
+      isSupportAV: true,
+      isSupportChat: true,
+      isSupportQA: true,
+      isSupportCC: true,
+      isSupportPolling: true,
+      isSupportBreakout: true,
+      screenShare: true,
+      rwcBackup: '',
+      videoDrag: true,
+      sharingMode: 'both',
+      videoHeader: true,
+      isLockBottom: true,
+      isShowAvatar: true,
+      isShowUserStatistics: true,
+      meetingInfo: ['topic', 'host', 'mn', 'pwd', 'telPwd', 'invite', 'participant', 'dc', 'enctype'],
+      success: (event: any) => {
+        console.log('Zoom client initialized successfully', {
+          event,
+          containerDimensions: {
+            width: zoomAppRoot.offsetWidth,
+            height: zoomAppRoot.offsetHeight
+          }
+        });
+      },
+      error: (event: any) => {
+        console.error('Zoom client initialization error', {
+          event,
+          containerDimensions: {
+            width: zoomAppRoot.offsetWidth,
+            height: zoomAppRoot.offsetHeight
+          }
+        });
+      },
+      ...initOptions
+    };
+
+    console.log('Initializing Zoom client with config:', { 
+      ...initConfig, 
+      zoomAppRoot: 'DOM Element'
+    });
     
-    // Preload CSS files
-    await Promise.all(ZOOM_CSS_FILES.map(preloadCSS));
-    
-    assetsPreloaded = true;
-    console.log('✅ [ZOOM-CONFIG] All assets preloaded successfully');
+    await client.init(initConfig);
+    console.log('Zoom Embedded SDK client initialized successfully');
+    return client;
   } catch (error) {
-    console.error('❌ [ZOOM-CONFIG] Asset preloading failed:', error);
-    throw new Error(`Failed to preload Zoom assets: ${error.message}`);
+    console.error('Error initializing Zoom client:', error);
+    throw error;
   }
 };
 
-const preloadScript = (url: string): Promise<void> => {
-  return new Promise((resolve, reject) => {
-    // Check if already preloaded
-    const existingLink = document.querySelector(`link[href="${url}"][rel="preload"]`);
-    if (existingLink) {
-      console.log(`🔍 [ZOOM-CONFIG] Script already preloaded: ${url}`);
-      resolve();
-      return;
+// UPDATED joinMeeting function with ZAK token support for host role
+export const joinMeeting = async (client: any, params: ZoomJoinParams) => {
+  try {
+    // Get OAuth token and check meeting status
+    const tokenData = await getZoomAccessToken(params.meetingNumber, params.role || 0);
+    const meetingStatus = await checkMeetingStatus(params.meetingNumber);
+    
+    console.log('Joining meeting with status:', {
+      status: meetingStatus.status,
+      joinBeforeHost: meetingStatus.joinBeforeHost,
+      hasToken: !!tokenData.accessToken,
+      tokenType: tokenData.tokenType,
+      sdkKey: tokenData.sdkKey,
+      role: params.role,
+      hasZak: !!params.zak,
+      hasSignature: !!tokenData.signature
+    });
+
+    // Add delay before joining
+    console.log('Waiting before joining meeting...');
+    await new Promise(resolve => setTimeout(resolve, 2000));
+
+    // Validate meeting number format
+    if (!/^\d{9,11}$/.test(params.meetingNumber)) {
+      throw new Error('Invalid meeting number format. Must be 9-11 digits.');
     }
 
-    const link = document.createElement('link');
-    link.rel = 'preload';
-    link.href = url;
-    link.as = 'script';
-    link.crossOrigin = 'anonymous';
-    
-    link.onload = () => {
-      console.log(`✅ [ZOOM-CONFIG] Script preloaded: ${url}`);
-      resolve();
-    };
-    
-    link.onerror = () => {
-      console.error(`❌ [ZOOM-CONFIG] Failed to preload script: ${url}`);
-      reject(new Error(`Failed to preload script: ${url}`));
-    };
-    
-    document.head.appendChild(link);
-  });
-};
-
-const preloadCSS = (url: string): Promise<void> => {
-  return new Promise((resolve, reject) => {
-    // Check if already preloaded
-    const existingLink = document.querySelector(`link[href="${url}"][rel="preload"]`);
-    if (existingLink) {
-      console.log(`🔍 [ZOOM-CONFIG] CSS already preloaded: ${url}`);
-      resolve();
-      return;
-    }
-
-    const link = document.createElement('link');
-    link.rel = 'preload';
-    link.href = url;
-    link.as = 'style';
-    link.crossOrigin = 'anonymous';
-    
-    link.onload = () => {
-      console.log(`✅ [ZOOM-CONFIG] CSS preloaded: ${url}`);
-      resolve();
-    };
-    
-    link.onerror = () => {
-      console.error(`❌ [ZOOM-CONFIG] Failed to preload CSS: ${url}`);
-      reject(new Error(`Failed to preload CSS: ${url}`));
-    };
-    
-    document.head.appendChild(link);
-  });
-};
-
-export const loadZoomSDK = async (): Promise<void> => {
-  // Return existing promise if already loading
-  if (sdkLoadPromise) {
-    return sdkLoadPromise;
-  }
-
-  // Return immediately if already loaded
-  if (window.ZoomSDKLoaded && window.ZoomMtgEmbedded) {
-    console.log('✅ [ZOOM-CONFIG] Zoom SDK already loaded');
-    return Promise.resolve();
-  }
-
-  console.log('🔄 [ZOOM-CONFIG] Beginning Zoom Component SDK loading sequence');
-
-  sdkLoadPromise = (async () => {
-    try {
-      // Ensure assets are preloaded first
-      await preloadZoomAssets();
-
-      // Load CSS files first
-      console.log('🔄 [ZOOM-CONFIG] Loading Zoom CSS files');
-      await Promise.all(ZOOM_CSS_FILES.map(loadCSS));
-      console.log('✅ [ZOOM-CONFIG] All CSS files loaded');
-
-      // Load main SDK script
-      console.log(`🔄 [ZOOM-CONFIG] Loading script: ${ZOOM_SDK_URL}`);
-      await loadScript(ZOOM_SDK_URL);
-      console.log(`✅ [ZOOM-CONFIG] Script loaded successfully: ${ZOOM_SDK_URL}`);
-
-      // Wait for ZoomMtgEmbedded to be available
-      await waitForZoomMtgEmbedded();
-
-      // Verify SDK initialization
-      if (typeof window.ZoomMtgEmbedded?.createClient === 'function') {
-        window.ZoomSDKLoaded = true;
-        console.log('✅ [ZOOM-CONFIG] SDK initialization verified successfully');
-      } else {
-        throw new Error('ZoomMtgEmbedded.createClient is not available');
-      }
-    } catch (error) {
-      console.error('❌ [ZOOM-CONFIG] Failed to load Zoom SDK:', error);
-      sdkLoadPromise = null; // Reset promise to allow retry
-      throw error;
-    }
-  })();
-
-  return sdkLoadPromise;
-};
-
-// Legacy function for backward compatibility with ZoomMeetingSample
-export const getSignature = async (meetingNumber: string, role: number = 0) => {
-  console.warn('getSignature is deprecated. Use Supabase edge functions instead.');
-  throw new Error('getSignature is deprecated. Use Supabase edge functions instead.');
-};
-
-const loadCSS = (url: string): Promise<void> => {
-  return new Promise((resolve, reject) => {
-    // Check if CSS is already loaded
-    const existingLink = document.querySelector(`link[href="${url}"]`);
-    if (existingLink) {
-      console.log(`CSS already loaded: ${url}`);
-      resolve();
-      return;
-    }
-
-    const link = document.createElement('link');
-    link.rel = 'stylesheet';
-    link.href = url;
-    link.onload = () => resolve();
-    link.onerror = () => reject(new Error(`Failed to load CSS: ${url}`));
-    document.head.appendChild(link);
-  });
-};
-
-const loadScript = (url: string): Promise<void> => {
-  return new Promise((resolve, reject) => {
-    // Check if script is already loaded
-    const existingScript = document.querySelector(`script[src="${url}"]`);
-    if (existingScript) {
-      console.log(`Script already loaded: ${url}`);
-      resolve();
-      return;
-    }
-
-    const script = document.createElement('script');
-    script.src = url;
-    script.async = true;
-    script.onload = () => resolve();
-    script.onerror = () => reject(new Error(`Failed to load script: ${url}`));
-    document.head.appendChild(script);
-  });
-};
-
-const waitForZoomMtgEmbedded = (): Promise<void> => {
-  return new Promise((resolve, reject) => {
-    let attempts = 0;
-    const maxAttempts = 100;
-    const checkInterval = 100;
-
-    const checkForZoom = () => {
-      attempts++;
-      if (window.ZoomMtgEmbedded) {
-        console.log(`ZoomMtgEmbedded found after ${attempts} attempts!`);
-        console.log('ZoomMtgEmbedded version:', window.ZoomMtgEmbedded.version || 'unknown');
-        resolve();
-      } else if (attempts >= maxAttempts) {
-        reject(new Error(`ZoomMtgEmbedded not found after ${maxAttempts} attempts`));
-      } else {
-        setTimeout(checkForZoom, checkInterval);
+    const joinConfig: ZoomJoinConfig = {
+      sdkKey: tokenData.sdkKey,
+      signature: tokenData.signature,
+      meetingNumber: params.meetingNumber,
+      userName: params.userName,
+      userEmail: params.userEmail,
+      password: params.password || '',
+      role: params.role || 0,
+      success: (success: any) => {
+        console.log('Join meeting success:', success);
+      },
+      error: (error: any) => {
+        console.error('Join meeting error:', error);
+        console.error('Error details:', {
+          code: error.code,
+          message: error.message,
+          type: error.type,
+          reason: error.reason,
+          hasZak: !!params.zak,
+          role: params.role,
+          hasSignature: !!tokenData.signature,
+          meetingNumber: params.meetingNumber,
+          userName: params.userName
+        });
       }
     };
 
-    checkForZoom();
-  });
+    // Add role-specific configuration
+    if (params.role === 1) { // Host role
+      joinConfig.zak = tokenData.zak;
+      joinConfig.join_before_host = true;
+      console.log('Host configuration applied with ZAK token');
+    }
+
+    console.log('Joining with config:', {
+      sdkKey: joinConfig.sdkKey,
+      hasSignature: !!joinConfig.signature,
+      hasZak: !!joinConfig.zak,
+      meetingNumber: joinConfig.meetingNumber,
+      userName: joinConfig.userName,
+      role: joinConfig.role,
+      hasPassword: !!joinConfig.password
+    });
+
+    await client.join(joinConfig);
+  } catch (error) {
+    console.error('Error joining meeting:', error);
+    throw error;
+  }
 };
 
-// Export for backward compatibility
-export const getZoomAccessToken = async () => {
-  throw new Error('getZoomAccessToken is deprecated. Use Supabase edge functions instead.');
+export const leaveZoomMeeting = async (client: any): Promise<void> => {
+  if (!client) {
+    console.warn('Zoom client not provided for leaveZoomMeeting');
+    return;
+  }
+  
+  try {
+    await client.leave();
+    console.log('Successfully left the Zoom meeting');
+  } catch (error) {
+    console.error('Error leaving Zoom meeting:', error);
+  }
+};
+
+export const createZoomMeeting = async (params: {
+  topic?: string;
+  type?: number;
+  settings?: {
+    host_video?: boolean;
+    participant_video?: boolean;
+    join_before_host?: boolean;
+    mute_upon_entry?: boolean;
+    waiting_room?: boolean;
+  };
+} = {}): Promise<any> => {
+  try {
+    const tokenData = localStorage.getItem('sb-qsxlvwwebbakmzpwjfbb-auth-token');
+    if (!tokenData) {
+      throw new Error('Authentication required to create meetings');
+    }
+    
+    const parsedToken = JSON.parse(tokenData);
+    const authToken = parsedToken?.access_token;
+    if (!authToken) {
+      throw new Error('Invalid authentication token');
+    }
+
+    const response = await fetch(`${SUPABASE_URL}/functions/v1/create-zoom-meeting`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${authToken}`,
+      },
+      body: JSON.stringify(params),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Failed to create meeting: ${response.status}. ${errorText}`);
+    }
+
+    const meetingData = await response.json();
+    if (!meetingData.id) {
+      throw new Error('Meeting ID not found in response');
+    }
+
+    return meetingData;
+  } catch (error) {
+    console.error('Error creating Zoom meeting:', error);
+    throw error;
+  }
 };
