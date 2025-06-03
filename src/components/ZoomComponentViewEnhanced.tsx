@@ -176,10 +176,10 @@ export function ZoomComponentViewEnhanced({
 
   // Enhanced container with session monitoring
   return (
-    <div className="w-full h-full">
-      <div 
+    <div className="flex items-center justify-center w-full h-full">
+      <div
         id="meetingSDKElement"
-        className="w-full h-full"
+        className="w-[960px] h-[540px] max-w-full max-h-full"
       />
     </div>
   );
