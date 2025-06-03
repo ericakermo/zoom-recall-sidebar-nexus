@@ -1,10 +1,10 @@
 
-import { useEffect, useState, useCallback, useRef } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
-import { Loader2, AlertCircle } from 'lucide-react';
+import { Loader2, AlertCircle, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import ZoomMtgEmbedded from '@zoom/meetingsdk/embedded';
+import { useZoomMeeting } from '@/hooks/useZoomMeeting';
 
 interface ZoomComponentViewProps {
   meetingNumber: string;
@@ -26,142 +26,116 @@ export function ZoomComponentView({
   onMeetingLeft
 }: ZoomComponentViewProps) {
   const { user } = useAuth();
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [loadingStep, setLoadingStep] = useState('Initializing SDK...');
-  const clientRef = useRef<any>(null);
-  const isInitializedRef = useRef(false);
-  const hasJoinedRef = useRef(false);
+  const [currentStep, setCurrentStep] = useState('Preparing...');
+  const [retryCount, setRetryCount] = useState(0);
+  
+  const {
+    containerRef,
+    isInitializing,
+    isJoining,
+    isJoined,
+    error,
+    joinMeeting,
+    leaveMeeting,
+    sdkStatus
+  } = useZoomMeeting();
 
-  const getTokens = useCallback(async (meetingNumber: string, role: number) => {
-    console.log('🔄 Getting tokens for meeting:', meetingNumber, 'role:', role);
-    
-    const { data: tokenData, error: tokenError } = await supabase.functions.invoke('get-zoom-token', {
-      body: {
-        meetingNumber,
-        role: role || 0,
-        expirationSeconds: 7200
-      }
-    });
+  const userName = providedUserName || user?.email || 'Guest';
 
-    if (tokenError) {
-      throw new Error(`Token error: ${tokenError.message}`);
-    }
-
-    let zakToken = null;
-    if (role === 1) {
-      const { data: zakData, error: zakError } = await supabase.functions.invoke('get-zoom-zak');
-      if (zakError || !zakData?.zak) {
-        throw new Error('Host role requires fresh ZAK token');
-      }
-      zakToken = zakData.zak;
-    }
-
-    return { ...tokenData, zak: zakToken };
-  }, []);
-
-  const initializeAndJoin = useCallback(async () => {
-    if (hasJoinedRef.current || isInitializedRef.current) {
-      console.log('🛑 Already initialized/joined, skipping');
-      return;
-    }
-
+  const getTokensAndJoin = useCallback(async () => {
     try {
-      setLoadingStep('Waiting for container...');
+      setCurrentStep('Getting authentication tokens...');
+      console.log('🔄 [ZOOM-VIEW] Getting tokens for meeting:', meetingNumber);
       
-      // Wait for container to be ready
-      let attempts = 0;
-      while (attempts < 50) {
-        const container = document.getElementById('meetingSDKElement');
-        if (container) {
-          console.log('✅ Container found');
-          break;
+      // Get tokens from Supabase
+      const { data: tokenData, error: tokenError } = await supabase.functions.invoke('get-zoom-token', {
+        body: {
+          meetingNumber,
+          role: role || 0,
+          expirationSeconds: 7200
         }
-        await new Promise(resolve => setTimeout(resolve, 100));
-        attempts++;
-      }
-
-      const container = document.getElementById('meetingSDKElement');
-      if (!container) {
-        throw new Error('Meeting container not found');
-      }
-
-      setLoadingStep('Initializing Zoom SDK...');
-      console.log('🔄 Creating Zoom client...');
-      
-      clientRef.current = ZoomMtgEmbedded.createClient();
-      
-      await clientRef.current.init({
-        debug: true,
-        zoomAppRoot: container,
-        assetPath: '/lib',
-        language: 'en-US'
       });
 
-      console.log('✅ SDK initialized');
-      isInitializedRef.current = true;
+      if (tokenError) {
+        throw new Error(`Token error: ${tokenError.message}`);
+      }
 
-      setLoadingStep('Getting authentication...');
-      const tokens = await getTokens(meetingNumber, role || 0);
+      // Get ZAK token if host
+      let zakToken = null;
+      if (role === 1) {
+        setCurrentStep('Getting host authentication...');
+        const { data: zakData, error: zakError } = await supabase.functions.invoke('get-zoom-zak');
+        if (zakError || !zakData?.zak) {
+          throw new Error('Host role requires fresh ZAK token');
+        }
+        zakToken = zakData.zak;
+      }
 
-      setLoadingStep('Joining meeting...');
-      console.log('🔄 Joining meeting...');
+      setCurrentStep('Joining meeting...');
+      console.log('🔄 [ZOOM-VIEW] Joining meeting with tokens...');
 
-      const joinConfig = {
-        sdkKey: tokens.sdkKey,
-        signature: tokens.signature,
+      // Join the meeting
+      await joinMeeting({
+        sdkKey: tokenData.sdkKey,
+        signature: tokenData.signature,
         meetingNumber: meetingNumber.replace(/\s+/g, ''),
-        userName: providedUserName || user?.email || 'Guest',
+        userName,
         userEmail: user?.email || '',
         password: meetingPassword || '',
         role: role || 0,
-        zak: tokens.zak || ''
-      };
+        zak: zakToken || ''
+      });
 
-      await clientRef.current.join(joinConfig);
-      
-      hasJoinedRef.current = true;
-      setIsLoading(false);
-      console.log('✅ Successfully joined meeting');
-      onMeetingJoined?.(clientRef.current);
+      // Notify parent component
+      onMeetingJoined?.(null);
+      console.log('✅ [ZOOM-VIEW] Meeting join complete');
 
     } catch (error: any) {
-      console.error('❌ Failed to initialize/join:', error);
-      setError(error.message);
-      setIsLoading(false);
+      console.error('❌ [ZOOM-VIEW] Join process failed:', error);
       onMeetingError?.(error.message);
     }
-  }, [meetingNumber, role, providedUserName, user, meetingPassword, getTokens, onMeetingJoined, onMeetingError]);
-
-  // Start initialization when component mounts
-  useEffect(() => {
-    console.log('🚀 ZoomComponentView mounted, starting initialization...');
-    const timer = setTimeout(() => {
-      initializeAndJoin();
-    }, 500); // Small delay to ensure container is rendered
-
-    return () => clearTimeout(timer);
-  }, [initializeAndJoin]);
-
-  // Reset on meeting change
-  useEffect(() => {
-    hasJoinedRef.current = false;
-    isInitializedRef.current = false;
-    setError(null);
-    setIsLoading(true);
-    setLoadingStep('Initializing SDK...');
-  }, [meetingNumber]);
+  }, [meetingNumber, role, userName, user?.email, meetingPassword, joinMeeting, onMeetingJoined, onMeetingError]);
 
   const handleRetry = useCallback(() => {
-    hasJoinedRef.current = false;
-    isInitializedRef.current = false;
-    setError(null);
-    setIsLoading(true);
-    setLoadingStep('Retrying...');
-    initializeAndJoin();
-  }, [initializeAndJoin]);
+    setRetryCount(prev => prev + 1);
+    setCurrentStep('Retrying...');
+    getTokensAndJoin();
+  }, [getTokensAndJoin]);
 
-  if (error) {
+  // Start the join process when component mounts
+  useEffect(() => {
+    console.log('🚀 [ZOOM-VIEW] Component mounted, starting join process...');
+    setCurrentStep('Initializing SDK...');
+    
+    // Small delay to ensure container is rendered
+    const timer = setTimeout(() => {
+      getTokensAndJoin();
+    }, 100);
+
+    return () => clearTimeout(timer);
+  }, [getTokensAndJoin]);
+
+  // Handle meeting leave
+  useEffect(() => {
+    if (!isJoined) return;
+
+    const handleBeforeUnload = () => {
+      leaveMeeting();
+      onMeetingLeft?.();
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+      leaveMeeting();
+      onMeetingLeft?.();
+    };
+  }, [isJoined, leaveMeeting, onMeetingLeft]);
+
+  const isLoading = isInitializing || isJoining;
+  const showError = error && !isLoading;
+
+  if (showError) {
     return (
       <div className="w-full h-full flex items-center justify-center p-4">
         <div className="text-center max-w-md">
@@ -169,11 +143,17 @@ export function ZoomComponentView({
           <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg">
             <p className="text-red-600 font-medium">Unable to Join Meeting</p>
             <p className="text-red-500 text-sm mt-1">{error}</p>
+            {retryCount > 0 && (
+              <p className="text-xs text-gray-500 mt-2">
+                Retry attempt: {retryCount}/3
+              </p>
+            )}
           </div>
           
           <div className="space-y-2">
-            <Button onClick={handleRetry} className="w-full">
-              Try Again
+            <Button onClick={handleRetry} disabled={retryCount >= 3} className="w-full">
+              <RefreshCw className="h-4 w-4 mr-2" />
+              {retryCount >= 3 ? 'Max retries reached' : 'Try Again'}
             </Button>
             <Button 
               variant="outline" 
@@ -183,6 +163,14 @@ export function ZoomComponentView({
               Refresh Page
             </Button>
           </div>
+
+          {/* Debug info */}
+          <details className="mt-4 text-left">
+            <summary className="text-xs text-gray-500 cursor-pointer">Debug Info</summary>
+            <pre className="text-xs bg-gray-100 p-2 rounded mt-2 overflow-auto">
+              {JSON.stringify(sdkStatus, null, 2)}
+            </pre>
+          </details>
         </div>
       </div>
     );
@@ -190,20 +178,40 @@ export function ZoomComponentView({
 
   return (
     <div className="w-full h-full relative">
+      {/* Loading overlay */}
       {isLoading && (
         <div className="absolute inset-0 bg-gray-900 flex items-center justify-center z-50">
           <div className="text-center text-white">
             <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4" />
-            <p className="text-lg">{loadingStep}</p>
+            <p className="text-lg">{currentStep}</p>
             <p className="text-sm text-gray-400 mt-2">Meeting ID: {meetingNumber}</p>
+            {retryCount > 0 && (
+              <p className="text-xs text-yellow-400 mt-1">
+                Retry attempt: {retryCount}/3
+              </p>
+            )}
+            
+            {/* Progress indicators */}
+            <div className="mt-4 space-y-1">
+              <div className="text-xs text-gray-500">
+                SDK Status: {sdkStatus.isInitialized ? '✅' : '⏳'} | 
+                Container: {sdkStatus.hasContainer ? '✅' : '⏳'} |
+                Client: {sdkStatus.hasClient ? '✅' : '⏳'}
+              </div>
+            </div>
           </div>
         </div>
       )}
       
+      {/* Zoom meeting container */}
       <div 
+        ref={containerRef}
         id="meetingSDKElement"
         className="w-full h-full"
-        style={{ minHeight: '400px' }}
+        style={{ 
+          minHeight: '400px',
+          background: isJoined ? 'transparent' : '#1f1f1f'
+        }}
       />
     </div>
   );

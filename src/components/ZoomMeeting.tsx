@@ -27,21 +27,23 @@ export function ZoomMeeting({
 
   const handleMeetingJoined = (client: any) => {
     setIsConnected(true);
-    console.log('✅ Meeting joined successfully');
+    console.log('✅ [ZOOM-MEETING] Meeting joined successfully');
     onMeetingJoined?.(client);
     toast({
       title: "Connected",
-      description: "You have joined the meeting"
+      description: "You have joined the meeting",
+      duration: 3000
     });
   };
 
   const handleMeetingError = (errorMessage: string) => {
     setIsConnected(false);
-    console.error('❌ Meeting error:', errorMessage);
+    console.error('❌ [ZOOM-MEETING] Meeting error:', errorMessage);
     toast({
       title: "Connection Failed",
       description: errorMessage,
-      variant: "destructive"
+      variant: "destructive",
+      duration: 5000
     });
   };
 
@@ -50,7 +52,8 @@ export function ZoomMeeting({
     onMeetingEnd?.();
     toast({
       title: "Meeting Ended",
-      description: "You have left the meeting"
+      description: "You have left the meeting",
+      duration: 3000
     });
   };
 
