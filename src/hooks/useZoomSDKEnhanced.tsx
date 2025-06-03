@@ -15,49 +15,14 @@ export function useZoomSDKEnhanced({ onReady, onError }: UseZoomSDKProps = {}) {
   const clientRef = useRef<any>(null);
   const isInitializedRef = useRef(false);
   const { 
-    currentClient, 
     setCurrentClient, 
     forceLeaveSession, 
-    isSessionActive, 
-    resetSession 
+    isSessionActive 
   } = useZoomSession();
 
-  const validateContainer = useCallback(() => {
-    const meetingSDKElement = document.getElementById('meetingSDKElement');
-    if (!meetingSDKElement) {
-      console.error('🚨 [SDK-ENHANCED] meetingSDKElement not found in DOM');
-      return false;
-    }
-
-    const computedStyle = window.getComputedStyle(meetingSDKElement);
-    console.log('🔍 [SDK-ENHANCED] Container validation:', {
-      element: meetingSDKElement,
-      display: computedStyle.display,
-      visibility: computedStyle.visibility,
-      width: computedStyle.width,
-      height: computedStyle.height,
-      rect: meetingSDKElement.getBoundingClientRect()
-    });
-
-    if (computedStyle.display === 'none' || computedStyle.visibility === 'hidden') {
-      console.error('🚨 [SDK-ENHANCED] Container not visible');
-      return false;
-    }
-
-    const rect = meetingSDKElement.getBoundingClientRect();
-    if (rect.width === 0 || rect.height === 0) {
-      console.error('🚨 [SDK-ENHANCED] Container has zero dimensions:', rect);
-      return false;
-    }
-
-    console.log('✅ [SDK-ENHANCED] Container validation passed');
-    return true;
-  }, []);
-
   const cleanup = useCallback(async () => {
-    console.log('🧹 [SDK-ENHANCED] Starting enhanced cleanup...');
+    console.log('🧹 [SDK] Starting cleanup...');
     
-    // Use session manager for cleanup
     await forceLeaveSession();
     
     if (clientRef.current) {
@@ -69,97 +34,72 @@ export function useZoomSDKEnhanced({ onReady, onError }: UseZoomSDKProps = {}) {
     setIsJoining(false);
     isInitializedRef.current = false;
     
-    console.log('✅ [SDK-ENHANCED] Enhanced cleanup complete');
+    console.log('✅ [SDK] Cleanup complete');
   }, [forceLeaveSession]);
 
-  const checkForExistingSession = useCallback(async () => {
-    if (isSessionActive()) {
-      console.log('⚠️ [SDK-ENHANCED] Existing session detected, cleaning up first');
-      await forceLeaveSession();
-      // Wait a moment for cleanup to complete
-      await new Promise(resolve => setTimeout(resolve, 1000));
-    }
-  }, [isSessionActive, forceLeaveSession]);
-
   const initializeSDK = useCallback(async () => {
-    // Check for existing sessions first
-    await checkForExistingSession();
-
-    // Prevent multiple initializations
     if (isInitializedRef.current || clientRef.current) {
-      console.log('⏸️ [SDK-ENHANCED] SDK already initialized, skipping');
+      console.log('⏸️ [SDK] Already initialized, skipping');
       return;
     }
 
-    console.log('🔄 [SDK-ENHANCED] Starting enhanced SDK initialization...');
+    console.log('🔄 [SDK] Starting initialization...');
     
+    // Wait for container
+    let attempts = 0;
+    while (attempts < 50) {
+      const meetingSDKElement = document.getElementById('meetingSDKElement');
+      if (meetingSDKElement) {
+        console.log('✅ [SDK] Container found');
+        break;
+      }
+      await new Promise(resolve => setTimeout(resolve, 100));
+      attempts++;
+    }
+
     const meetingSDKElement = document.getElementById('meetingSDKElement');
     if (!meetingSDKElement) {
-      console.error('🚨 [SDK-ENHANCED] meetingSDKElement not found');
-      return;
-    }
-
-    if (!validateContainer()) {
-      console.error('🚨 [SDK-ENHANCED] Container validation failed');
-      return;
+      throw new Error('Meeting container not found');
     }
 
     try {
-      console.log('🔄 [SDK-ENHANCED] Creating Zoom embedded client...');
-      
+      console.log('🔄 [SDK] Creating Zoom client...');
       clientRef.current = ZoomMtgEmbedded.createClient();
-      console.log('✅ [SDK-ENHANCED] Zoom client created:', clientRef.current);
 
-      const assetPath = '/lib';
       const initConfig = {
         debug: true,
         zoomAppRoot: meetingSDKElement,
-        assetPath: assetPath,
+        assetPath: '/lib',
         language: 'en-US'
       };
 
-      console.log('🔄 [SDK-ENHANCED] Calling client.init()...');
+      console.log('🔄 [SDK] Initializing client...');
       await clientRef.current.init(initConfig);
       
-      console.log('✅ [SDK-ENHANCED] client.init() completed successfully');
-      validateContainer();
-
       isInitializedRef.current = true;
       setIsReady(true);
       onReady?.();
-      console.log('✅ [SDK-ENHANCED] Enhanced SDK initialization complete');
+      console.log('✅ [SDK] Initialization complete');
     } catch (error: any) {
-      console.error('❌ [SDK-ENHANCED] client.init() failed:', error);
+      console.error('❌ [SDK] Initialization failed:', error);
       clientRef.current = null;
       isInitializedRef.current = false;
-      resetSession(); // Reset session state on error
       onError?.(error.message || 'Failed to initialize Zoom SDK');
     }
-  }, [onReady, onError, validateContainer, checkForExistingSession, resetSession]);
+  }, [onReady, onError]);
 
   const joinMeeting = useCallback(async (joinConfig: any) => {
-    console.log('🔄 [SDK-ENHANCED] Enhanced joinMeeting() called');
-
-    // Check for existing sessions
-    await checkForExistingSession();
+    console.log('🔄 [SDK] Join meeting called');
     
     if (!isReady || !clientRef.current || isJoining || isJoined) {
-      console.error('🚨 [SDK-ENHANCED] Cannot join - invalid state:', {
-        isReady,
-        hasClient: !!clientRef.current,
-        isJoining,
-        isJoined
-      });
-      
-      if (isJoined || isSessionActive()) {
-        throw new Error('Session already active - cleaning up and retry');
-      }
-      
-      throw new Error('Zoom SDK not ready');
+      throw new Error('SDK not ready or already joining/joined');
     }
 
-    if (!validateContainer()) {
-      throw new Error('Meeting container not properly mounted');
+    // Clean up any existing sessions
+    if (isSessionActive()) {
+      console.log('🔄 [SDK] Cleaning up existing session...');
+      await forceLeaveSession();
+      await new Promise(resolve => setTimeout(resolve, 1000));
     }
 
     const meetingNumberStr = String(joinConfig.meetingNumber).replace(/\s+/g, '');
@@ -180,70 +120,49 @@ export function useZoomSDKEnhanced({ onReady, onError }: UseZoomSDKProps = {}) {
         zak: joinConfig.zak || ''
       };
 
-      console.log('🔄 [SDK-ENHANCED] Calling client.join()...');
-      const joinResult = await clientRef.current.join(meetingConfig);
+      console.log('🔄 [SDK] Calling client.join()...');
+      await clientRef.current.join(meetingConfig);
       
-      console.log('✅ [SDK-ENHANCED] client.join() completed successfully');
-      
-      // Register with session manager
       setCurrentClient(clientRef.current);
-      
-      setTimeout(() => {
-        validateContainer();
-      }, 1000);
-      
       setIsJoined(true);
       setIsJoining(false);
-      console.log('✅ [SDK-ENHANCED] Enhanced meeting join complete');
-      return joinResult;
+      console.log('✅ [SDK] Join successful');
     } catch (error: any) {
-      console.error('❌ [SDK-ENHANCED] client.join() failed:', error);
+      console.error('❌ [SDK] Join failed:', error);
       setIsJoining(false);
       
       let errorMessage = error.message || 'Failed to join meeting';
       if (error?.reason === 'Duplicated join operation') {
-        errorMessage = 'Session conflict detected. Cleaning up and retrying...';
+        errorMessage = 'Session conflict detected. Please try again.';
         await forceLeaveSession();
-      } else if (error?.errorCode === 200 || error?.reason === 'Fail to join the meeting.') {
-        if (joinConfig.role === 1) {
-          errorMessage = 'Host authentication failed. This may be due to an expired ZAK token or active session conflict.';
-        } else {
-          errorMessage = 'Meeting join failed. The meeting may not be active or there may be authentication issues.';
-        }
       }
       
       throw new Error(errorMessage);
     }
-  }, [isReady, isJoining, isJoined, validateContainer, checkForExistingSession, setCurrentClient, forceLeaveSession]);
+  }, [isReady, isJoining, isJoined, setCurrentClient, forceLeaveSession, isSessionActive]);
 
   const leaveMeeting = useCallback(async () => {
     if (clientRef.current && isJoined) {
-      console.log('🔄 [SDK-ENHANCED] Leaving meeting...');
+      console.log('🔄 [SDK] Leaving meeting...');
       await forceLeaveSession();
       setIsJoined(false);
       setIsJoining(false);
     }
   }, [isJoined, forceLeaveSession]);
 
-  // Initialize when DOM is ready
+  // Initialize when component mounts
   useEffect(() => {
-    if (isInitializedRef.current) {
-      return;
-    }
-
-    const initWhenReady = () => {
-      const meetingSDKElement = document.getElementById('meetingSDKElement');
-      if (meetingSDKElement) {
-        console.log('🔍 [SDK-ENHANCED] meetingSDKElement found, starting initialization');
-        initializeSDK();
-      } else {
-        console.log('⏳ [SDK-ENHANCED] Waiting for meetingSDKElement...');
-        setTimeout(initWhenReady, 50);
+    const timer = setTimeout(() => {
+      if (!isInitializedRef.current) {
+        initializeSDK().catch(error => {
+          console.error('Failed to initialize SDK:', error);
+          onError?.(error.message);
+        });
       }
-    };
-    
-    initWhenReady();
-  }, [initializeSDK]);
+    }, 100);
+
+    return () => clearTimeout(timer);
+  }, [initializeSDK, onError]);
 
   // Cleanup on unmount
   useEffect(() => {

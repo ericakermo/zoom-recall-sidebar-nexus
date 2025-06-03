@@ -4,7 +4,6 @@ import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { ZoomComponentView } from './ZoomComponentView';
-import { ZoomLoadingOverlay } from './zoom/ZoomLoadingOverlay';
 
 interface ZoomMeetingProps {
   meetingNumber: string;
@@ -27,14 +26,11 @@ export function ZoomMeeting({
 }: ZoomMeetingProps) {
   const [error, setError] = useState<string | null>(null);
   const [isConnected, setIsConnected] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
-  const [loadingStep, setLoadingStep] = useState('Initializing Zoom SDK...');
   const navigate = useNavigate();
   const { toast } = useToast();
 
   const handleMeetingJoined = (client: any) => {
     setIsConnected(true);
-    setIsLoading(false);
     console.log('✅ Meeting joined successfully');
     onMeetingJoined?.(client);
     toast({
@@ -46,13 +42,11 @@ export function ZoomMeeting({
   const handleMeetingError = (errorMessage: string) => {
     setError(errorMessage);
     setIsConnected(false);
-    setIsLoading(false);
     console.error('❌ Meeting error:', errorMessage);
   };
 
   const handleMeetingLeft = () => {
     setIsConnected(false);
-    setIsLoading(false);
     onMeetingEnd?.();
     toast({
       title: "Meeting Ended",
@@ -60,60 +54,8 @@ export function ZoomMeeting({
     });
   };
 
-  if (error) {
-    return (
-      <div className="flex flex-col items-center justify-center min-h-[400px] p-4">
-        <div className="text-center max-w-md">
-          <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg">
-            <p className="text-red-600 font-medium">Unable to Join Meeting</p>
-            <p className="text-red-500 text-sm mt-1">{error}</p>
-          </div>
-          
-          <div className="text-sm text-gray-600 mb-6">
-            <p className="font-medium mb-2">Troubleshooting tips:</p>
-            <ul className="list-disc list-inside text-left space-y-1">
-              <li>Check your internet connection</li>
-              <li>Verify the meeting ID is correct</li>
-              <li>Allow camera and microphone access</li>
-              <li>Try using Chrome browser</li>
-              <li>Ensure meeting hasn't ended</li>
-            </ul>
-          </div>
-          
-          <div className="flex gap-3 justify-center">
-            <Button
-              onClick={() => {
-                setError(null);
-                setIsLoading(true);
-                setLoadingStep('Retrying connection...');
-                window.location.reload();
-              }}
-            >
-              Retry Connection
-            </Button>
-            <Button
-              onClick={() => navigate('/calendar')}
-              variant="outline"
-            >
-              Back to Calendar
-            </Button>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="h-full w-full flex flex-col relative">
-      {/* Loading overlay */}
-      <ZoomLoadingOverlay
-        isLoading={isLoading}
-        currentStep={loadingStep}
-        meetingNumber={meetingNumber}
-        retryCount={0}
-        maxRetries={2}
-      />
-
       {/* Meeting header */}
       <div className="flex items-center justify-between p-4 bg-white border-b flex-shrink-0">
         <div>
@@ -128,7 +70,7 @@ export function ZoomMeeting({
         )}
       </div>
       
-      {/* Meeting content - fixed positioned container */}
+      {/* Meeting content */}
       <div className="relative flex-1">
         <ZoomComponentView
           meetingNumber={meetingNumber}

@@ -3,13 +3,9 @@ import { useEffect, useState, useCallback, useRef } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { useZoomSDKEnhanced } from '@/hooks/useZoomSDKEnhanced';
 import { useZoomSession } from '@/context/ZoomSessionContext';
-import { useContainerReadiness } from '@/hooks/useContainerReadiness';
-import { useZoomLoadingLogger } from '@/hooks/useZoomLoadingLogger';
-import { useZoomRetryLogic } from '@/hooks/useZoomRetryLogic';
-import { preloadZoomAssets } from '@/lib/zoom-config';
 import { supabase } from '@/integrations/supabase/client';
-import { ZoomRecoveryOptions } from './zoom/ZoomRecoveryOptions';
-import { ZoomLoadingOverlay } from './zoom/ZoomLoadingOverlay';
+import { Loader2, AlertCircle } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 
 interface ZoomComponentViewProps {
   meetingNumber: string;
@@ -31,41 +27,13 @@ export function ZoomComponentView({
   onMeetingLeft
 }: ZoomComponentViewProps) {
   const { user } = useAuth();
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [loadingStep, setLoadingStep] = useState('Initializing...');
   const hasAttemptedJoinRef = useRef(false);
-  const [assetsLoaded, setAssetsLoaded] = useState(false);
-  const [showRecovery, setShowRecovery] = useState(false);
   const { forceLeaveSession, isSessionActive } = useZoomSession();
 
-  // Enhanced logging and retry logic
-  const { logStep, getLoadingReport, reset: resetLogger } = useZoomLoadingLogger();
-  const { 
-    executeWithRetry, 
-    retryCount, 
-    isRetrying, 
-    lastError: retryError, 
-    canRetry,
-    maxRetries,
-    reset: resetRetry 
-  } = useZoomRetryLogic({
-    maxRetries: 2,
-    baseDelay: 2000
-  });
-
-  logStep('Component initialized', { meetingNumber, role, userName: providedUserName });
-
-  // Container readiness check
-  const { isReady: isContainerReady, error: containerError } = useContainerReadiness({
-    containerId: 'meetingSDKElement',
-    onReady: () => {
-      logStep('Container ready', null, true);
-    },
-    onTimeout: () => {
-      logStep('Container readiness timeout', null, false, 'Container failed to initialize');
-      onMeetingError?.('Meeting container failed to initialize properly');
-    }
-  });
-
-  // Enhanced SDK with logging
+  // Enhanced SDK
   const {
     isReady,
     isJoining,
@@ -74,42 +42,19 @@ export function ZoomComponentView({
     client
   } = useZoomSDKEnhanced({
     onReady: () => {
-      logStep('SDK ready', null, true);
+      console.log('✅ SDK ready');
+      setLoadingStep('SDK ready - preparing to join...');
     },
     onError: (error) => {
-      logStep('SDK error', { error }, false, error);
-      setShowRecovery(true);
-      onMeetingError?.(error);
+      console.error('❌ SDK error:', error);
+      setError(error);
+      setIsLoading(false);
     }
   });
 
-  // Asset preloading with logging
-  useEffect(() => {
-    const loadAssets = async () => {
-      try {
-        logStep('Starting asset preload');
-        await executeWithRetry(
-          () => preloadZoomAssets(),
-          'Asset preloading',
-          (attempt, delay) => {
-            logStep(`Asset preload retry ${attempt}`, { delay });
-          }
-        );
-        logStep('Assets preloaded', null, true);
-        setAssetsLoaded(true);
-      } catch (error: any) {
-        logStep('Asset preload failed', { error: error.message }, false, error.message);
-        onMeetingError?.(`Failed to load meeting assets: ${error.message}`);
-        setShowRecovery(true);
-      }
-    };
-
-    loadAssets();
-  }, [executeWithRetry, logStep, onMeetingError]);
-
-  const getTokens = useCallback(async (meetingNumber: string, role: number, forceRefresh: boolean = false) => {
+  const getTokens = useCallback(async (meetingNumber: string, role: number) => {
     try {
-      logStep('Getting authentication tokens', { meetingNumber, role, forceRefresh });
+      setLoadingStep('Getting authentication tokens...');
       
       const { data: tokenData, error: tokenError } = await supabase.functions.invoke('get-zoom-token', {
         body: {
@@ -125,7 +70,7 @@ export function ZoomComponentView({
 
       let zakToken = null;
       if (role === 1) {
-        logStep('Getting ZAK token for host', { retryCount });
+        setLoadingStep('Getting host authentication...');
         const { data: zakData, error: zakError } = await supabase.functions.invoke('get-zoom-zak');
         
         if (zakError || !zakData?.zak) {
@@ -133,166 +78,133 @@ export function ZoomComponentView({
         }
         
         zakToken = zakData.zak;
-        logStep('ZAK token obtained', null, true);
       }
 
-      logStep('Authentication tokens obtained', null, true);
       return { ...tokenData, zak: zakToken };
     } catch (error: any) {
-      logStep('Token fetch failed', { error: error.message }, false, error.message);
       throw error;
     }
-  }, [logStep, retryCount]);
+  }, []);
 
   const handleJoinMeeting = useCallback(async () => {
-    // Check prerequisites with logging
-    if (!assetsLoaded) {
-      logStep('Waiting for assets');
-      return;
-    }
-
-    if (!isContainerReady) {
-      logStep('Waiting for container');
-      return;
-    }
-
-    if (containerError) {
-      logStep('Container error detected', { containerError }, false, containerError);
-      onMeetingError?.(containerError);
-      setShowRecovery(true);
+    // Prevent multiple join attempts
+    if (!isReady || isJoining || isJoined || hasAttemptedJoinRef.current) {
       return;
     }
 
     // Check for existing sessions
     if (isSessionActive()) {
-      logStep('Active session detected, cleaning up');
+      console.log('🔄 Cleaning up existing session...');
       await forceLeaveSession();
       await new Promise(resolve => setTimeout(resolve, 1000));
     }
 
-    // Prevent multiple join attempts
-    if (!isReady || isJoining || isJoined || hasAttemptedJoinRef.current) {
-      logStep('Join attempt prevented', {
-        isReady,
-        isJoining,
-        isJoined,
-        hasAttempted: hasAttemptedJoinRef.current
-      });
-      return;
-    }
-
     hasAttemptedJoinRef.current = true;
+    setLoadingStep('Connecting to meeting...');
 
     try {
-      logStep('Starting join process', { attempt: retryCount + 1 });
+      const tokens = await getTokens(meetingNumber, role || 0);
 
-      await executeWithRetry(async () => {
-        const tokens = await getTokens(meetingNumber, role || 0, retryCount > 0);
+      const joinConfig = {
+        sdkKey: tokens.sdkKey,
+        signature: tokens.signature,
+        meetingNumber,
+        userName: providedUserName || user?.email || 'Guest',
+        userEmail: user?.email || '',
+        password: meetingPassword || '',
+        role: role || 0,
+        zak: tokens.zak || ''
+      };
 
-        const joinConfig = {
-          sdkKey: tokens.sdkKey,
-          signature: tokens.signature,
-          meetingNumber,
-          userName: providedUserName || user?.email || 'Guest',
-          userEmail: user?.email || '',
-          password: meetingPassword || '',
-          role: role || 0,
-          zak: tokens.zak || ''
-        };
-
-        logStep('Calling joinMeeting', { config: { ...joinConfig, signature: 'hidden' } });
-        await joinMeeting(joinConfig);
-        logStep('Join completed successfully', null, true);
-        
-        onMeetingJoined?.(client);
-      }, 'Meeting join', (attempt, delay) => {
-        logStep(`Join retry ${attempt}`, { delay });
-        hasAttemptedJoinRef.current = false;
-      });
-
+      console.log('🔄 Joining meeting with config:', { ...joinConfig, signature: 'hidden' });
+      await joinMeeting(joinConfig);
+      
+      setIsLoading(false);
+      onMeetingJoined?.(client);
     } catch (error: any) {
-      logStep('Join failed completely', { error: error.message }, false, error.message);
+      console.error('❌ Join failed:', error);
       hasAttemptedJoinRef.current = false;
-      setShowRecovery(true);
+      setError(error.message);
+      setIsLoading(false);
       onMeetingError?.(error.message);
     }
   }, [
-    assetsLoaded, isContainerReady, containerError, isReady, isJoining, isJoined,
-    meetingNumber, role, providedUserName, user, meetingPassword, getTokens,
-    joinMeeting, onMeetingJoined, client, retryCount, onMeetingError,
-    isSessionActive, forceLeaveSession, executeWithRetry, logStep
+    isReady, isJoining, isJoined, meetingNumber, role, providedUserName, 
+    user, meetingPassword, getTokens, joinMeeting, onMeetingJoined, 
+    client, isSessionActive, forceLeaveSession, onMeetingError
   ]);
 
   // Auto-join when ready
   useEffect(() => {
-    if (assetsLoaded && isContainerReady && isReady && !hasAttemptedJoinRef.current && !containerError) {
-      logStep('All prerequisites met - starting auto-join');
+    if (isReady && !hasAttemptedJoinRef.current && !error) {
+      console.log('🚀 SDK ready - starting join process');
       handleJoinMeeting();
     }
-  }, [assetsLoaded, isContainerReady, isReady, handleJoinMeeting, containerError, logStep]);
+  }, [isReady, handleJoinMeeting, error]);
 
   // Reset on meeting change
   useEffect(() => {
     hasAttemptedJoinRef.current = false;
-    resetRetry();
-    resetLogger();
-    setShowRecovery(false);
-  }, [meetingNumber, resetRetry, resetLogger]);
+    setError(null);
+    setIsLoading(true);
+    setLoadingStep('Initializing...');
+  }, [meetingNumber]);
 
-  // Recovery options
   const handleRetry = useCallback(() => {
-    logStep('Manual retry initiated');
-    resetRetry();
-    setShowRecovery(false);
+    setError(null);
+    setIsLoading(true);
+    setLoadingStep('Retrying...');
     hasAttemptedJoinRef.current = false;
     handleJoinMeeting();
-  }, [logStep, resetRetry, handleJoinMeeting]);
+  }, [handleJoinMeeting]);
 
-  const handleRefreshPage = useCallback(() => {
-    logStep('Page refresh initiated');
-    window.location.reload();
-  }, [logStep]);
-
-  const handleGoHome = useCallback(() => {
-    logStep('Navigating to calendar');
-    window.location.href = '/calendar';
-  }, [logStep]);
-
-  // Show recovery options if needed
-  if (showRecovery && (retryError || containerError)) {
-    const error = retryError || containerError || 'Unknown error occurred';
+  // Show error state
+  if (error) {
     return (
       <div className="w-full h-full flex items-center justify-center p-4">
-        <ZoomRecoveryOptions
-          error={error}
-          retryCount={retryCount}
-          maxRetries={maxRetries}
-          onRetry={handleRetry}
-          onGoHome={handleGoHome}
-          onRefreshPage={handleRefreshPage}
-          isRetrying={isRetrying}
-          loadingReport={getLoadingReport()}
-        />
+        <div className="text-center max-w-md">
+          <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-4" />
+          <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg">
+            <p className="text-red-600 font-medium">Unable to Join Meeting</p>
+            <p className="text-red-500 text-sm mt-1">{error}</p>
+          </div>
+          
+          <div className="space-y-2">
+            <Button onClick={handleRetry} className="w-full">
+              Try Again
+            </Button>
+            <Button 
+              variant="outline" 
+              onClick={() => window.location.reload()} 
+              className="w-full"
+            >
+              Refresh Page
+            </Button>
+            <Button 
+              variant="ghost" 
+              onClick={() => window.location.href = '/calendar'} 
+              className="w-full"
+            >
+              Back to Calendar
+            </Button>
+          </div>
+        </div>
       </div>
     );
   }
 
   return (
     <div className="w-full h-full relative">
-      {/* Loading overlay with enhanced information */}
-      <ZoomLoadingOverlay
-        isLoading={!isJoined && !showRecovery}
-        currentStep={
-          !assetsLoaded ? 'Loading Zoom components...' :
-          !isContainerReady ? 'Preparing meeting interface...' :
-          !isReady ? 'Initializing Zoom SDK...' :
-          isJoining ? 'Connecting to meeting...' :
-          'Finalizing connection...'
-        }
-        meetingNumber={meetingNumber}
-        retryCount={retryCount}
-        maxRetries={maxRetries}
-      />
+      {/* Loading overlay */}
+      {isLoading && (
+        <div className="absolute inset-0 bg-gray-900 flex items-center justify-center z-50">
+          <div className="text-center text-white">
+            <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4" />
+            <p className="text-lg">{loadingStep}</p>
+            <p className="text-sm text-gray-400 mt-2">Meeting ID: {meetingNumber}</p>
+          </div>
+        </div>
+      )}
       
       <div 
         id="meetingSDKElement"
