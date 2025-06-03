@@ -24,6 +24,22 @@
 
   <body>
     <div id="root"></div>
+    <!-- Preload local Zoom SDK assets -->
+    <script>
+      // Preload critical SDK assets to ensure they're available
+      const preloadAssets = [
+        '/lib/js_media.min.js',
+        '/lib/av/zoom-meeting-embedded-3.13.2.min.js'
+      ];
+      
+      preloadAssets.forEach(asset => {
+        const link = document.createElement('link');
+        link.rel = 'preload';
+        link.href = asset;
+        link.as = 'script';
+        document.head.appendChild(link);
+      });
+    </script>
     <!-- IMPORTANT: DO NOT REMOVE THIS SCRIPT TAG OR THIS VERY COMMENT! -->
     <script src="https://cdn.gpteng.co/gptengineer.js" type="module"></script>
     <script type="module" src="/src/main.tsx"></script>
